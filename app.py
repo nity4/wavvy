@@ -3,6 +3,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import matplotlib.pyplot as plt
+from PIL import Image
 
 # Spotify API credentials stored in Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -15,91 +16,98 @@ SCOPE = 'user-top-read user-read-recently-played'
 # Initialize Spotify OAuth
 sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=SCOPE)
 
-# Streamlit App Layout
+# Streamlit App Layout - Set Dark Theme
 st.set_page_config(page_title="Wavvy 〰", page_icon="〰", layout="centered", initial_sidebar_state="collapsed")
+
+# Apply Dark Mode CSS
+st.markdown(
+    """
+    <style>
+    body {
+        background-color: #1c1c1e;
+        color: white;
+    }
+    .stButton>button {
+        background-color: #ff5f6d;
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True
+)
 
 # Initialize session state for token persistence
 if 'token_info' not in st.session_state:
     st.session_state['token_info'] = None
 
-# Check if the user has authorized Spotify
-if st.session_state['token_info']:
-    # Access token is already available
-    sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
-    st.success("Spotify Authorization Successful!")
+# Define a function to display top tracks with album covers
+def display_top_tracks(sp):
+    st.header("Your Top Tracks & Albums 🎶")
+    top_tracks = sp.current_user_top_tracks(limit=10)
+    for track in top_tracks['items']:
+        album_cover = track['album']['images'][0]['url']
+        track_name = track['name']
+        artist_name = track['artists'][0]['name']
+        st.image(album_cover, width=150)
+        st.write(f"**{track_name}** by *{artist_name}*")
+        st.write("---")
 
-    # Fetch Top Tracks from Spotify
-    st.header("Your Top Tracks & Emotional Waves 🌊")
-    top_tracks = sp.current_user_top_tracks(limit=20)
-
-    track_names = [track['name'] for track in top_tracks['items']]
-    track_artists = [track['artists'][0]['name'] for track in top_tracks['items']]
-
-    # Display top tracks
-    st.subheader("Your Recent Emotional Journey")
-    st.write("Here are your top songs from the last few months, reflecting your mood and emotions.")
+# Define a function to show emotional insights (simplified bar charts)
+def display_emotional_insights():
+    st.header("Emotional Insights 🎧")
+    st.write("Here are your emotional insights based on your recent listening:")
     
-    df_tracks = pd.DataFrame({'Track': track_names, 'Artist': track_artists})
-    st.dataframe(df_tracks)
-
-    # Mock emotional tone analysis (replace with actual analysis or API later)
-    mood_data = {
-        'Track': track_names,
-        'Happiness': [80, 70, 60, 90, 50, 40, 80, 90, 60, 75, 45, 65, 85, 95, 50, 55, 80, 60, 70, 80],
-        'Energy': [60, 70, 40, 80, 55, 30, 75, 90, 60, 80, 40, 50, 70, 80, 50, 40, 60, 80, 60, 75],
-        'Calmness': [40, 30, 80, 50, 60, 85, 40, 30, 80, 60, 85, 70, 55, 35, 80, 85, 60, 50, 65, 40]
+    # Example data for emotional analysis
+    emotional_data = {
+        'Track': ['Song 1', 'Song 2', 'Song 3', 'Song 4'],
+        'Happiness': [80, 60, 90, 75],
+        'Energy': [50, 70, 85, 65],
+        'Calmness': [60, 55, 40, 80]
     }
-    mood_df = pd.DataFrame(mood_data)
+    df_emotions = pd.DataFrame(emotional_data)
 
-    # Visualize Emotional Journey - Black Background
-    st.subheader("Your Emotional WaveMap")
-    fig, ax = plt.subplots()
-    ax.plot(mood_df['Track'], mood_df['Happiness'], label="Happiness", marker='o', color='yellow')
-    ax.plot(mood_df['Track'], mood_df['Energy'], label="Energy", marker='s', color='cyan')
-    ax.plot(mood_df['Track'], mood_df['Calmness'], label="Calmness", marker='^', color='magenta')
+    # Plot simplified horizontal bar charts for emotional insights
+    for i, row in df_emotions.iterrows():
+        st.write(f"**{row['Track']}**")
+        st.write("Emotional Scores:")
+        st.write(f"Happiness: {row['Happiness']} | Energy: {row['Energy']} | Calmness: {row['Calmness']}")
+        st.bar_chart(pd.DataFrame([row[['Happiness', 'Energy', 'Calmness']]]))
 
-    # Customize plot appearance
-    ax.set_facecolor("black")
-    ax.tick_params(axis='x', rotation=90, colors='white')
-    ax.tick_params(axis='y', colors='white')
-    ax.spines['top'].set_color('white')
-    ax.spines['right'].set_color('white')
-    ax.spines['left'].set_color('white')
-    ax.spines['bottom'].set_color('white')
+# Define a function to display the Wavvy Wellness Score
+def display_wavvy_wellness():
+    st.header("Your Wavvy Wellness Score 🌟")
+    st.write("Based on your recent emotional journey through music, here’s your wellness score:")
+    
+    # Example wellness score
+    happiness_score = 75
+    calmness_score = 65
+    energy_score = 70
+    avg_wellness_score = (happiness_score + calmness_score + energy_score) / 3
+    
+    st.metric(label="Overall Wellness Score", value=f"{avg_wellness_score:.2f}/100")
+    st.write("This score reflects your emotional balance based on your recent listening habits. Keep riding the waves of your emotions through music!")
 
-    plt.title("Your Emotional WaveMap", color='white')
-    plt.xlabel("Tracks", color='white')
-    plt.ylabel("Emotional Levels", color='white')
-    plt.legend(loc="upper left", facecolor='black', edgecolor='white')
+# Main Flow of the App
+if st.session_state['token_info']:
+    sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
+    
+    # Use a radio button to move between sections
+    section = st.radio("Explore your music journey", ["Top Tracks", "Emotional Insights", "Wellness Score"])
 
-    # Show plot
-    st.pyplot(fig)
+    if section == "Top Tracks":
+        display_top_tracks(sp)
+    elif section == "Emotional Insights":
+        display_emotional_insights()
+    elif section == "Wellness Score":
+        display_wavvy_wellness()
 
-    # Show a summary (Wavvy Wellness Score - mocked here)
-    st.subheader("Your Wavvy Wellness Score")
-    happiness_score = mood_df['Happiness'].mean()
-    calmness_score = mood_df['Calmness'].mean()
-    energy_score = mood_df['Energy'].mean()
-
-    st.write(f"**Happiness:** {happiness_score:.2f} / 100")
-    st.write(f"**Calmness:** {calmness_score:.2f} / 100")
-    st.write(f"**Energy:** {energy_score:.2f} / 100")
-
-    st.write("Based on your recent listening patterns, your **Wavvy Wellness Score** reflects your emotional balance. "
-             "Keep riding the emotional waves with your music! 🌊")
-
-# Handle the Spotify authorization flow
 elif "code" in st.experimental_get_query_params():
-    # If we have an authorization code in the query parameters, exchange it for an access token
     code = st.experimental_get_query_params()["code"][0]
     token_info = sp_oauth.get_access_token(code)
-
-    # Store the token in session_state and reload the app to proceed
     st.session_state['token_info'] = token_info
     st.experimental_rerun()
 
 else:
-    # If there's no access token, show the authorization button
-    st.write("To begin, authorize Wavvy to access your Spotify data.")
+    st.write("Welcome to **Wavvy** 〰")
+    st.write("Wavvy offers you a personal reflection on your emotional journey through music.")
     auth_url = sp_oauth.get_authorize_url()
     st.markdown(f'<a href="{auth_url}" target="_self">Click here to authorize with Spotify</a>', unsafe_allow_html=True)
