@@ -105,11 +105,8 @@ elif "code" in query_params:
     # Store the token in session_state
     st.session_state['token_info'] = token_info
 
-    # Now create a Spotify API client with the token
-    sp = spotipy.Spotify(auth=token_info["access_token"])
-
-    # Reload the app with the token set in session state
-    st.experimental_rerun()
+    # Provide a simple message for the user to refresh the page manually
+    st.write("Spotify authorization successful! Please refresh the page to continue.")
 else:
     # If there's no access token, ask the user to authorize with Spotify
     auth_url = sp_oauth.get_authorize_url()
