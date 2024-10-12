@@ -16,7 +16,11 @@ SCOPE = 'user-top-read user-read-recently-played'
 sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=SCOPE)
 
 # Streamlit App Layout
-st.set_page_config(page_title="Wavvy", page_icon="〰", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Wavvy 〰", page_icon="〰", layout="centered", initial_sidebar_state="collapsed")
+
+# Initialize session state for token persistence
+if 'token_info' not in st.session_state:
+    st.session_state['token_info'] = None
 
 # First Page - Welcome Message
 st.title("Welcome to Wavvy 〰")
@@ -25,22 +29,14 @@ st.write("Wavvy offers you a deep, personal reflection on your emotional journey
 
 st.write("To begin, authorize Wavvy to access your Spotify data.")
 
-# Spotify Authorization
-if st.button("Authorize with Spotify"):
-    auth_url = sp_oauth.get_authorize_url()
-    st.markdown(f"[Click here to authorize with Spotify]({auth_url})")
+# Get the current URL parameters to check for authorization code
+query_params = st.experimental_get_query_params()
 
-# Get token after user authorization
-if 'code' not in st.session_state:
-    token_info = sp_oauth.get_access_token()
-    sp = spotipy.Spotify(auth=token_info['access_token'])
-else:
-    sp = None
-
-# Check if Spotify authentication is successful
-if sp:
-    st.success("Spotify Authentication Successful!")
-
+# If the user has authorized and we have an access token in session_state, use it
+if st.session_state['token_info']:
+    sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
+    st.success("Spotify Authorization Successful!")
+    
     # Fetch Top Tracks from Spotify
     st.header("Your Top Tracks & Emotional Waves 🌊")
     top_tracks = sp.current_user_top_tracks(limit=20)
@@ -101,3 +97,20 @@ if sp:
     st.write("Based on your recent listening patterns, your **Wavvy Wellness Score** reflects your emotional balance. "
              "Keep riding the emotional waves with your music! 🌊")
 
+elif "code" in query_params:
+    # If we have an authorization code in the query parameters, exchange it for an access token
+    code = query_params["code"][0]
+    token_info = sp_oauth.get_access_token(code)
+
+    # Store the token in session_state
+    st.session_state['token_info'] = token_info
+
+    # Now create a Spotify API client with the token
+    sp = spotipy.Spotify(auth=token_info["access_token"])
+
+    # Reload the app with the token set in session state
+    st.experimental_rerun()
+else:
+    # If there's no access token, ask the user to authorize with Spotify
+    auth_url = sp_oauth.get_authorize_url()
+    st.markdown(f'<a href="{auth_url}" target="_self">Click here to authorize with Spotify</a>', unsafe_allow_html=True)
