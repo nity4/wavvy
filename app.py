@@ -22,21 +22,12 @@ st.set_page_config(page_title="Wavvy 〰", page_icon="〰", layout="centered", i
 if 'token_info' not in st.session_state:
     st.session_state['token_info'] = None
 
-# First Page - Welcome Message
-st.title("Welcome to Wavvy 〰")
-st.write("Wavvy offers you a deep, personal reflection on your emotional journey through music. "
-         "Let's discover how your favorite tracks reflect your moods and enhance your well-being.")
-
-st.write("To begin, authorize Wavvy to access your Spotify data.")
-
-# Get the current URL parameters to check for authorization code
-query_params = st.experimental_get_query_params()
-
-# If the user has authorized and we have an access token in session_state, use it
+# Check if the user has authorized Spotify
 if st.session_state['token_info']:
+    # Access token is already available
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
     st.success("Spotify Authorization Successful!")
-    
+
     # Fetch Top Tracks from Spotify
     st.header("Your Top Tracks & Emotional Waves 🌊")
     top_tracks = sp.current_user_top_tracks(limit=20)
@@ -97,17 +88,18 @@ if st.session_state['token_info']:
     st.write("Based on your recent listening patterns, your **Wavvy Wellness Score** reflects your emotional balance. "
              "Keep riding the emotional waves with your music! 🌊")
 
-elif "code" in query_params:
+# Handle the Spotify authorization flow
+elif "code" in st.experimental_get_query_params():
     # If we have an authorization code in the query parameters, exchange it for an access token
-    code = query_params["code"][0]
+    code = st.experimental_get_query_params()["code"][0]
     token_info = sp_oauth.get_access_token(code)
 
-    # Store the token in session_state
+    # Store the token in session_state and reload the app to proceed
     st.session_state['token_info'] = token_info
+    st.experimental_rerun()
 
-    # Provide a simple message for the user to refresh the page manually
-    st.write("Spotify authorization successful! Please refresh the page to continue.")
 else:
-    # If there's no access token, ask the user to authorize with Spotify
+    # If there's no access token, show the authorization button
+    st.write("To begin, authorize Wavvy to access your Spotify data.")
     auth_url = sp_oauth.get_authorize_url()
     st.markdown(f'<a href="{auth_url}" target="_self">Click here to authorize with Spotify</a>', unsafe_allow_html=True)
