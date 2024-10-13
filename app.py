@@ -259,7 +259,7 @@ def personality_page(sp):
 if is_authenticated():
     try:
         refresh_token()
-        sp = spotipy.Spotipy(auth=st.session_state['token_info']['access_token'])
+        sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
         # Reorganizing the Page Flow
         page = st.sidebar.radio("Navigation", [
