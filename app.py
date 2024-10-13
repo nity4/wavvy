@@ -156,7 +156,7 @@ def discover_music_by_feelings(sp):
     except Exception as e:
         st.error(f"Error curating your playlist: {e}")
 
-# Top Songs, Artists, and Genres with Insights
+# Interesting Insights on Top Songs, Artists, and Genres Page
 def get_top_items_with_insights(sp):
     st.header("Your Top Songs, Artists, and Genres")
     time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
@@ -182,10 +182,11 @@ def get_top_items_with_insights(sp):
     genre_df = pd.DataFrame(top_genres, columns=['Genre'])
     st.table(genre_df)
 
-    # Insights at the Bottom
-    st.write("## Insights")
-    st.write("**Total Tracks Played This Week:** 120")  # Replace with actual values
-    st.write("**Total Minutes Listened:** 320 minutes")  # Replace with actual values
+    # Interesting Insights
+    st.write("### Some Fun Insights")
+    st.write(f"**Most Listened Artist:** {top_artists['items'][0]['name']}")
+    st.write(f"**Most Played Song:** {top_tracks['items'][0]['name']}")
+    st.write(f"**Most Common Genre:** {genre_df['Genre'].mode()[0]}")
 
 # Listening Time Insights (Daily Listening for the Past Week)
 def get_listening_time_insights(sp):
@@ -218,20 +219,11 @@ def personality_page(sp):
 
     # Display Personality Name and Color
     st.markdown(f"<div style='background-color:{color}; padding:20px;'><h2>{personality_name}</h2></div>", unsafe_allow_html=True)
-    st.write(f"As a **{personality_name}**, you're someone who loves to vibe with **{dominant_genre}** music. You explore a lot of genres and enjoy blending different styles.")
-
-    # Total Tracks Played and Total Minutes Listened
-    total_tracks = 100  # Replace with actual data
-    total_minutes = 250  # Replace with actual data
-
-    # Display Total Stats Below the Graph
-    daily_listening, daily_minutes = get_listening_time_insights(sp)
-
-    st.write(f"**Total Tracks Played This Week:** {total_tracks}")
-    st.write(f"**Total Minutes Listened This Week:** {total_minutes} minutes")
+    st.write(f"As a **{personality_name}**, you love to vibe with **{dominant_genre}** music. Your music taste reflects your unique style and bold personality, which is why we gave you the color **{color}**—symbolizing creativity and energy!")
 
     # Display Listening Stats (Graph)
     st.subheader("Your Listening Stats Over the Last Week")
+    daily_listening, daily_minutes = get_listening_time_insights(sp)
     daily_tracks = daily_listening.values
     days = list(daily_listening.index)
     minutes_listened = list(daily_minutes.values())
@@ -264,6 +256,13 @@ def personality_page(sp):
 
     st.pyplot(fig)
 
+    # Total Tracks Played and Total Minutes Listened
+    total_tracks = sum(daily_tracks)  # Replace with actual data
+    total_minutes = sum(minutes_listened)  # Replace with actual data
+
+    st.write(f"**Total Tracks Played This Week:** {total_tracks}")
+    st.write(f"**Total Minutes Listened This Week:** {total_minutes} minutes")
+
 # Main App Layout
 if is_authenticated():
     try:
@@ -280,7 +279,6 @@ if is_authenticated():
         if page == "Wavvy":
             discover_music_by_feelings(sp)
         elif page == "Your Top Hits":
-            st.header("Your Top Hits and Insights")
             get_top_items_with_insights(sp)
         elif page == "Music Personality":
             personality_page(sp)
