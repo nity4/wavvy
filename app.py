@@ -2,6 +2,8 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import random
+import pandas as pd
+import matplotlib.pyplot as plt
 import time
 
 # Spotify API credentials from Streamlit Secrets
@@ -16,74 +18,6 @@ sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redire
 
 # Streamlit App Layout with Sleek Design
 st.set_page_config(page_title="Wavvy", page_icon="🌊", layout="centered", initial_sidebar_state="collapsed")
-
-# Custom CSS for modern and interactive design
-st.markdown(
-    """
-    <style>
-    body {
-        background-color: #f5f5f5;
-        color: #000000;
-        font-family: 'Roboto', sans-serif;
-    }
-    .stButton>button {
-        background-color: #0073e6;
-        color: #ffffff;
-        border-radius: 12px;
-        font-size: 1rem;
-        padding: 0.5rem;
-        transition: background-color 0.3s ease;
-    }
-    .stButton>button:hover {
-        background-color: #ff4081;
-    }
-    .stImage {
-        border-radius: 15px;
-        margin-bottom: 12px;
-    }
-    h1, h2, h3 {
-        font-weight: 400;
-        color: #ff4081;
-    }
-    .insight-box {
-        background-color: #ffffff;
-        border-radius: 15px;
-        padding: 15px;
-        margin-left: 20px;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
-    }
-    .insight-header {
-        color: #0073e6;
-        font-size: 1.2rem;
-        font-weight: bold;
-    }
-    .insight-detail {
-        color: #000000;
-        font-size: 1rem;
-        margin-top: 10px;
-    }
-    .fun-personality {
-        font-size: 2rem;
-        font-weight: bold;
-    }
-    .fun-bg {
-        width: 100%;
-        height: 50px;
-        margin-bottom: 20px;
-        border-radius: 5px;
-    }
-    .loading {
-        font-size: 1.5rem;
-        color: #ff4081;
-        font-weight: bold;
-    }
-    .insight {
-        font-size: 1rem;
-        padding: 5px;
-    }
-    </style>
-    """, unsafe_allow_html=True
-)
 
 # Helper Functions
 
@@ -135,7 +69,7 @@ def fetch_audio_features_in_batches(sp, song_ids):
 
     return features
 
-# The missing filter_liked_songs_by_mood function
+# Function to match mood and intensity to liked songs
 def filter_liked_songs_by_mood(track_features, feeling, intensity):
     filtered_songs = []
     fallback_songs = []
@@ -168,21 +102,6 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
 
     # If no exact matches found, return fallback songs
     return filtered_songs if filtered_songs else fallback_songs
-
-# Function to fetch top artists and compare for new artist discovery
-def get_new_artists(sp, time_range):
-    # Fetch the user's long-term top artists to act as the baseline
-    long_term_artists = sp.current_user_top_artists(time_range='long_term', limit=50)['items']
-    long_term_artist_names = set(artist['name'] for artist in long_term_artists)
-    
-    # Fetch top artists for the selected time frame (week, month, year)
-    time_frame_artists = sp.current_user_top_artists(time_range=time_range, limit=50)['items']
-    time_frame_artist_names = set(artist['name'] for artist in time_frame_artists)
-    
-    # Identify new artists in the selected time frame that are not in the long-term baseline
-    new_artists = time_frame_artist_names - long_term_artist_names
-    
-    return len(new_artists), new_artists  # Return the count of new artists and their names
 
 # Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
@@ -232,56 +151,43 @@ def get_top_items_with_insights(sp):
     # Fetch new artist discovery for the current time range
     new_artist_count, new_artists = get_new_artists(sp, spotify_time_range)
 
-    col1, col2 = st.columns([2, 1])
+    # Create a table format for songs, artists, and genres
+    st.subheader("Your Top Songs")
+    for i, track in enumerate(top_tracks['items']):
+        st.write(f"{i+1}. {track['name']} by {track['artists'][0]['name']}")
+        st.image(track['album']['images'][0]['url'], width=60)
 
-    # Display top songs, artists, and genres on the left (col1)
-    with col1:
-        if top_tracks['items']:
-            st.subheader("Your Top Songs")
-            for i, track in enumerate(top_tracks['items']):
-                song_name = track['name']
-                artist_name = track['artists'][0]['name']
-                album_cover = track['album']['images'][0]['url']
-                st.image(album_cover, width=100, caption=f"{song_name} by {artist_name}")
+    st.subheader("Your Top Artists")
+    for i, artist in enumerate(top_artists['items']):
+        st.write(f"{i+1}. {artist['name']}")
+        st.image(artist['images'][0]['url'], width=60)
 
-        if top_artists['items']:
-            st.subheader("Your Top Artists")
-            for i, artist in enumerate(top_artists['items']):
-                artist_name = artist['name']
-                artist_cover = artist['images'][0]['url']
-                st.image(artist_cover, width=100, caption=f"{artist_name}")
+    st.subheader("Your Top Genres")
+    genre_df = pd.DataFrame(top_genres, columns=['Genre'])
+    st.table(genre_df)
 
-        if top_genres:
-            st.subheader("Your Top Genres")
-            unique_genres = list(set(top_genres))[:5]
-            if unique_genres:
-                st.write("You're currently into these genres:")
-                for genre in unique_genres:
-                    icon = "🎸" if "rock" in genre else "🎶"
-                    st.write(f"<span class='genre-icon'>{icon}</span> {genre.capitalize()}", unsafe_allow_html=True)
+    # Display insights in a persistent insight box
+    st.markdown('<div class="insight-box">', unsafe_allow_html=True)
+    st.markdown('<div class="insight-header">Creative Insights</div>', unsafe_allow_html=True)
 
-    # Display insights on the right (col2) inside a box
-    with col2:
-        st.markdown('<div class="insight-box">', unsafe_allow_html=True)
-        st.markdown('<div class="insight-header">Creative Insights</div>', unsafe_allow_html=True)
+    genre_count = len(set(top_genres))
+    st.write(f"<div class='insight-detail'>You've explored {genre_count} different genres. You have a broad taste in music!</div>", unsafe_allow_html=True)
 
-        genre_count = len(set(top_genres))
-        st.write(f"<div class='insight-detail'>You've explored {genre_count} different genres. You have a broad taste in music!</div>", unsafe_allow_html=True)
+    st.write(f"<div class='insight-detail'>You've discovered {new_artist_count} new artists during this {time_range.lower()}.</div>", unsafe_allow_html=True)
 
-        # Display new artist discovery insight
-        st.write(f"<div class='insight-detail'>You've discovered {new_artist_count} new artists during this {time_range.lower()}.</div>", unsafe_allow_html=True)
+    adventurous_genre = random.choice(top_genres) if top_genres else "pop"
+    st.write(f"<div class='insight-detail'>Your most adventurous genre is {adventurous_genre.capitalize()}, you're always looking for something unique!</div>", unsafe_allow_html=True)
 
-        adventurous_genre = random.choice(unique_genres) if unique_genres else "pop"
-        st.write(f"<div class='insight-detail'>Your most adventurous genre is {adventurous_genre.capitalize()}, you're always looking for something unique!</div>", unsafe_allow_html=True)
+    most_played_song = top_tracks['items'][0]['name'] if top_tracks['items'] else "None"
+    st.write(f"<div class='insight-detail'>The song you can't get enough of this {time_range.lower()} is {most_played_song}!</div>", unsafe_allow_html=True)
 
-        # A standout insight: Song most played during a specific time
-        if top_tracks['items']:
-            most_played_song = top_tracks['items'][0]['name']
-            st.write(f"<div class='insight-detail'>The song you can't get enough of this {time_range.lower()} is {most_played_song}!</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Displaying Data Charts for Visual Insights
+    genre_chart = genre_df['Genre'].value_counts().plot(kind='bar', title='Top Genres Distribution')
+    st.pyplot(plt)
 
-# Personality Page with loading effect
+# Personality Page
 def personality_page(sp):
     st.header("Building Your Music Personality...")
 
@@ -290,7 +196,7 @@ def personality_page(sp):
     top_genres = [genre for artist in top_tracks['items'] for genre in artist['artists'][0].get('genres', [])]
     
     # Define a consistent personality based on the user's top genres and tracks
-    genre_preference = random.choice(top_genres) if top_genres else "pop"
+    genre_preference = random.choice(top_genes) if top_genres else "pop"
     personality_map = {
         "pop": ("Groove Enthusiast", "#ffd700"),
         "rock": ("Melody Explorer", "#ff4081"),
@@ -314,24 +220,10 @@ def personality_page(sp):
     # Display personality
     st.markdown(f'<div class="fun-bg" style="background-color:{associated_color};"></div>', unsafe_allow_html=True)
     st.markdown(f'<div class="fun-personality" style="color:{associated_color};">{fun_personality_name}</div>', unsafe_allow_html=True)
-    
+
     # Personality description in Gen Z lingo
     st.write(f"As a **{fun_personality_name}**, you vibe with music that takes you places. You're not just listening—you're living.")
     st.write("You love to mix it up, keeping things fresh and never settling for the mainstream. Your playlist is as unique as you are.")
-    st.write("You're the kind of person who discovers new tracks before anyone else. Keep being the trendsetter you are!")
-    
-    # Awarding a fun "Music Trophy" based on personality
-    music_trophies = {
-        "Groove Enthusiast": "Golden Ear Trophy 🏆",
-        "Melody Explorer": "Beat King/Queen Crown 👑",
-        "Rhythm Wanderer": "Sound Explorer's Badge 🏅",
-        "Harmony Seeker": "Harmony Master Medallion 🎖️",
-        "Beat Adventurer": "Adventure Beat Trophy 🏆",
-        "Vibe Creator": "Vibe Star Medal 🌟",
-        "Tempo Navigator": "Tempo Master Cup 🏆"
-    }
-    
-    st.subheader(f"You've earned the {music_trophies[fun_personality_name]}!")
 
 # Main App Flow
 if is_authenticated():
