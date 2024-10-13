@@ -17,7 +17,7 @@ SCOPE = 'user-library-read user-top-read user-read-recently-played'
 sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=SCOPE)
 
 # App Layout and Configuration
-st.set_page_config(page_title="VibeCheck", page_icon="🎧", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Wvvy", page_icon="〰", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""
     <style>
     .main {
@@ -36,7 +36,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown("<div class='header-title'>VibeCheck</div>", unsafe_allow_html=True)
+st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
 
 # Authentication Functions
 def is_authenticated():
@@ -95,6 +95,37 @@ def fetch_audio_features_in_batches(sp, song_ids):
     
     return features
 
+# Filter Liked Songs by Mood
+def filter_liked_songs_by_mood(track_features, feeling, intensity):
+    filtered_songs = []
+    fallback_songs = []
+
+    for track in track_features:
+        valence = track.get('valence', 0)
+        energy = track.get('energy', 0)
+        danceability = track.get('danceability', 0)
+        score = 0
+
+        if feeling == "Happy":
+            score += (valence - 0.6) * 10 + (energy - intensity / 5) * 5
+        elif feeling == "Sad":
+            score += (0.3 - valence) * 10 + (energy - 0.4) * 5
+        elif feeling == "Chill":
+            score += (0.4 - energy) * 7 + (danceability - 0.4) * 5
+        elif feeling == "Hype":
+            score += (energy - 0.7) * 12
+        elif feeling == "Romantic":
+            score += (valence - 0.5) * 5 + (danceability - 0.4) * 5
+        elif feeling == "Adventurous":
+            score += danceability * 5 + energy * 3
+
+        if score > intensity * 1.2:
+            filtered_songs.append(track)
+        elif score > intensity * 0.8:
+            fallback_songs.append(track)
+
+    return filtered_songs if filtered_songs else fallback_songs
+
 # Function for Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
     st.header("Curate Your Vibe")
@@ -151,6 +182,11 @@ def get_top_items_with_insights(sp):
     genre_df = pd.DataFrame(top_genres, columns=['Genre'])
     st.table(genre_df)
 
+    # Insights at the Bottom
+    st.write("## Insights")
+    st.write("**Total Tracks Played This Week:** 120")  # Replace with actual values
+    st.write("**Total Minutes Listened:** 320 minutes")  # Replace with actual values
+
 # Listening Time Insights (Daily Listening for the Past Week)
 def get_listening_time_insights(sp):
     recent_tracks = sp.current_user_recently_played(limit=50)
@@ -164,64 +200,35 @@ def get_listening_time_insights(sp):
     
     return daily_listening, daily_minutes
 
-# Genre Evolution Over Time
-def get_genre_evolution(sp):
-    top_artists_long_term = sp.current_user_top_artists(time_range='long_term', limit=50)['items']
-    top_artists_short_term = sp.current_user_top_artists(time_range='short_term', limit=50)['items']
-    
-    long_term_genres = [genre for artist in top_artists_long_term for genre in artist['genres']]
-    short_term_genres = [genre for artist in top_artists_short_term for genre in artist['genres']]
-
-    # Display Top Genres
-    unique_long_term_genres = set(long_term_genres)
-    unique_short_term_genres = set(short_term_genres)
-    new_genres = unique_short_term_genres - unique_long_term_genres
-    
-    return unique_long_term_genres, new_genres
-
-# Mainstream vs Niche Insight
-def get_niche_vs_mainstream_insight(sp, top_tracks):
-    popularity_scores = [track['popularity'] for track in top_tracks['items']]
-    
-    avg_popularity = sum(popularity_scores) / len(popularity_scores)
-    return avg_popularity
-
 # Music Personality Page (Create Profile)
 def personality_page(sp):
     st.header("Your Music Personality")
 
-    top_tracks = sp.current_user_top_tracks(time_range='long_term', limit=50)
-    top_artists = sp.current_user_top_artists(time_range='long_term', limit=5)
-    
-    # Listening Time and Track Count
-    daily_listening, daily_minutes = get_listening_time_insights(sp)
-    
     # Personality Traits and Colors
-    genre_names, new_genres = get_genre_evolution(sp)
-    genre_list = list(genre_names)
-    dominant_genre = random.choice(genre_list) if genre_list else "pop"
-    
+    genre_names = ["pop", "rock", "indie", "hip hop"]  # Demo genres
+    dominant_genre = random.choice(genre_names)
+
     personality_map = {
         "pop": ("Groove Enthusiast", "#ffd700"),
         "rock": ("Melody Explorer", "#ff4081"),
         "indie": ("Rhythm Wanderer", "#00ff7f"),
-        "jazz": ("Harmony Seeker", "#1e90ff"),
-        "electronic": ("Beat Adventurer", "#8a2be2"),
-        "hip hop": ("Vibe Creator", "#ff6347"),
-        "classical": ("Tempo Navigator", "#00ced1")
+        "hip hop": ("Vibe Creator", "#ff6347")
     }
     personality_name, color = personality_map.get(dominant_genre, ("Groove Enthusiast", "#ffd700"))
 
     # Display Personality Name and Color
     st.markdown(f"<div style='background-color:{color}; padding:20px;'><h2>{personality_name}</h2></div>", unsafe_allow_html=True)
-    st.write(f"Your music taste shows you're a **{personality_name}**. You vibe with {dominant_genre} music, and you're always on the lookout for something new.")
+    st.write(f"As a **{personality_name}**, you're someone who loves to vibe with **{dominant_genre}** music. You explore a lot of genres and enjoy blending different styles.")
 
-    # Display Total Stats
-    total_tracks = sum(daily_listening.values)
-    total_minutes = sum(daily_minutes.values())
-    
-    st.write(f"**Total Tracks Played:** {total_tracks}")
-    st.write(f"**Total Minutes Listened:** {total_minutes} minutes")
+    # Total Tracks Played and Total Minutes Listened
+    total_tracks = 100  # Replace with actual data
+    total_minutes = 250  # Replace with actual data
+
+    # Display Total Stats Below the Graph
+    daily_listening, daily_minutes = get_listening_time_insights(sp)
+
+    st.write(f"**Total Tracks Played This Week:** {total_tracks}")
+    st.write(f"**Total Minutes Listened This Week:** {total_minutes} minutes")
 
     # Display Listening Stats (Graph)
     st.subheader("Your Listening Stats Over the Last Week")
@@ -257,10 +264,6 @@ def personality_page(sp):
 
     st.pyplot(fig)
 
-    # Personality Insights
-    st.subheader("What Your Music Says About You")
-    st.write(f"As a **{personality_name}**, you're someone who loves to {dominant_genre} music. Whether it's chilling with some tracks or exploring new genres, your playlist is as unique as you are!")
-
 # Main App Layout
 if is_authenticated():
     try:
@@ -269,12 +272,12 @@ if is_authenticated():
 
         # Reorganizing the Page Flow
         page = st.sidebar.radio("Navigation", [
-            "Vibe Check", 
+            "Wavvy", 
             "Your Top Hits", 
             "Music Personality"
         ])
 
-        if page == "Vibe Check":
+        if page == "Wavvy":
             discover_music_by_feelings(sp)
         elif page == "Your Top Hits":
             st.header("Your Top Hits and Insights")
@@ -285,6 +288,6 @@ if is_authenticated():
     except Exception as e:
         st.error(f"Error loading the app: {e}")
 else:
-    st.write("Welcome to VibeCheck")
+    st.write("Welcome to Wvvy")
     st.write("Login to explore your personalized music experience.")
     authenticate_user()
