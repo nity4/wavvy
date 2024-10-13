@@ -2,7 +2,6 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import random
-import matplotlib.pyplot as plt
 import time
 
 # Spotify API credentials from Streamlit Secrets
@@ -46,28 +45,6 @@ st.markdown(
     h1, h2, h3 {
         font-weight: 400;
         color: #ff4081;
-    }
-    h1 {
-        font-size: 3.5rem;
-        margin-bottom: 1rem;
-    }
-    h2 {
-        font-size: 2rem;
-        margin-bottom: 1rem;
-    }
-    h3 {
-        font-size: 1.5rem;
-        margin-bottom: 1.5rem;
-    }
-    .album-cover {
-        display: inline-block;
-        margin: 10px;
-        text-align: center;
-    }
-    .artist-cover {
-        width: 150px;
-        height: 150px;
-        border-radius: 50%;
     }
     </style>
     """, unsafe_allow_html=True
@@ -124,59 +101,66 @@ def fetch_audio_features_in_batches(sp, song_ids):
 
     return features
 
-# Fetch top songs, artists, and genres with time range filter and fun insights
-def get_top_items(sp):
-    st.header("Your Top Songs, Artists, and Genres")
-    
-    # Allow users to select time range for insights
-    time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
-    
-    time_range_map = {
-        'This Week': 'short_term',
-        'This Month': 'medium_term',
-        'This Year': 'long_term'
-    }
-    
-    spotify_time_range = time_range_map[time_range]
-    st.write(f"Showing data for: **{time_range}**")
+# Mood-Based Music Discovery
+def discover_music_by_feelings(sp):
+    st.header("Curated Music for Your Mood")
+    st.write("Select your mood, and we'll build the perfect playlist.")
 
-    # Fetch top tracks
-    top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
-    if top_tracks['items']:
-        st.subheader("Your Top Songs")
-        for i, track in enumerate(top_tracks['items']):
-            song_name = track['name']
-            artist_name = track['artists'][0]['name']
-            album_cover = track['album']['images'][0]['url']
-            st.image(album_cover, width=150, caption=f"{i+1}. {song_name} by {artist_name}")
-    else:
-        st.write(f"No top songs for {time_range}.")
+    feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
+    intensity = st.slider(f"How {feeling} are you feeling?", 1, 10)
 
-    # Fetch top artists
-    top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
-    if top_artists['items']:
-        st.subheader("Your Top Artists")
-        for i, artist in enumerate(top_artists['items']):
-            artist_name = artist['name']
-            artist_cover = artist['images'][0]['url']
-            st.image(artist_cover, width=150, caption=f"{i+1}. {artist_name}")
-    else:
-        st.write(f"No top artists for {time_range}.")
+    try:
+        # Fetch recommended or liked songs, based on user selection
+        liked_songs = get_all_liked_songs(sp)
+        random.shuffle(liked_songs)
+        song_ids = [track['track']['id'] for track in liked_songs]
 
-    # Fetch top genres from top artists
-    if top_artists['items']:
-        st.subheader("Your Top Genres")
-        all_genres = [genre for artist in top_artists['items'] for genre in artist['genres']]
-        unique_genres = list(set(all_genres))[:5]  # Limit to 5 unique genres
+        # Fetch audio features in batches to avoid URL length issues
+        features = fetch_audio_features_in_batches(sp, song_ids)
 
-        if unique_genres:
-            st.write("You're currently into these genres:")
-            for genre in unique_genres:
-                st.write(f"🎶 - {genre.capitalize()}")
+        # Apply filters based on mood and intensity
+        filtered_songs = filter_songs_by_mood(features, feeling, intensity)
+
+        if filtered_songs:
+            st.subheader(f"Here's your {feeling.lower()} playlist:")
+            for i, feature in enumerate(filtered_songs[:10]):
+                song = liked_songs[i]['track']
+                song_name = song['name']
+                artist_name = song['artists'][0]['name']
+                album_cover = song['album']['images'][0]['url']
+                st.image(album_cover, width=150, caption=f"{song_name} by {artist_name}")
         else:
-            st.write(f"No genres found for {time_range}.")
-    else:
-        st.write(f"No top genres for {time_range}.")
+            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try tweaking the intensity or picking a different mood.")
+
+    except Exception as e:
+        st.error(f"Error curating your playlist: {e}")
+
+# Comprehensive insights and stats with improved flow
+def comprehensive_insights(sp):
+    st.header("Your Music Journey: Insights")
+
+    try:
+        # Fetch user's top items based on time range selection
+        time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1, key="insights_radio")
+        spotify_time_range = {
+            'This Week': 'short_term',
+            'This Month': 'medium_term',
+            'This Year': 'long_term'
+        }[time_range]
+
+        # Fetch top tracks
+        top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
+        # Fetch top artists
+        top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
+
+        # Display top items (songs, artists, genres)
+        get_top_items(sp)
+
+        # Show fun insights (pass the time_range variable to the function)
+        show_fun_insights(sp, top_artists, top_tracks, time_range)
+
+    except Exception as e:
+        st.error(f"Error fetching insights: {e}")
 
 # Fun insights pop-up after data is loaded
 def show_fun_insights(sp, top_artists, top_tracks, time_range):
@@ -201,32 +185,66 @@ def show_fun_insights(sp, top_artists, top_tracks, time_range):
     if repeat_songs:
         st.toast(f"You seem to love replaying **{repeat_songs}** quite a bit!")
 
-# Comprehensive insights and stats with improved flow
-def comprehensive_insights(sp):
-    st.header("Your Music Journey: Insights")
+# Music Personality and Color Assignment
+def assign_personality_and_color(genres):
+    genre_string = ', '.join([g for sublist in genres for g in sublist])
+    personality_map = {
+        "rock": ("Adventurer", "#ff3b30", "The Rock Warrior"),
+        "pop": ("Trendsetter", "#ffd700", "The Chart Topper"),
+        "jazz": ("Calm Soul", "#1e90ff", "The Smooth Operator"),
+        "electronic": ("Innovator", "#8a2be2", "The Beat Creator"),
+        "hip hop": ("Rebel", "#000000", "The Mic Dropper"),
+        "classical": ("Old Soul", "#ffa500", "The Timeless Genius"),
+        "blues": ("Sentimental", "#008080", "The Deep Thinker"),
+        "indie": ("Dreamer", "#ff6347", "The Free Spirit"),
+        "metal": ("Warrior", "#dc143c", "The Riff Master"),
+        "folk": ("Storyteller", "#8b4513", "The Poetic Soul"),
+        "reggae": ("Free Spirit", "#00ff00", "The Groove Rider"),
+        "country": ("Honest Heart", "#deb887", "The True Cowboy")
+    }
+
+    for genre, (personality, color, label) in personality_map.items():
+        if genre in genre_string:
+            return personality, color, label
+    return "Explorer", "#808080", "The Wanderer"  # Default if no match
+
+# Music Personality Analysis
+def music_personality_analysis(sp):
+    st.header("Discover Your Music Personality")
+    st.write("Let's analyze your music taste and assign you a unique music personality.")
 
     try:
-        # Fetch user's top items based on time range selection
-        time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
-        spotify_time_range = {
-            'This Week': 'short_term',
-            'This Month': 'medium_term',
-            'This Year': 'long_term'
-        }[time_range]
+        # Fetch top tracks and extract genres from albums
+        results = sp.current_user_top_tracks(limit=50)
+        top_genres = [track['album'].get('genres', []) for track in results['items'] if 'genres' in track['album']]
 
-        # Fetch top tracks
-        top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
-        # Fetch top artists
-        top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
+        # Flatten the list of genres
+        top_genres = [genre for sublist in top_genres for genre in sublist]
 
-        # Display top items (songs, artists, genres)
-        get_top_items(sp)
+        # Backup plan: if no genres found from tracks, use top artists' genres
+        if not top_genres:
+            st.write("Not enough genre data from your tracks, fetching your top artists for genre analysis...")
+            top_artists = sp.current_user_top_artists(limit=5)
+            top_genres = [genre for artist in top_artists['items'] for genre in artist.get('genres', [])]
 
-        # Show fun insights (pass the time_range variable to the function)
-        show_fun_insights(sp, top_artists, top_tracks, time_range)
+        # Analyze music personality based on genres
+        if top_genres:
+            st.write("Analyzing your music personality...")
+            progress_bar = st.progress(0)
+            for percent in range(100):
+                time.sleep(0.01)
+                progress_bar.progress(percent + 1)
+
+            # Assign personality based on the available genres
+            personality_type, color, label = assign_personality_and_color(top_genres)
+            st.markdown(f"<div class='personality-box' style='color:{color};'>You're a **{personality_type}**! ({label})</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='width:100%; height:120px; background-color:{color}; border-radius:10px;'></div>", unsafe_allow_html=True)
+            st.write(f"Your music color is {color}!")
+        else:
+            st.write("You're a mystery! We couldn't get enough data, so you're an Explorer with a Gray personality.")
 
     except Exception as e:
-        st.error(f"Error fetching insights: {e}")
+        st.error(f"Error analyzing your music personality: {e}")
 
 # Main App Flow
 if is_authenticated():
@@ -238,7 +256,7 @@ if is_authenticated():
             "Mood-Based Music Discovery", 
             "Your Music Insights", 
             "Your Music Personality"
-        ])
+        ], key="main_radio")
 
         if section == "Mood-Based Music Discovery":
             discover_music_by_feelings(sp)
