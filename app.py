@@ -104,14 +104,12 @@ def authenticate_user():
 
             return True  # Authentication is successful
 
-        # If not authenticated, provide the login link
-        else:
-            return False
+        # If not authenticated, return False and handle login prompt elsewhere
+        return False
 
     except Exception as e:
         st.error(f"Authentication error: {e}")
         return False
-
 
 # Main App Flow
 if authenticate_user():
@@ -120,13 +118,14 @@ if authenticate_user():
         refresh_token()
         sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
-        # Now you can proceed with your app's functionality
+        # Proceed with app functionality after authentication
         st.write("Welcome to your personalized music experience!")
         # Add more functionality here (e.g., mood-based discovery, insights, etc.)
 
     except Exception as e:
         st.error(f"Error loading the app: {e}")
 else:
+    # Only show the login message once when not authenticated
     st.write("Welcome to **Wavvy** 🌊")
     st.write("Login to explore your personalized music experience.")
     auth_url = sp_oauth.get_authorize_url()
