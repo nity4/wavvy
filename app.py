@@ -165,8 +165,7 @@ def filter_songs_by_mood(track_features, feeling, intensity, recent_genres):
             score += track.get('danceability', 0) * 5
 
         # Additional filter: check if the track matches recent genres to align with user's taste
-        track_genre = random.choice(recent_genres) if recent_genres else "pop"
-        if track_genre in recent_genres and score > intensity * 1.8:
+        if recent_genres and score > intensity * 1.8:
             filtered_songs.append(track)
     
     return filtered_songs
@@ -185,7 +184,8 @@ def discover_music_by_feelings(sp):
     try:
         if song_source == "Liked Songs":
             liked_songs = get_all_liked_songs(sp)
-            recent_genres = [track['track']['album']['genres'][0] for track in liked_songs if track['track']['album']['genres']]
+            # Extract genres only if available to avoid errors
+            recent_genres = [track['track']['album'].get('genres', ['pop'])[0] for track in liked_songs if 'genres' in track['track']['album'] and track['track']['album']['genres']]
             if len(liked_songs) > 0:
                 random.shuffle(liked_songs)
                 song_ids = [track['track']['id'] for track in liked_songs]
@@ -224,7 +224,7 @@ def get_top_items_with_insights(sp):
     # Fetch top tracks, artists, and genres
     top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
     top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
-    top_genres = [genre for artist in top_artists['items'] for genre in artist['genres']]
+    top_genres = [genre for artist in top_artists['items'] for genre in artist['genres'] if 'genres' in artist and artist['genres']]
 
     col1, col2 = st.columns([3, 1])
 
