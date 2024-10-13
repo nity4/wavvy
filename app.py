@@ -156,19 +156,20 @@ def filter_songs_by_mood(track_features, feeling, intensity):
     
     return filtered_songs
 
-# Fetch top songs, artists, and genres with time range filter and fun insights
-def get_top_items(sp):
-    st.header("Your Top Songs, Artists, and Genres")
-    
-    # Allow users to select time range for insights
+
+  # Fetch top songs, artists, and genres with a single time range filter and insights
+def get_top_items_with_insights(sp):
+    st.header("Your Top Songs, Artists, and Genres with Insights")
+
+    # Unified time range filter for all insights
     time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1, key="time_range_radio")
-    
+
     time_range_map = {
         'This Week': 'short_term',
         'This Month': 'medium_term',
         'This Year': 'long_term'
     }
-    
+
     spotify_time_range = time_range_map[time_range]
     st.write(f"Showing data for: **{time_range}**")
 
@@ -210,29 +211,33 @@ def get_top_items(sp):
     else:
         st.write(f"No top genres for {time_range}.")
 
-# Fun insights displayed on the page
-def show_fun_insights(sp, top_artists, top_tracks, time_range):
-    st.subheader(f"Fun insights for **{time_range}**:")
+    # Show insights in a fixed "popup" style on the side
+    with st.sidebar:
+        st.markdown('<div class="popup">', unsafe_allow_html=True)
+        st.subheader(f"Fun insights for **{time_range}**:")
 
-    most_played_artist = top_artists['items'][0]['name'] if top_artists['items'] else 'Unknown Artist'
-    most_played_song = top_tracks['items'][0]['name'] if top_tracks['items'] else 'Unknown Song'
+        most_played_artist = top_artists['items'][0]['name'] if top_artists['items'] else 'Unknown Artist'
+        most_played_song = top_tracks['items'][0]['name'] if top_tracks['items'] else 'Unknown Song'
 
-    st.write(f"🎤 Your most played artist of {time_range} is **{most_played_artist}**.")
-    st.write(f"🎵 Your most played song of {time_range} is **{most_played_song}**.")
+        st.write(f"🎤 Your most played artist of {time_range} is **{most_played_artist}**.")
+        st.write(f"🎵 Your most played song of {time_range} is **{most_played_song}**.")
 
-    # Fun fact: Number of new artists discovered
-    new_artists = len(set(track['artists'][0]['name'] for track in top_tracks['items']))
-    st.write(f"🌟 You've discovered **{new_artists}** new artists this {time_range.lower()}.")
+        # Fun fact: Number of new artists discovered
+        new_artists = len(set(track['artists'][0]['name'] for track in top_tracks['items']))
+        st.write(f"🌟 You've discovered **{new_artists}** new artists this {time_range.lower()}.")
 
-    # Fun fact: Genre diversity
-    all_genres = [genre for artist in top_artists['items'] for genre in artist['genres']]
-    genre_count = len(set(all_genres))
-    st.write(f"🎶 Your listening span covered **{genre_count}** unique genres!")
+        # Fun fact: Genre diversity
+        all_genres = [genre for artist in top_artists['items'] for genre in artist['genres']]
+        genre_count = len(set(all_genres))
+        st.write(f"🎶 Your listening span covered **{genre_count}** unique genres!")
 
-    # Fun fact: Song replay habit
-    repeat_songs = random.choice(top_tracks['items'])['name'] if top_tracks['items'] else None
-    if repeat_songs:
-        st.write(f"🔁 You seem to love replaying **{repeat_songs}** quite a bit!")
+        # Fun fact: Song replay habit
+        repeat_songs = random.choice(top_tracks['items'])['name'] if top_tracks['items'] else None
+        if repeat_songs:
+            st.write(f"🔁 You seem to love replaying **{repeat_songs}** quite a bit!")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
 
 # Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
