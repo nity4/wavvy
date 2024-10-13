@@ -99,6 +99,20 @@ def authenticate_user():
     except Exception as e:
         st.error(f"Authentication error: {e}")
 
+
+# Function to fetch all liked songs from the user's library
+def get_all_liked_songs(sp):
+    liked_songs = []
+    results = sp.current_user_saved_tracks(limit=50, offset=0)
+    total_songs = results['total']
+    
+    while len(liked_songs) < total_songs:
+        liked_songs.extend(results['items'])
+        offset = len(liked_songs)
+        results = sp.current_user_saved_tracks(limit=50, offset=offset)
+    
+    return liked_songs
+
 # Function to fetch audio features in batches to avoid the 414 error
 def fetch_audio_features_in_batches(sp, song_ids):
     features = []
