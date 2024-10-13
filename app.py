@@ -184,6 +184,38 @@ def get_new_artists(sp, time_range):
     
     return len(new_artists), new_artists  # Return the count of new artists and their names
 
+# Mood-Based Music Discovery
+def discover_music_by_feelings(sp):
+    st.header("Curated Music for Your Mood")
+    st.write("Select your mood, and we'll build the perfect playlist.")
+
+    feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
+    intensity = st.slider(f"How {feeling} are you feeling?", 1, 5)  # Intensity is now between 1-5
+
+    try:
+        liked_songs = get_all_liked_songs(sp)
+        if len(liked_songs) > 0:
+            random.shuffle(liked_songs)  # Shuffle to avoid bias from first tracks
+            song_ids = [track['track']['id'] for track in liked_songs]
+            features = fetch_audio_features_in_batches(sp, song_ids)
+            filtered_songs = filter_liked_songs_by_mood(features, feeling, intensity)
+        else:
+            filtered_songs = []
+
+        if filtered_songs:
+            st.subheader(f"Here's your {feeling.lower()} playlist:")
+            for i, feature in enumerate(filtered_songs[:10]):
+                song = sp.track(feature['id'])
+                song_name = song['name']
+                artist_name = song['artists'][0]['name']
+                album_cover = song['album']['images'][0]['url']
+                st.image(album_cover, width=150, caption=f"{song_name} by {artist_name}")
+        else:
+            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try tweaking the intensity or picking a different mood.")
+    
+    except Exception as e:
+        st.error(f"Error curating your playlist: {e}")
+
 # Insights Page with Top Songs, Artists, and New Artists Discovery
 def get_top_items_with_insights(sp):
     st.header("Your Top Songs, Artists, and Genres with Creative Insights")
