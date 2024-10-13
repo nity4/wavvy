@@ -170,8 +170,8 @@ def get_listening_time_insights(sp):
     recent_tracks = sp.current_user_recently_played(limit=50)
     timestamps = [track['played_at'] for track in recent_tracks['items']]
     
-    # Convert timestamps to hours for time-based analysis
-    time_data = pd.to_datetime(timestamps)
+    # Convert timestamps to pandas datetime series for time-based analysis
+    time_data = pd.Series(pd.to_datetime(timestamps))
     listening_hours = time_data.dt.hour.value_counts().sort_index()
 
     # Display insights
