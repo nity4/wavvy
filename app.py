@@ -22,8 +22,8 @@ st.markdown(
     """
     <style>
     body {
-        background-color: #121212;
-        color: #f5f5f5;
+        background-color: #f5f5f5;  /* Light background for better contrast with black text */
+        color: #000000;  /* Black text for better visibility */
         font-family: 'Roboto', sans-serif;
     }
     .stButton>button {
@@ -46,24 +46,21 @@ st.markdown(
         color: #ff4081;
     }
     .insight-box {
-        background-color: #2c2c2c;
+        background-color: #ffffff;
         border-radius: 15px;
         padding: 15px;
         margin-left: 20px;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
     }
     .insight-header {
-        color: #ffd700;
+        color: #0073e6;
         font-size: 1.2rem;
         font-weight: bold;
     }
     .insight-detail {
-        color: #f0f0f0;  /* Updated to a darker color for visibility */
+        color: #000000;
         font-size: 1rem;
         margin-top: 10px;
-    }
-    .genre-icon {
-        font-size: 1.2rem;
-        margin-right: 10px;
     }
     .fun-personality {
         font-size: 2rem;
@@ -149,7 +146,7 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
 
         # Adjust the scoring to match mood and intensity
         if feeling == "Happy":
-            score += (valence - 0.6) * 10 + (energy - intensity / 10) * 5
+            score += (valence - 0.6) * 10 + (energy - intensity / 5) * 5
         elif feeling == "Sad":
             score += (0.3 - valence) * 10 + (energy - 0.4) * 5
         elif feeling == "Chill":
@@ -170,34 +167,13 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
     # If no exact matches found, return fallback songs
     return filtered_songs if filtered_songs else fallback_songs
 
-# Recommend new songs based on user's recent listening habits and mood
-def recommend_new_songs_by_mood(sp, recent_tracks, feeling, intensity):
-    # Analyze recent listening patterns to match with recommendations
-    genres = set([genre for track in recent_tracks for genre in track['album'].get('genres', [])])
-    recency = [track['album']['release_date'] for track in recent_tracks]
-    latest_release_year = max([int(date.split('-')[0]) for date in recency if date])
-
-    seed_genres = list(genres)[:2] if genres else ["pop"]
-    seed_tracks = [track['id'] for track in recent_tracks[:5]] if recent_tracks else None
-
-    # Request recommendations from Spotify based on mood and recent habits
-    recommendations = sp.recommendations(seed_tracks=seed_tracks, seed_genres=seed_genres, limit=20)
-    
-    # Filter recommendations by mood
-    song_ids = [track['id'] for track in recommendations['tracks']]
-    audio_features = fetch_audio_features_in_batches(sp, song_ids)
-    
-    filtered_songs = filter_liked_songs_by_mood(audio_features, feeling, intensity)
-    
-    return filtered_songs
-
-# Mood-Based Music Discovery with enhanced fallback mechanism and new song recommendations
+# Mood-Based Music Discovery with enhanced fallback mechanism
 def discover_music_by_feelings(sp):
     st.header("Curated Music for Your Mood")
     st.write("Select your mood, and we'll build the perfect playlist.")
 
     feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
-    intensity = st.slider(f"How {feeling} are you feeling?", 1, 10)
+    intensity = st.slider(f"How {feeling} are you feeling?", 1, 5)  # Intensity is now between 1-5
     
     # Option to choose between liked songs and new songs
     song_source = st.radio("Pick your song source:", ["Liked Songs", "Discover New Songs"], index=0)
@@ -280,12 +256,18 @@ def get_top_items_with_insights(sp):
         genre_count = len(set(top_genres))
         st.write(f"<div class='insight-detail'>You've explored {genre_count} different genres. You have a broad taste in music!</div>", unsafe_allow_html=True)
 
+        # Interesting insight based on artist discovery
         new_artists = len(set(artist['name'] for artist in top_artists['items']))
         st.write(f"<div class='insight-detail'>You've discovered {new_artists} new artists during this {time_range.lower()}.</div>", unsafe_allow_html=True)
 
         adventurous_genre = random.choice(unique_genres) if unique_genres else "pop"
         st.write(f"<div class='insight-detail'>Your most adventurous genre is {adventurous_genre.capitalize()}, you're always looking for something unique!</div>", unsafe_allow_html=True)
         
+        # A standout insight: Song most played during a specific time
+        if top_tracks['items']:
+            most_played_song = top_tracks['items'][0]['name']
+            st.write(f"<div class='insight-detail'>The song you can't get enough of this {time_range.lower()} is {most_played_song}!</div>", unsafe_allow_html=True)
+
         st.markdown('</div>', unsafe_allow_html=True)
 
 # Personality Page with loading effect
@@ -299,12 +281,15 @@ def personality_page():
         progress.progress(i)
     progress.empty()
 
-    # Fun personality name generation
+    # Fun personality name generation with fixed colors
     personality_map = {
         "Melody Explorer": "#ff4081",
         "Groove Enthusiast": "#ffd700",
         "Rhythm Wanderer": "#00ff7f",
-        "Harmony Seeker": "#1e90ff"
+        "Harmony Seeker": "#1e90ff",
+        "Beat Adventurer": "#8a2be2",   # New Personality
+        "Vibe Creator": "#ff6347",      # New Personality
+        "Tempo Navigator": "#00ced1"    # New Personality
     }
     
     fun_personality_name, associated_color = random.choice(list(personality_map.items()))
@@ -317,6 +302,19 @@ def personality_page():
     st.write(f"As a **{fun_personality_name}**, you vibe with music that takes you places. You're not just listening—you're living.")
     st.write("You love to mix it up, keeping things fresh and never settling for the mainstream. Your playlist is as unique as you are.")
     st.write("You're the kind of person who discovers new tracks before anyone else. Keep being the trendsetter you are!")
+    
+    # Awarding a fun "Music Trophy" based on personality
+    music_trophies = {
+        "Melody Explorer": "Golden Ear Trophy 🏆",
+        "Groove Enthusiast": "Beat King/Queen Crown 👑",
+        "Rhythm Wanderer": "Sound Explorer's Badge 🏅",
+        "Harmony Seeker": "Harmony Master Medallion 🎖️",
+        "Beat Adventurer": "Adventure Beat Trophy 🏆",
+        "Vibe Creator": "Vibe Star Medal 🌟",
+        "Tempo Navigator": "Tempo Master Cup 🏆"
+    }
+    
+    st.subheader(f"You've earned the {music_trophies[fun_personality_name]}!")
 
 # Main App Flow
 if is_authenticated():
