@@ -5,6 +5,7 @@ import random
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -32,6 +33,12 @@ st.markdown("""
         color: white;
         font-weight: bold;
         text-align: center;
+    }
+    .loading-text {
+        font-size: 1.5em;
+        color: white;
+        text-align: center;
+        padding: 20px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -63,6 +70,12 @@ def authenticate_user():
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; background-color: #ff4081; padding: 10px; border-radius: 8px;">Login with Spotify</a>', unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Authentication error: {e}")
+
+# Loading Animation
+def show_loading_animation(text="Loading..."):
+    st.markdown(f"<div class='loading-text'>{text}</div>", unsafe_allow_html=True)
+    with st.spinner("Processing..."):
+        time.sleep(2)  # Simulating a loading process
 
 # Helper Functions
 def get_all_liked_songs(sp):
@@ -140,6 +153,7 @@ def discover_music_by_feelings(sp):
     try:
         liked_songs = get_all_liked_songs(sp)
         if len(liked_songs) > 0:
+            show_loading_animation(text="Creating your vibe-based playlist...")
             random.shuffle(liked_songs)
             song_ids = [track['track']['id'] for track in liked_songs]
             features = fetch_audio_features_in_batches(sp, song_ids)
@@ -169,6 +183,7 @@ def get_top_items_with_insights(sp):
     time_range_map = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
     spotify_time_range = time_range_map[time_range]
 
+    show_loading_animation(text="Fetching your top tracks and insights...")
     top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
     top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
     top_genres = [genre for artist in top_artists['items'] for genre in artist['genres'] if 'genres' in artist]
@@ -197,14 +212,14 @@ def get_top_items_with_insights(sp):
 def get_most_active_listening_time(sp, time_range):
     recent_tracks = sp.current_user_recently_played(limit=50)
     timestamps = [track['played_at'] for track in recent_tracks['items']]
-    time_data = pd.to_datetime(timestamps)
-    
+    time_data = pd.to_datetime(timestamps).tz_convert('UTC')
+
     if time_range == 'short_term':
-        time_data = time_data[time_data >= (pd.Timestamp.now() - pd.DateOffset(weeks=1))]
+        time_data = time_data[time_data >= (pd.Timestamp.now(tz='UTC') - pd.DateOffset(weeks=1))]
     elif time_range == 'medium_term':
-        time_data = time_data[time_data >= (pd.Timestamp.now() - pd.DateOffset(months=1))]
+        time_data = time_data[time_data >= (pd.Timestamp.now(tz='UTC') - pd.DateOffset(months=1))]
     else:
-        time_data = time_data[time_data >= (pd.Timestamp.now() - pd.DateOffset(years=1))]
+        time_data = time_data[time_data >= (pd.Timestamp.now(tz='UTC') - pd.DateOffset(years=1))]
 
     active_hour = time_data.dt.hour.value_counts().idxmax() if not time_data.empty else "N/A"
     return f"{active_hour}:00 - {active_hour + 1}:00" if active_hour != "N/A" else "No data"
