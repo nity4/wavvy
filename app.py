@@ -256,8 +256,9 @@ def show_fun_insights(sp, top_artists, top_tracks, time_range):
         st.toast(f"You seem to love replaying **{repeat_songs}** quite a bit!")
 
 # Updated comprehensive insights with time range filter and fun facts
+# Comprehensive insights and stats
 def comprehensive_insights(sp):
-    st.header("Your Music Insights")
+    st.header("Your Music Journey: Insights")
 
     try:
         # Fetch user's top items based on time range selection
