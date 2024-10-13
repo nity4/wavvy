@@ -38,114 +38,26 @@ st.markdown(
 if 'token_info' not in st.session_state:
     st.session_state['token_info'] = None
 
-# Core Feature: Music Discovery by Personality & Energy
-def personality_based_recommendations(sp):
-    st.header("Discover Music Based on Your Personality 🎧")
-    
-    # User input for personality and current mood
-    personality_type = st.selectbox("Choose your personality type", ["Adventurous", "Calm", "Energetic", "Reflective"])
-    current_mood = st.slider("How are you feeling right now? (1 = Low Energy, 10 = High Energy)", 1, 10, 5)
-    
-    st.write(f"Based on your personality ({personality_type}) and your current mood ({current_mood}), here are some recommended tracks for you:")
-    
-    # Fetch top track recommendations based on personality and mood
-    recommended_tracks = sp.recommendations(seed_genres=['pop', 'chill'], limit=5)
-    
-    for track in recommended_tracks['tracks']:
-        album_cover = track['album']['images'][0]['url']
-        track_name = track['name']
-        artist_name = track['artists'][0]['name']
-        st.image(album_cover, width=150)
-        st.write(f"**{track_name}** by *{artist_name}*")
-        st.write("---")
+# Check if the user is authenticated
+def is_authenticated():
+    return st.session_state['token_info'] is not None
 
-# Feature: Predictive Music Recommendation Engine (Life Soundtrack)
-def predictive_recommendations():
-    st.header("Your Predictive Life Soundtrack 🎶")
-    st.write("Based on upcoming life events or patterns, here’s a soundtrack tailored for your future.")
-    
-    # User selects life events or moods
-    life_events = st.multiselect("Select upcoming events or moods:", ["Vacation", "Work Deadline", "Workout", "Relaxation"])
-    
-    for event in life_events:
-        st.write(f"For your {event}, here are some tracks to match the vibe:")
-        st.write("🎵 Song 1 by Artist A")
-        st.write("🎵 Song 2 by Artist B")
-        st.write("🎵 Song 3 by Artist C")
-        st.write("---")
-
-# Feature: Music Archetypes and Identity Mapping
-def music_archetypes():
-    st.header("Explore Your Musical Archetype 🎭")
-    st.write("Based on your listening habits, you fall into the following music archetype:")
-    
-    # Example archetypes and their descriptions
-    archetypes = {"Adventurer": "You love exploring new genres.", "Nostalgic": "You revisit the classics.", "Trendsetter": "You lead music trends."}
-    
-    selected_archetype = "Adventurer"
-    st.write(f"**You are an {selected_archetype}**: {archetypes[selected_archetype]}")
-    
-    st.write("Here are some music recommendations that fit your archetype:")
-    st.write("🎧 Track 1 by Artist A")
-    st.write("🎧 Track 2 by Artist B")
-    st.write("🎧 Track 3 by Artist C")
-    st.write("---")
-
-# Feature: Deep Social Connectivity and Music Sharing
-def social_connectivity(sp):
-    st.header("Connect and Share with Friends 🎶")
-    st.write("Share your current music vibe with friends or discover what they are listening to.")
-    
-    # Mock example of shared playlists
-    friends = ["Friend 1", "Friend 2", "Friend 3"]
-    shared_playlist = st.selectbox("Choose a friend to view their shared playlist:", friends)
-    
-    st.write(f"Here’s what {shared_playlist} is listening to:")
-    st.write("🎧 Track 1 by Artist X")
-    st.write("🎧 Track 2 by Artist Y")
-    st.write("🎧 Track 3 by Artist Z")
-    st.write("You can sync your playlist with theirs and listen together!")
-    
-    # Option to share your current vibe
-    st.write("Want to share your current music vibe with friends? Click below:")
-    if st.button("Share My Vibe"):
-        st.write("Your current vibe has been shared with your friends!")
-
-# Feature: Hyper-Intelligent Music Journaling
-def music_journaling():
-    st.header("Your Music Journal 📓")
-    st.write("Document your emotional journey through music.")
-    
-    # Automatically generated journal entry (mocked for now)
-    st.write("**Entry for today:**")
-    st.write("You listened to relaxing tracks like Song A by Artist X in the morning, which helped you stay focused.")
-    st.write("In the afternoon, you switched to upbeat music to energize yourself for your workout.")
-    
-    # Option for users to add their own journal notes
-    st.text_area("Add your personal reflection on today's music journey:", "")
-    
-    if st.button("Save Journal Entry"):
-        st.write("Your journal entry has been saved!")
-
-# Feature: Musical Wellness Insights
-def musical_wellness():
-    st.header("Musical Wellness Insights 🌿")
-    st.write("Here’s how your music choices are impacting your emotional and mental wellness.")
-    
-    # Example wellness scores (these would be based on deeper data)
-    wellness_data = {
-        'Metric': ['Happiness', 'Calmness', 'Energy'],
-        'Score': [78, 65, 80]
-    }
-    df_wellness = pd.DataFrame(wellness_data)
-    
-    st.bar_chart(df_wellness.set_index('Metric'))
-    st.write("Your music has contributed to a good balance of energy and calmness this week.")
+# Handle Spotify Authentication
+def authenticate_user():
+    # Check if code is present in query params
+    if "code" in st.experimental_get_query_params():
+        code = st.experimental_get_query_params()["code"][0]
+        token_info = sp_oauth.get_access_token(code)
+        st.session_state['token_info'] = token_info
+        st.experimental_rerun()  # Ensure the app is refreshed after receiving the token
+    else:
+        auth_url = sp_oauth.get_authorize_url()
+        st.markdown(f'<a href="{auth_url}" target="_self">Click here to authorize with Spotify</a>', unsafe_allow_html=True)
 
 # Main Flow of the App
-if st.session_state['token_info']:
+if is_authenticated():
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
-    
+
     # Main navigation
     section = st.radio("Explore your music journey", [
         "Personality-Based Recommendations", 
@@ -169,14 +81,8 @@ if st.session_state['token_info']:
     elif section == "Wellness Insights":
         musical_wellness()
 
-elif "code" in st.experimental_get_query_params():
-    code = st.experimental_get_query_params()["code"][0]
-    token_info = sp_oauth.get_access_token(code)
-    st.session_state['token_info'] = token_info
-    st.experimental_rerun()
-
 else:
     st.write("Welcome to **Wavvy** 〰")
     st.write("Wavvy offers you a personal reflection on your emotional and personality-driven journey through music.")
-    auth_url = sp_oauth.get_authorize_url()
-    st.markdown(f'<a href="{auth_url}" target="_self">Click here to authorize with Spotify</a>', unsafe_allow_html=True)
+    authenticate_user()
+
