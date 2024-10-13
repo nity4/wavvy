@@ -172,10 +172,12 @@ def recommend_new_songs_by_mood(sp, recent_tracks, feeling, intensity):
     # Analyze recent listening patterns to match with recommendations
     genres = set([genre for track in recent_tracks for genre in track['track']['artists'][0].get('genres', [])])
     seed_genres = list(genres)[:2] if genres else ["pop"]
+
+    # Ensure the number of seed tracks does not exceed 5 (Spotify API limit)
     seed_tracks = [track['track']['id'] for track in recent_tracks[:5]] if recent_tracks else None
 
     # Request recommendations from Spotify based on mood and recent habits
-    recommendations = sp.recommendations(seed_tracks=seed_tracks, seed_genres=seed_genres, limit=20)
+    recommendations = sp.recommendations(seed_tracks=seed_tracks[:2], seed_genres=seed_genres[:3], limit=20)
     
     # Filter recommendations by mood
     song_ids = [track['id'] for track in recommendations['tracks']]
