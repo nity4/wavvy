@@ -270,7 +270,7 @@ def comprehensive_insights(sp):
         # Display top items
         get_top_items(sp)
 
-        # Show fun insights
+        # Show fun insights (pass the time_range variable)
         show_fun_insights(sp, top_artists, top_tracks, time_range)
 
     except Exception as e:
