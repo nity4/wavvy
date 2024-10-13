@@ -169,39 +169,22 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
     # If no exact matches found, return fallback songs
     return filtered_songs if filtered_songs else fallback_songs
 
-# Mood-Based Music Discovery
-def discover_music_by_feelings(sp):
-    st.header("Curated Music for Your Mood")
-    st.write("Select your mood, and we'll build the perfect playlist.")
-
-    feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
-    intensity = st.slider(f"How {feeling} are you feeling?", 1, 5)  # Intensity is now between 1-5
-
-    try:
-        liked_songs = get_all_liked_songs(sp)
-        if len(liked_songs) > 0:
-            random.shuffle(liked_songs)  # Shuffle to avoid bias from first tracks
-            song_ids = [track['track']['id'] for track in liked_songs]
-            features = fetch_audio_features_in_batches(sp, song_ids)
-            filtered_songs = filter_liked_songs_by_mood(features, feeling, intensity)
-        else:
-            filtered_songs = []
-
-        if filtered_songs:
-            st.subheader(f"Here's your {feeling.lower()} playlist:")
-            for i, feature in enumerate(filtered_songs[:10]):
-                song = sp.track(feature['id'])
-                song_name = song['name']
-                artist_name = song['artists'][0]['name']
-                album_cover = song['album']['images'][0]['url']
-                st.image(album_cover, width=150, caption=f"{song_name} by {artist_name}")
-        else:
-            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try tweaking the intensity or picking a different mood.")
+# Function to fetch top artists and compare for new artist discovery
+def get_new_artists(sp, time_range):
+    # Fetch the user's long-term top artists to act as the baseline
+    long_term_artists = sp.current_user_top_artists(time_range='long_term', limit=50)['items']
+    long_term_artist_names = set(artist['name'] for artist in long_term_artists)
     
-    except Exception as e:
-        st.error(f"Error curating your playlist: {e}")
+    # Fetch top artists for the selected time frame (week, month, year)
+    time_frame_artists = sp.current_user_top_artists(time_range=time_range, limit=50)['items']
+    time_frame_artist_names = set(artist['name'] for artist in time_frame_artists)
+    
+    # Identify new artists in the selected time frame that are not in the long-term baseline
+    new_artists = time_frame_artist_names - long_term_artist_names
+    
+    return len(new_artists), new_artists  # Return the count of new artists and their names
 
-# Insights Page
+# Insights Page with Top Songs, Artists, and New Artists Discovery
 def get_top_items_with_insights(sp):
     st.header("Your Top Songs, Artists, and Genres with Creative Insights")
 
@@ -213,6 +196,9 @@ def get_top_items_with_insights(sp):
     top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
     top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
     top_genres = [genre for artist in top_artists['items'] for genre in artist['genres'] if 'genres' in artist and artist['genres']]
+
+    # Fetch new artist discovery for the current time range
+    new_artist_count, new_artists = get_new_artists(sp, spotify_time_range)
 
     col1, col2 = st.columns([2, 1])
 
@@ -250,9 +236,8 @@ def get_top_items_with_insights(sp):
         genre_count = len(set(top_genres))
         st.write(f"<div class='insight-detail'>You've explored {genre_count} different genres. You have a broad taste in music!</div>", unsafe_allow_html=True)
 
-        # Interesting insight based on artist discovery
-        new_artists = len(set(artist['name'] for artist in top_artists['items']))
-        st.write(f"<div class='insight-detail'>You've discovered {new_artists} new artists during this {time_range.lower()}.</div>", unsafe_allow_html=True)
+        # Display new artist discovery insight
+        st.write(f"<div class='insight-detail'>You've discovered {new_artist_count} new artists during this {time_range.lower()}.</div>", unsafe_allow_html=True)
 
         adventurous_genre = random.choice(unique_genres) if unique_genres else "pop"
         st.write(f"<div class='insight-detail'>Your most adventurous genre is {adventurous_genre.capitalize()}, you're always looking for something unique!</div>", unsafe_allow_html=True)
