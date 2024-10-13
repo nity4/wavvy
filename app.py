@@ -245,6 +245,47 @@ def plot_genre_distribution(genre_df):
     else:
         st.write("No genre data available to display.")
 
+# Top Songs, Artists, and Genres with Insights (the missing function)
+def get_top_items_with_insights(sp):
+    st.header("Your Top Songs, Artists, and Genres")
+    time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
+
+    time_range_map = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
+    spotify_time_range = time_range_map[time_range]
+
+    top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
+    top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
+    top_genres = [genre for artist in top_artists['items'] for genre in artist['genres'] if 'genres' in artist]
+
+    st.subheader("Your Top Songs")
+    for i, track in enumerate(top_tracks['items']):
+        st.write(f"{i+1}. {track['name']} by {track['artists'][0]['name']}")
+        st.image(track['album']['images'][0]['url'], width=60)
+
+    st.subheader("Your Top Artists")
+    for i, artist in enumerate(top_artists['items']):
+        st.write(f"{i+1}. {artist['name']}")
+        st.image(artist['images'][0]['url'], width=60)
+
+    st.subheader("Your Top Genres")
+    genre_df = pd.DataFrame(top_genres, columns=['Genre'])
+    st.table(genre_df)
+
+    # Display insights box
+    st.markdown('<div class="insight-box">', unsafe_allow_html=True)
+    st.markdown('<div class="insight-header">Creative Insights</div>', unsafe_allow_html=True)
+
+    genre_count = len(set(top_genres))
+    st.write(f"You've explored {genre_count} different genres. You have a broad taste in music!")
+
+    most_played_song = top_tracks['items'][0]['name'] if top_tracks['items'] else "None"
+    st.write(f"The song you can't get enough of this {time_range.lower()} is {most_played_song}!")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Plot genre distribution
+    plot_genre_distribution(genre_df)
+
 # Personality Page
 def personality_page(sp):
     st.header("Building Your Music Personality...")
