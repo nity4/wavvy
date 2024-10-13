@@ -57,7 +57,7 @@ st.markdown(
         font-weight: bold;
     }
     .insight-detail {
-        color: #f5f5f5;
+        color: #f0f0f0;  /* Updated to a darker color for visibility */
         font-size: 1rem;
         margin-top: 10px;
     }
@@ -79,12 +79,6 @@ st.markdown(
         font-size: 1.5rem;
         color: #ff4081;
         font-weight: bold;
-        animation: blink 1s infinite;
-    }
-    @keyframes blink {
-        0% { opacity: 1; }
-        50% { opacity: 0.5; }
-        100% { opacity: 1; }
     }
     </style>
     """, unsafe_allow_html=True
@@ -115,7 +109,6 @@ def authenticate_user():
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: #ff4081;">Login with Spotify</a>', unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Authentication error: {e}")
-        
 
 # Fetch all liked songs from the user's library
 def get_all_liked_songs(sp):
@@ -177,7 +170,28 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
     # If no exact matches found, return fallback songs
     return filtered_songs if filtered_songs else fallback_songs
 
-# Mood-Based Music Discovery with enhanced fallback mechanism
+# Recommend new songs based on user's recent listening habits and mood
+def recommend_new_songs_by_mood(sp, recent_tracks, feeling, intensity):
+    # Analyze recent listening patterns to match with recommendations
+    genres = set([genre for track in recent_tracks for genre in track['album'].get('genres', [])])
+    recency = [track['album']['release_date'] for track in recent_tracks]
+    latest_release_year = max([int(date.split('-')[0]) for date in recency if date])
+
+    seed_genres = list(genres)[:2] if genres else ["pop"]
+    seed_tracks = [track['id'] for track in recent_tracks[:5]] if recent_tracks else None
+
+    # Request recommendations from Spotify based on mood and recent habits
+    recommendations = sp.recommendations(seed_tracks=seed_tracks, seed_genres=seed_genres, limit=20)
+    
+    # Filter recommendations by mood
+    song_ids = [track['id'] for track in recommendations['tracks']]
+    audio_features = fetch_audio_features_in_batches(sp, song_ids)
+    
+    filtered_songs = filter_liked_songs_by_mood(audio_features, feeling, intensity)
+    
+    return filtered_songs
+
+# Mood-Based Music Discovery with enhanced fallback mechanism and new song recommendations
 def discover_music_by_feelings(sp):
     st.header("Curated Music for Your Mood")
     st.write("Select your mood, and we'll build the perfect playlist.")
@@ -185,15 +199,23 @@ def discover_music_by_feelings(sp):
     feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
     intensity = st.slider(f"How {feeling} are you feeling?", 1, 10)
     
+    # Option to choose between liked songs and new songs
+    song_source = st.radio("Pick your song source:", ["Liked Songs", "Discover New Songs"], index=0)
+
     try:
-        liked_songs = get_all_liked_songs(sp)
-        if len(liked_songs) > 0:
-            random.shuffle(liked_songs)  # Shuffle to avoid bias from first tracks
-            song_ids = [track['track']['id'] for track in liked_songs]
-            features = fetch_audio_features_in_batches(sp, song_ids)
-            filtered_songs = filter_liked_songs_by_mood(features, feeling, intensity)
+        if song_source == "Liked Songs":
+            liked_songs = get_all_liked_songs(sp)
+            if len(liked_songs) > 0:
+                random.shuffle(liked_songs)  # Shuffle to avoid bias from first tracks
+                song_ids = [track['track']['id'] for track in liked_songs]
+                features = fetch_audio_features_in_batches(sp, song_ids)
+                filtered_songs = filter_liked_songs_by_mood(features, feeling, intensity)
+            else:
+                filtered_songs = []
         else:
-            filtered_songs = []
+            # Analyze user's recent listening habits
+            recent_tracks = sp.current_user_recently_played(limit=50)['items']
+            filtered_songs = recommend_new_songs_by_mood(sp, recent_tracks, feeling, intensity)
 
         if filtered_songs:
             st.subheader(f"Here's your {feeling.lower()} playlist:")
@@ -208,7 +230,6 @@ def discover_music_by_feelings(sp):
     
     except Exception as e:
         st.error(f"Error curating your playlist: {e}")
-
 
 # Insights Page with Top Songs, Artists, and Genres
 def get_top_items_with_insights(sp):
@@ -254,16 +275,16 @@ def get_top_items_with_insights(sp):
     # Display insights on the right (col2) inside a box
     with col2:
         st.markdown('<div class="insight-box">', unsafe_allow_html=True)
-        st.markdown('<div class="insight-header">Interesting Insights</div>', unsafe_allow_html=True)
+        st.markdown('<div class="insight-header">Creative Insights</div>', unsafe_allow_html=True)
 
         genre_count = len(set(top_genres))
-        st.write(f"<div class='insight-detail'>You've explored {genre_count} different genres. You're a true explorer of sound!</div>", unsafe_allow_html=True)
+        st.write(f"<div class='insight-detail'>You've explored {genre_count} different genres. You have a broad taste in music!</div>", unsafe_allow_html=True)
 
         new_artists = len(set(artist['name'] for artist in top_artists['items']))
-        st.write(f"<div class='insight-detail'>You've discovered {new_artists} new artists this {time_range.lower()}.</div>", unsafe_allow_html=True)
+        st.write(f"<div class='insight-detail'>You've discovered {new_artists} new artists during this {time_range.lower()}.</div>", unsafe_allow_html=True)
 
         adventurous_genre = random.choice(unique_genres) if unique_genres else "pop"
-        st.write(f"<div class='insight-detail'>Your taste gravitates toward {adventurous_genre.capitalize()}, which shows you're always seeking something fresh and exciting.</div>", unsafe_allow_html=True)
+        st.write(f"<div class='insight-detail'>Your most adventurous genre is {adventurous_genre.capitalize()}, you're always looking for something unique!</div>", unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -271,16 +292,22 @@ def get_top_items_with_insights(sp):
 def personality_page():
     st.header("Building Your Music Personality...")
 
-    # Add a "loading" effect
-    for i in range(1, 6):
-        st.markdown(f'<div class="loading">Analyzing your vibes... {i*20}%</div>', unsafe_allow_html=True)
+    # Add a "loading" effect but no flickering
+    progress = st.progress(0)
+    for i in range(1, 101, 20):
         time.sleep(0.5)
+        progress.progress(i)
+    progress.empty()
 
     # Fun personality name generation
-    fun_personality_name = random.choice(["Melody Explorer", "Groove Enthusiast", "Rhythm Wanderer", "Harmony Seeker"])
+    personality_map = {
+        "Melody Explorer": "#ff4081",
+        "Groove Enthusiast": "#ffd700",
+        "Rhythm Wanderer": "#00ff7f",
+        "Harmony Seeker": "#1e90ff"
+    }
     
-    # Random color assignment
-    associated_color = random.choice(["#ff4081", "#ffd700", "#00ff7f", "#1e90ff"])
+    fun_personality_name, associated_color = random.choice(list(personality_map.items()))
 
     # Display color visually with a fun background
     st.markdown(f'<div class="fun-bg" style="background-color:{associated_color};"></div>', unsafe_allow_html=True)
