@@ -4,7 +4,7 @@ from spotipy.oauth2 import SpotifyOAuth
 import random
 import pandas as pd
 import matplotlib.pyplot as plt
-import time
+import numpy as np
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -81,6 +81,20 @@ def get_all_liked_songs(sp):
     
     return liked_songs
 
+# Fetch Audio Features in Batches (Spotify API has a limit on batch size)
+def fetch_audio_features_in_batches(sp, song_ids):
+    features = []
+    try:
+        batch_size = 100  # Spotify's limit for batch requests
+        for i in range(0, len(song_ids), batch_size):
+            batch = song_ids[i:i + batch_size]
+            audio_features = sp.audio_features(tracks=batch)
+            features.extend(audio_features)
+    except Exception as e:
+        st.error(f"Error fetching audio features: {e}")
+    
+    return features
+
 # Function for Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
     st.header("Curate Your Vibe")
@@ -145,6 +159,7 @@ def get_listening_time_insights(sp):
     time_data = pd.Series(pd.to_datetime(timestamps))
     daily_listening = time_data.dt.date.value_counts().sort_index()
 
+    # Simulating daily minutes listened for demo purposes
     daily_minutes = {day: random.randint(20, 120) for day in daily_listening.index}  # Random minutes for demo
     
     return daily_listening, daily_minutes
@@ -201,6 +216,13 @@ def personality_page(sp):
     st.markdown(f"<div style='background-color:{color}; padding:20px;'><h2>{personality_name}</h2></div>", unsafe_allow_html=True)
     st.write(f"Your music taste shows you're a **{personality_name}**. You vibe with {dominant_genre} music, and you're always on the lookout for something new.")
 
+    # Display Total Stats
+    total_tracks = sum(daily_listening.values)
+    total_minutes = sum(daily_minutes.values())
+    
+    st.write(f"**Total Tracks Played:** {total_tracks}")
+    st.write(f"**Total Minutes Listened:** {total_minutes} minutes")
+
     # Display Listening Stats (Graph)
     st.subheader("Your Listening Stats Over the Last Week")
     daily_tracks = daily_listening.values
@@ -209,20 +231,29 @@ def personality_page(sp):
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    ax.bar(days, minutes_listened, color="#1e90ff", alpha=0.8, label="Minutes Listened")
+    # Bar chart for minutes listened
+    bars = ax.bar(days, minutes_listened, color=plt.cm.viridis(np.linspace(0.2, 0.8, len(days))), alpha=0.8)
     ax.set_xlabel("Day", fontsize=12)
     ax.set_ylabel("Minutes Listened", fontsize=12, color="#1e90ff")
-    
+    ax.set_title("Your Daily Listening Activity", fontsize=16)
+
+    # Adding values on top of bars
+    for bar in bars:
+        yval = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2, yval + 2, f"{int(yval)}", ha='center', va='bottom', fontsize=10)
+
+    # Line chart for tracks played
     ax2 = ax.twinx()
-    ax2.plot(days, daily_tracks, color="#ff4081", marker='o', label="Tracks Played", linewidth=2)
+    ax2.plot(days, daily_tracks, color="#ff4081", marker='o', linewidth=2.5, label="Tracks Played")
     ax2.set_ylabel("Tracks Played", fontsize=12, color="#ff4081")
 
-    ax.set_title("Your Daily Listening Activity", fontsize=16)
-    fig.tight_layout()
-
     # Add legends
-    ax.legend(loc="upper left")
+    ax.legend(["Minutes Listened"], loc="upper left")
     ax2.legend(loc="upper right")
+
+    # Grid and formatting
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+    fig.tight_layout()
 
     st.pyplot(fig)
 
