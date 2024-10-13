@@ -157,8 +157,8 @@ def discover_music_by_feelings(sp):
                     filtered_songs.append(song)
                 elif feeling == "Hype" and energy > 0.8 and tempo > 120:
                     filtered_songs.append(song)
-                elif feeling == "Romantic" and valence > 0.6 and tempo between 60 and 90:
-                    filtered_songs.append(song)
+                elif feeling == "Romantic" and valence > 0.6 and 60 <= tempo <= 90:
+    filtered_songs.append(song)
 
         if filtered_songs:
             st.subheader(f"Here's your {feeling.lower()} playlist:")
