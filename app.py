@@ -42,17 +42,14 @@ if 'token_info' not in st.session_state:
 def is_authenticated():
     return st.session_state['token_info'] is not None
 
-# Define helper function to authenticate the user
 def authenticate_user():
     try:
         if "code" in st.experimental_get_query_params():
             code = st.experimental_get_query_params()["code"][0]
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
-            st.experimental_rerun()
-        else:
-            auth_url = sp_oauth.get_authorize_url()
-            st.markdown(f'<a href="{auth_url}" target="_self">Click here to authorize with Spotify</a>', unsafe_allow_html=True)
+            # Instead of rerunning, use st.experimental_set_query_params to change state
+            st.experimental_set_query_params(code="")  # Clear the code so it doesn't keep rerunning
     except Exception as e:
         st.error(f"Authentication error: {e}")
 
