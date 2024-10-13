@@ -2,6 +2,7 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
+import matplotlib.pyplot as plt
 import time
 
 # Spotify API credentials stored in Streamlit Secrets
@@ -23,7 +24,7 @@ st.markdown(
     """
     <style>
     body {
-        background-color: #1c1c1e;
+        background-color: #000000;
         color: white;
     }
     .stButton>button {
@@ -129,34 +130,36 @@ def comprehensive_insights(sp):
         artist_names = [artist['name'] for artist in top_artists['items']]
         top_genres = [artist['genres'] for artist in top_artists['items']]
 
-        # Display top artists
+        # Display top artists with more engaging visuals
         st.subheader("Your Top Artists:")
-        for artist in artist_names:
-            st.write(f"Artist: {artist}")
+        for artist in top_artists['items']:
+            st.image(artist['images'][0]['url'], width=150)
+            st.write(f"**{artist['name']}**")
 
         # Display top genres
         st.subheader("Top Genres You Listen To:")
         for genre_list in top_genres:
-            st.write(f"Genres: {', '.join(genre_list)}")
+            st.write(f"**Genres:** {', '.join(genre_list)}")
 
-        # Fetch recent listening history
+        # Fetch recent listening history and total listening time
         st.subheader("Recent Listening Insights:")
         results = sp.current_user_recently_played(limit=10)
         recent_tracks = results['items']
         total_tracks = len(recent_tracks)
         listening_time = total_tracks * 3  # Assume each song is 3 minutes
 
-        st.write(f"You've listened to {total_tracks} tracks today, totaling about {listening_time} minutes.")
+        st.write(f"You've listened to **{total_tracks} tracks** today, totaling about **{listening_time} minutes**.")
         for track in recent_tracks[:5]:
             song_name = track['track']['name']
             album_cover = track['track']['album']['images'][0]['url']
             artist_name = track['track']['artists'][0]['name']
             st.image(album_cover, width=100)
-            st.write(f"Track: {song_name} by {artist_name}")
+            st.write(f"Track: **{song_name}** by *{artist_name}*")
 
-        # Make insights interesting by showing new discoveries
+        # Interesting Insights with engaging visualizations
+        new_artists_count = len(set(artist['name'] for artist in recent_tracks))
         st.subheader("Interesting Insights:")
-        st.write("You're exploring **new genres** and discovering **new artists** recently! Keep up the music journey!")
+        st.write(f"🎧 You've explored **{new_artists_count} new artists** recently! Keep expanding your music journey.")
 
     except Exception as e:
         st.error(f"Error fetching comprehensive insights: {e}")
@@ -181,7 +184,10 @@ def music_personality_analysis(sp):
             st.write(f"**Your personality type is:** *{personality_type}*")
             st.write(f"**Your associated color is:** *{color}*")
         else:
-            st.write("Not enough data to determine your personality.")
+            st.write(f"You're a mystery! Defaulting to the personality of 'Explorer' with the color *Green*.")
+            st.write(f"Your personality type is: *Explorer*")
+            st.write(f"Your associated color is: *Green*")
+
     except Exception as e:
         st.error(f"Error analyzing your music personality: {e}")
 
