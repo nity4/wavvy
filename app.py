@@ -85,19 +85,43 @@ def refresh_token():
 
 def authenticate_user():
     try:
+        # Check if there's a token in session state already
+        if "token_info" in st.session_state and st.session_state['token_info']:
+            token_info = st.session_state['token_info']
+
+            # Check if token is expired and refresh if necessary
+            if sp_oauth.is_token_expired(token_info):
+                token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+                st.session_state['token_info'] = token_info
+
+            st.success("You're already authenticated!")
+            return True  # User is authenticated
+
+        # Check if there is an authorization code in the URL (redirected from Spotify)
         if "code" in st.experimental_get_query_params():
             code = st.experimental_get_query_params()["code"][0]
+
+            # Exchange the code for an access token
             token_info = sp_oauth.get_access_token(code)
-            st.session_state['token_info'] = token_info
+            st.session_state['token_info'] = token_info  # Save token info in session state
+
+            # Clean the URL after successful login
             st.experimental_set_query_params(code=None)
             st.success("You're authenticated! Refresh to get your music data.")
-            if st.button("Refresh Now"):
-                st.experimental_set_query_params()
+            
+            # Automatically reload the page
+            st.experimental_rerun()
+            return True
+
+        # If no token and no code, present the login link
         else:
             auth_url = sp_oauth.get_authorize_url()
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: #ff4081;">Login with Spotify</a>', unsafe_allow_html=True)
+            return False
+
     except Exception as e:
         st.error(f"Authentication error: {e}")
+        return False
 
 # Function to fetch all liked songs from the user's library
 def get_all_liked_songs(sp):
