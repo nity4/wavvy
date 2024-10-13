@@ -2,14 +2,12 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import random
-import time
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
 CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 
-# Spotify OAuth Scope to access user's full library and other data
 SCOPE = 'user-library-read user-top-read user-read-recently-played'
 
 # Initialize Spotify OAuth
@@ -61,6 +59,11 @@ st.markdown(
         color: #f5f5f5;
         font-size: 1rem;
         margin-top: 10px;
+    }
+    .fun-personality {
+        font-size: 2rem;
+        color: #ff4081;
+        font-weight: bold;
     }
     </style>
     """, unsafe_allow_html=True
@@ -147,110 +150,34 @@ def filter_songs_by_mood(track_features, feeling, intensity):
     
     return filtered_songs
 
-# Display personalized insights
-def display_insights(top_tracks, top_artists, top_genres, time_range):
-    st.header(f"Fun Insights from your {time_range} Listening Habits")
-
-    # Total number of songs listened to
-    total_songs = len(top_tracks['items']) if top_tracks else 0
-    most_played_artist = top_artists['items'][0]['name'] if top_artists['items'] else "Unknown Artist"
-    most_played_song = top_tracks['items'][0]['name'] if top_tracks['items'] else "Unknown Song"
-
-    with st.sidebar:
-        st.markdown('<div class="insight-popup">', unsafe_allow_html=True)
-        st.markdown('<div class="insight-header">🎤 Your Most Played Artist</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="insight-detail">**{most_played_artist}**</div>', unsafe_allow_html=True)
-        
-        st.markdown('<div class="insight-header">🎵 Your Most Played Song</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="insight-detail">**{most_played_song}**</div>', unsafe_allow_html=True)
-        
-        # Insight: Genre diversity
-        st.markdown('<div class="insight-header">🎶 Genre Diversity</div>', unsafe_allow_html=True)
-        genre_count = len(set(top_genres))
-        st.markdown(f'<div class="insight-detail">Your listening span covered **{genre_count}** unique genres!</div>', unsafe_allow_html=True)
-
-        # Insight: Number of new artists discovered
-        st.markdown('<div class="insight-header">🌟 New Artists Discovered</div>', unsafe_allow_html=True)
-        new_artists = len(set(artist['name'] for artist in top_artists['items']))
-        st.markdown(f'<div class="insight-detail">You discovered **{new_artists}** new artists this {time_range.lower()}!</div>', unsafe_allow_html=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# Get and display top items with filtering and insights
-def get_top_items_with_insights(sp):
-    st.header("Your Top Songs, Artists, and Genres with Insights")
-
-    # Time range selection for filtering insights
-    time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1, key="time_range_radio")
-    time_range_map = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
-    spotify_time_range = time_range_map[time_range]
-
-    # Fetch top tracks, artists, and genres
-    top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
-    top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
-    top_genres = [genre for artist in top_artists['items'] for genre in artist['genres']]
-
-    # Display top songs
-    if top_tracks['items']:
-        st.subheader("Your Top Songs")
-        for i, track in enumerate(top_tracks['items']):
-            song_name = track['name']
-            artist_name = track['artists'][0]['name']
-            album_cover = track['album']['images'][0]['url']
-            st.image(album_cover, width=150, caption=f"{i+1}. {song_name} by {artist_name}")
-    else:
-        st.write(f"No top songs found for {time_range}.")
-
-    # Display top artists
-    if top_artists['items']:
-        st.subheader("Your Top Artists")
-        for i, artist in enumerate(top_artists['items']):
-            artist_name = artist['name']
-            artist_cover = artist['images'][0]['url']
-            st.image(artist_cover, width=150, caption=f"{i+1}. {artist_name}")
-    else:
-        st.write(f"No top artists found for {time_range}.")
-
-    # Display top genres
-    if top_genres:
-        st.subheader("Your Top Genres")
-        unique_genres = list(set(top_genres))[:5]
-        if unique_genres:
-            st.write("You're currently into these genres:")
-            for genre in unique_genres:
-                st.write(f"🎶 - {genre.capitalize()}")
-        else:
-            st.write(f"No genres found for {time_range}.")
-    else:
-        st.write(f"No top genres for {time_range}.")
-
-    # Show insights based on the user's listening habits
-    display_insights(top_tracks, top_artists, top_genres, time_range)
-
-# Mood-Based Music Discovery
+# Mood-Based Music Discovery with additional source filter
 def discover_music_by_feelings(sp):
     st.header("Curated Music for Your Mood")
     st.write("Select your mood, and we'll build the perfect playlist.")
 
     feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
     intensity = st.slider(f"How {feeling} are you feeling?", 1, 10)
+    
+    # Added song source filter: Liked songs or new discovery
+    song_source = st.radio("Pick your song source:", ["Liked Songs", "Discover New Songs"], index=0)
 
     try:
-        # Fetch user's liked songs and audio features
-        liked_songs = get_all_liked_songs(sp)
-        random.shuffle(liked_songs)
-        song_ids = [track['track']['id'] for track in liked_songs]
+        if song_source == "Liked Songs":
+            liked_songs = get_all_liked_songs(sp)
+            random.shuffle(liked_songs)
+            song_ids = [track['track']['id'] for track in liked_songs]
+        else:
+            results = sp.recommendations(seed_genres=["pop", "rock", "indie"], limit=50)
+            song_ids = [track['id'] for track in results['tracks']]
 
-        # Fetch audio features in batches
         features = fetch_audio_features_in_batches(sp, song_ids)
 
-        # Apply filtering based on mood and intensity
         filtered_songs = filter_songs_by_mood(features, feeling, intensity)
 
         if filtered_songs:
             st.subheader(f"Here's your {feeling.lower()} playlist:")
             for i, feature in enumerate(filtered_songs[:10]):
-                song = liked_songs[i]['track']
+                song = sp.track(feature['id'])
                 song_name = song['name']
                 artist_name = song['artists'][0]['name']
                 album_cover = song['album']['images'][0]['url']
@@ -260,6 +187,47 @@ def discover_music_by_feelings(sp):
     
     except Exception as e:
         st.error(f"Error curating your playlist: {e}")
+
+# Get and display top items with filtering and insights
+def get_top_items_with_insights(sp):
+    st.header("Your Top Songs, Artists, and Genres with Insights")
+
+    time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1, key="time_range_radio")
+    time_range_map = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
+    spotify_time_range = time_range_map[time_range]
+
+    # Fetch top tracks, artists, and genres
+    top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
+    top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
+    top_genres = [genre for artist in top_artists['items'] for genre in artist['genres']]
+
+    # Display top songs with smaller album cover
+    if top_tracks['items']:
+        st.subheader("Your Top Songs")
+        cols = st.columns(5)
+        for i, track in enumerate(top_tracks['items']):
+            song_name = track['name']
+            artist_name = track['artists'][0]['name']
+            album_cover = track['album']['images'][0]['url']
+            with cols[i % 5]:
+                st.image(album_cover, width=100, caption=f"{song_name[:10]}...")
+
+    # Display top artists with smaller cover
+    if top_artists['items']:
+        st.subheader("Your Top Artists")
+        cols = st.columns(5)
+        for i, artist in enumerate(top_artists['items']):
+            artist_name = artist['name']
+            artist_cover = artist['images'][0]['url']
+            with cols[i % 5]:
+                st.image(artist_cover, width=100, caption=f"{artist_name[:10]}...")
+
+    # Personality Fun Section
+    st.subheader("Your Listening Personality")
+    fun_personality_name = random.choice(["Melody Explorer", "Groove Enthusiast", "Rhythm Wanderer", "Harmony Seeker"])
+    associated_color = random.choice(["#ff4081", "#ffd700", "#00ff7f", "#1e90ff"])
+
+    st.markdown(f'<div class="fun-personality" style="color:{associated_color};">{fun_personality_name}</div>', unsafe_allow_html=True)
 
 # Main App Flow
 if is_authenticated():
