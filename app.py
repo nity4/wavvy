@@ -16,10 +16,33 @@ SCOPE = 'user-library-read user-top-read user-read-recently-played'
 # Initialize Spotify OAuth
 sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=SCOPE)
 
-# Streamlit App Layout
-st.set_page_config(page_title="Wavvy", page_icon="🌊", layout="centered", initial_sidebar_state="collapsed")
+# App Layout and Configuration
+st.set_page_config(page_title="VibeCheck", page_icon="🎧", layout="wide", initial_sidebar_state="expanded")
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f4f4f4;
+        font-family: 'Courier New', Courier, monospace;
+    }
+    .stApp {
+        background-image: linear-gradient(to right, #ff4081, #ff6347);
+    }
+    .header-title {
+        font-size: 3em;
+        color: white;
+        font-weight: bold;
+        text-align: center;
+    }
+    .subheader-text {
+        font-size: 1.5em;
+        color: #ff4081;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-# Helper Functions
+st.markdown("<div class='header-title'>VibeCheck</div>", unsafe_allow_html=True)
+
+# Authentication Functions
 def is_authenticated():
     return st.session_state.get('token_info') is not None
 
@@ -36,15 +59,51 @@ def authenticate_user():
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
             st.experimental_set_query_params(code=None)
-            st.success("You're authenticated! Refresh to get your music data.")
+            st.success("You're in. Refresh to access your music data.")
             if st.button("Refresh Now"):
                 st.experimental_set_query_params()
         else:
             auth_url = sp_oauth.get_authorize_url()
-            st.markdown(f'<a href="{auth_url}" target="_self" style="color: #ff4081;">Login with Spotify</a>', unsafe_allow_html=True)
+            st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; background-color: #ff4081; padding: 10px; border-radius: 8px;">Login with Spotify</a>', unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Authentication error: {e}")
 
+# Helper Function for Random Background Color Change (Gen Z Touch)
+def random_color_bg():
+    colors = ["#ff4081", "#00ff7f", "#1e90ff", "#ffd700", "#ff6347", "#8a2be2"]
+    return random.choice(colors)
+
+# Enhanced Mood-Based Music Discovery (New Default Page)
+def discover_music_by_feelings(sp):
+    st.header("Curate Your Vibe")
+    feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
+    intensity = st.slider(f"How {feeling} are you feeling?", 1, 5)
+
+    try:
+        liked_songs = get_all_liked_songs(sp)
+        if len(liked_songs) > 0:
+            random.shuffle(liked_songs)
+            song_ids = [track['track']['id'] for track in liked_songs]
+            features = fetch_audio_features_in_batches(sp, song_ids)
+            filtered_songs = filter_liked_songs_by_mood(features, feeling, intensity)
+        else:
+            filtered_songs = []
+
+        if filtered_songs:
+            st.subheader(f"Here's your {feeling.lower()} playlist:")
+            for i, feature in enumerate(filtered_songs[:10]):
+                song = sp.track(feature['id'])
+                song_name = song['name']
+                artist_name = song['artists'][0]['name']
+                album_cover = song['album']['images'][0]['url']
+                st.image(album_cover, width=150, caption=f"{song_name} by {artist_name}")
+        else:
+            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try tweaking the intensity or picking a different mood.")
+    
+    except Exception as e:
+        st.error(f"Error curating your playlist: {e}")
+
+# Helper Functions
 def get_all_liked_songs(sp):
     liked_songs = []
     try:
@@ -172,9 +231,9 @@ def get_niche_vs_mainstream_insight(sp, top_tracks):
     
     avg_popularity = sum(popularity_scores) / len(popularity_scores)
     if avg_popularity > 70:
-        st.write("Your music taste is quite mainstream.")
+        st.write("Your music taste is pretty mainstream.")
     else:
-        st.write("You tend to explore niche, lesser-known tracks.")
+        st.write("You're into niche, lesser-known tracks.")
 
 # Enhanced Data Visualization
 def plot_genre_distribution(genre_df):
@@ -184,78 +243,7 @@ def plot_genre_distribution(genre_df):
         plt.xlabel("Genres")
         st.pyplot(plt)
     else:
-        st.write("No genres data available to display.")
-
-# Mood-Based Music Discovery
-def discover_music_by_feelings(sp):
-    st.header("Curated Music for Your Mood")
-    feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
-    intensity = st.slider(f"How {feeling} are you feeling?", 1, 5)
-
-    try:
-        liked_songs = get_all_liked_songs(sp)
-        if len(liked_songs) > 0:
-            random.shuffle(liked_songs)
-            song_ids = [track['track']['id'] for track in liked_songs]
-            features = fetch_audio_features_in_batches(sp, song_ids)
-            filtered_songs = filter_liked_songs_by_mood(features, feeling, intensity)
-        else:
-            filtered_songs = []
-
-        if filtered_songs:
-            st.subheader(f"Here's your {feeling.lower()} playlist:")
-            for i, feature in enumerate(filtered_songs[:10]):
-                song = sp.track(feature['id'])
-                song_name = song['name']
-                artist_name = song['artists'][0]['name']
-                album_cover = song['album']['images'][0]['url']
-                st.image(album_cover, width=150, caption=f"{song_name} by {artist_name}")
-        else:
-            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try tweaking the intensity or picking a different mood.")
-    
-    except Exception as e:
-        st.error(f"Error curating your playlist: {e}")
-
-# Insights Page with Top Songs, Artists, and Genres
-def get_top_items_with_insights(sp):
-    st.header("Your Top Songs, Artists, and Genres with Creative Insights")
-    time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
-
-    time_range_map = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
-    spotify_time_range = time_range_map[time_range]
-
-    top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
-    top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
-    top_genres = [genre for artist in top_artists['items'] for genre in artist['genres'] if 'genres' in artist]
-
-    st.subheader("Your Top Songs")
-    for i, track in enumerate(top_tracks['items']):
-        st.write(f"{i+1}. {track['name']} by {track['artists'][0]['name']}")
-        st.image(track['album']['images'][0]['url'], width=60)
-
-    st.subheader("Your Top Artists")
-    for i, artist in enumerate(top_artists['items']):
-        st.write(f"{i+1}. {artist['name']}")
-        st.image(artist['images'][0]['url'], width=60)
-
-    st.subheader("Your Top Genres")
-    genre_df = pd.DataFrame(top_genres, columns=['Genre'])
-    st.table(genre_df)
-
-    # Display insights box
-    st.markdown('<div class="insight-box">', unsafe_allow_html=True)
-    st.markdown('<div class="insight-header">Creative Insights</div>', unsafe_allow_html=True)
-
-    genre_count = len(set(top_genres))
-    st.write(f"You've explored {genre_count} different genres. You have a broad taste in music!")
-
-    most_played_song = top_tracks['items'][0]['name'] if top_tracks['items'] else "None"
-    st.write(f"The song you can't get enough of this {time_range.lower()} is {most_played_song}!")
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # Plot genre distribution
-    plot_genre_distribution(genre_df)
+        st.write("No genre data available to display.")
 
 # Personality Page
 def personality_page(sp):
@@ -289,35 +277,38 @@ def personality_page(sp):
     st.write(f"As a **{fun_personality_name}**, you vibe with music that takes you places. You're not just listening—you're living.")
     st.write("You love to mix it up, keeping things fresh and never settling for the mainstream. Your playlist is as unique as you are.")
 
-# Main App Flow
+# Main App Layout
 if is_authenticated():
     try:
         refresh_token()
         sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
-        page = st.radio("Choose a Page", [
-            "Mood-Based Music Discovery", 
-            "Your Top Songs, Artists, and Genres with Insights",
-            "Listening Time and Music Personality",
-            "Additional Music Insights"
+        # Reorganizing the Page Flow
+        page = st.sidebar.radio("Navigation", [
+            "Vibe Check", 
+            "Your Top Hits", 
+            "Music Personality", 
+            "Listening Insights", 
+            "Extra Insights"
         ])
 
-        if page == "Mood-Based Music Discovery":
+        if page == "Vibe Check":
             discover_music_by_feelings(sp)
-        elif page == "Your Top Songs, Artists, and Genres with Insights":
+        elif page == "Your Top Hits":
             get_top_items_with_insights(sp)
-        elif page == "Listening Time and Music Personality":
-            get_listening_time_insights(sp)
+        elif page == "Music Personality":
             personality_page(sp)
-        elif page == "Additional Music Insights":
+        elif page == "Listening Insights":
+            get_listening_time_insights(sp)
             get_tempo_insights(sp, get_all_liked_songs(sp))
             get_playlist_overlap(sp)
             get_genre_evolution(sp)
+        elif page == "Extra Insights":
             get_niche_vs_mainstream_insight(sp, sp.current_user_top_tracks(time_range='long_term', limit=10))
 
     except Exception as e:
         st.error(f"Error loading the app: {e}")
 else:
-    st.write("Welcome to **Wavvy**")
+    st.write("Welcome to VibeCheck")
     st.write("Login to explore your personalized music experience.")
     authenticate_user()
