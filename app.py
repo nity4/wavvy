@@ -95,6 +95,42 @@ def fetch_audio_features_in_batches(sp, song_ids):
     
     return features
 
+# Filter Liked Songs by Mood
+def filter_liked_songs_by_mood(track_features, feeling, intensity):
+    filtered_songs = []
+    fallback_songs = []
+
+    for track in track_features:
+        valence = track.get('valence', 0)
+        energy = track.get('energy', 0)
+        danceability = track.get('danceability', 0)
+        tempo = track.get('tempo', 0)
+
+        score = 0  # Base score for filtering
+        
+        # Apply mood-based logic
+        if feeling == "Happy":
+            score += (valence - 0.6) * 10 + (energy - intensity / 5) * 5
+        elif feeling == "Sad":
+            score += (0.3 - valence) * 10 + (energy - 0.4) * 5
+        elif feeling == "Chill":
+            score += (0.4 - energy) * 7 + (danceability - 0.4) * 5
+        elif feeling == "Hype":
+            score += (energy - 0.7) * 12 + (tempo - 120) * 0.1
+        elif feeling == "Romantic":
+            score += (valence - 0.5) * 5 + (danceability - 0.4) * 5
+        elif feeling == "Adventurous":
+            score += danceability * 5 + (tempo - 120) * 0.1
+
+        # Choose tracks with a score above the intensity threshold
+        if score > intensity * 1.2:
+            filtered_songs.append(track)
+        elif score > intensity * 0.8:
+            fallback_songs.append(track)
+
+    # If no strongly matching songs, return fallback songs
+    return filtered_songs if filtered_songs else fallback_songs
+
 # Function for Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
     st.header("Curate Your Vibe")
@@ -125,50 +161,6 @@ def discover_music_by_feelings(sp):
     except Exception as e:
         st.error(f"Error curating your playlist: {e}")
 
-# Unique Insights Based on Data
-def get_top_items_with_insights(sp):
-    st.header("Your Top Songs, Artists, and Genres")
-    time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
-
-    time_range_map = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
-    spotify_time_range = time_range_map[time_range]
-
-    top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
-    top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
-    top_genres = [genre for artist in top_artists['items'] for genre in artist['genres'] if 'genres' in artist]
-
-    st.subheader("Your Top Songs")
-    for i, track in enumerate(top_tracks['items']):
-        st.write(f"{i+1}. {track['name']} by {track['artists'][0]['name']}")
-        st.image(track['album']['images'][0]['url'], width=60)
-
-    st.subheader("Your Top Artists")
-    for i, artist in enumerate(top_artists['items']):
-        st.write(f"{i+1}. {artist['name']}")
-        st.image(artist['images'][0]['url'], width=60)
-
-    st.subheader("Your Top Genres")
-    genre_df = pd.DataFrame(top_genres, columns=['Genre'])
-    st.table(genre_df)
-
-    # Unique and Exciting Insights
-    st.write("### Interesting Insights You Didn't Know")
-    st.write(f"**Most Active Listening Time:** You tend to listen to music the most at **{get_most_active_listening_time(sp)}**.")
-    st.write(f"**Diversity of Your Music Taste:** You have explored **{len(set(top_genres))} genres**.")
-    st.write(f"**Rarest Genre:** {get_rarest_genre(top_genres)} is the rarest genre in your playlist!")
-
-# Helper for Most Active Listening Time
-def get_most_active_listening_time(sp):
-    recent_tracks = sp.current_user_recently_played(limit=50)
-    timestamps = [track['played_at'] for track in recent_tracks['items']]
-    time_data = pd.to_datetime(timestamps).hour.value_counts().idxmax()
-    return f"{time_data}:00 - {time_data + 1}:00"
-
-# Helper for Rarest Genre
-def get_rarest_genre(genres):
-    genre_counts = pd.Series(genres).value_counts()
-    return genre_counts.idxmin()
-
 # Listening Time Insights (Daily Listening for the Past Week)
 def get_listening_time_insights(sp):
     recent_tracks = sp.current_user_recently_played(limit=50)
@@ -181,79 +173,6 @@ def get_listening_time_insights(sp):
     daily_minutes = {day: random.randint(20, 120) for day in daily_listening.index}  # Random minutes for demo
     
     return daily_listening, daily_minutes
-
-# Music Personality Page (Create Profile)
-def personality_page(sp):
-    st.header("Your Music Personality")
-
-    # Personality Traits and Colors based on Data
-    top_genres = [genre for artist in sp.current_user_top_artists(time_range='long_term', limit=50)['items'] for genre in artist['genres']]
-    
-    dominant_genre = pd.Series(top_genres).mode()[0]  # Most common genre
-    top_tracks_features = sp.current_user_top_tracks(limit=50)['items']
-
-    avg_valence = np.mean([sp.audio_features(track['id'])[0]['valence'] for track in top_tracks_features])
-    avg_energy = np.mean([sp.audio_features(track['id'])[0]['energy'] for track in top_tracks_features])
-
-    # Decide the personality based on valence (happiness) and energy
-    if avg_valence > 0.5 and avg_energy > 0.5:
-        personality_name, color_name = "Groove Enthusiast", "Gold"
-        color = "#ffd700"
-    elif avg_valence > 0.5:
-        personality_name, color_name = "Harmony Seeker", "Sky Blue"
-        color = "#87CEEB"
-    elif avg_energy > 0.5:
-        personality_name, color_name = "Rhythm Wanderer", "Lime Green"
-        color = "#32CD32"
-    else:
-        personality_name, color_name = "Melody Explorer", "Lavender"
-        color = "#E6E6FA"
-
-    # Display Personality Name and Color
-    st.markdown(f"<div style='background-color:{color}; padding:20px;'><h2>{personality_name}</h2></div>", unsafe_allow_html=True)
-    st.write(f"As a **{personality_name}**, you vibe with {dominant_genre} music. Your personality reflects **{color_name}**, symbolizing your energetic and creative spirit!")
-
-    # Display Listening Stats (Graph)
-    st.subheader("Your Listening Stats Over the Last Week")
-    daily_listening, daily_minutes = get_listening_time_insights(sp)
-    daily_tracks = daily_listening.values
-    days = list(daily_listening.index)
-    minutes_listened = list(daily_minutes.values())
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    # Bar chart for minutes listened
-    bars = ax.bar(days, minutes_listened, color=plt.cm.viridis(np.linspace(0.2, 0.8, len(days))), alpha=0.8)
-    ax.set_xlabel("Day", fontsize=12)
-    ax.set_ylabel("Minutes Listened", fontsize=12, color="#1e90ff")
-    ax.set_title("Your Daily Listening Activity", fontsize=16)
-
-    # Adding values on top of bars
-    for bar in bars:
-        yval = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2, yval + 2, f"{int(yval)}", ha='center', va='bottom', fontsize=10)
-
-    # Line chart for tracks played
-    ax2 = ax.twinx()
-    ax2.plot(days, daily_tracks, color="#ff4081", marker='o', linewidth=2.5, label="Tracks Played")
-    ax2.set_ylabel("Tracks Played", fontsize=12, color="#ff4081")
-
-    # Add legends
-    ax.legend(["Minutes Listened"], loc="upper left")
-    ax2.legend(loc="upper right")
-
-    # Grid and formatting
-    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
-    fig.tight_layout()
-
-    st.pyplot(fig)
-
-    # Total Tracks Played and Total Minutes Listened
-    total_tracks = sum(daily_tracks)
-    total_minutes = sum(minutes_listened)
-
-    st.write(f"**Total Tracks Played This Week:** {total_tracks}")
-    st.write(f"**Total Minutes Listened This Week:** {total_minutes} minutes")
 
 # Main App Layout
 if is_authenticated():
