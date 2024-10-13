@@ -102,16 +102,18 @@ def fetch_audio_features_in_batches(sp, song_ids):
     return features
 
 # Fetch top songs, artists, and genres with time range filter and fun insights
-def get_top_items(sp, column, time_range):
+def get_top_items(sp, column):
     column.subheader("Your Top Songs, Artists, and Genres")
-
-    # Mapping of the selected time range for Spotify's API
+    
+    # Allow users to select time range for insights
+    time_range = column.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1, key="time_range_radio")
+    
     time_range_map = {
         'This Week': 'short_term',
         'This Month': 'medium_term',
         'This Year': 'long_term'
     }
-
+    
     spotify_time_range = time_range_map[time_range]
     column.write(f"Showing data for: **{time_range}**")
 
@@ -181,19 +183,25 @@ def show_fun_insights(sp, top_artists, top_tracks, time_range, column):
 def comprehensive_insights(sp):
     st.header("Your Music Journey: Insights")
 
-    # Time range selection at the top, shared for both sections
-    time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1, key="insights_radio")
-
     # Create two columns for side-by-side layout
     col1, col2 = st.columns(2)
 
     try:
-        # Fetch top tracks and artists based on the selected time range
-        top_tracks = sp.current_user_top_tracks(time_range=time_range, limit=10)
-        top_artists = sp.current_user_top_artists(time_range=time_range, limit=5)
+        # Fetch user's top items based on time range selection
+        time_range = col1.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1, key="insights_radio")
+        spotify_time_range = {
+            'This Week': 'short_term',
+            'This Month': 'medium_term',
+            'This Year': 'long_term'
+        }[time_range]
+
+        # Fetch top tracks
+        top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
+        # Fetch top artists
+        top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
 
         # Display top items in the first column
-        get_top_items(sp, col1, time_range)
+        get_top_items(sp, col1)
 
         # Show fun insights in the second column
         show_fun_insights(sp, top_artists, top_tracks, time_range, col2)
