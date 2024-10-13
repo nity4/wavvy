@@ -77,11 +77,16 @@ st.markdown(
         color: #ff4081;
         font-weight: bold;
     }
+    .insight {
+        font-size: 1rem;
+        padding: 5px;
+    }
     </style>
     """, unsafe_allow_html=True
 )
 
-# Authentication Helpers
+# Helper Functions
+
 def is_authenticated():
     return st.session_state.get('token_info') is not None
 
@@ -107,7 +112,6 @@ def authenticate_user():
     except Exception as e:
         st.error(f"Authentication error: {e}")
 
-# Fetch all liked songs from the user's library
 def get_all_liked_songs(sp):
     liked_songs = []
     results = sp.current_user_saved_tracks(limit=50, offset=0)
@@ -120,7 +124,6 @@ def get_all_liked_songs(sp):
     
     return liked_songs
 
-# Fetch audio features in batches to avoid the 414 error
 def fetch_audio_features_in_batches(sp, song_ids):
     features = []
     batch_size = 100  # Spotify's limit for batch requests
@@ -132,7 +135,6 @@ def fetch_audio_features_in_batches(sp, song_ids):
 
     return features
 
-# Improved filtering of liked songs by mood and intensity
 def filter_liked_songs_by_mood(track_features, feeling, intensity):
     filtered_songs = []
     fallback_songs = []
@@ -158,7 +160,6 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
         elif feeling == "Adventurous":
             score += danceability * 5 + (tempo - 120) * 0.1
 
-        # Use more lenient fallback filtering
         if score > intensity * 1.2:
             filtered_songs.append(track)
         elif score > intensity * 0.8:
@@ -167,13 +168,13 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
     # If no exact matches found, return fallback songs
     return filtered_songs if filtered_songs else fallback_songs
 
-# Recommend new songs based on user's listening habits and mood
+# Enhanced recommendations based on user listening behavior
 def recommend_new_songs_by_mood(sp, recent_tracks, feeling, intensity):
     # Analyze recent listening patterns to match with recommendations
     genres = set([genre for track in recent_tracks for genre in track['track']['artists'][0].get('genres', [])])
     seed_genres = list(genres)[:2] if genres else ["pop"]
-
-    # Ensure the number of seed tracks does not exceed 5 (Spotify API limit)
+    
+    # Only consider recent tracks within a reasonable timeline to match listening habits
     seed_tracks = [track['track']['id'] for track in recent_tracks[:5]] if recent_tracks else None
 
     # Request recommendations from Spotify based on mood and recent habits
@@ -187,7 +188,6 @@ def recommend_new_songs_by_mood(sp, recent_tracks, feeling, intensity):
     
     return filtered_songs
 
-# Mood-Based Music Discovery with enhanced fallback mechanism
 def discover_music_by_feelings(sp):
     st.header("Curated Music for Your Mood")
     st.write("Select your mood, and we'll build the perfect playlist.")
@@ -240,7 +240,7 @@ def get_top_items_with_insights(sp):
     top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
     top_genres = [genre for artist in top_artists['items'] for genre in artist['genres'] if 'genres' in artist and artist['genres']]
 
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([2, 1])
 
     # Display top songs, artists, and genres on the left (col1)
     with col1:
@@ -291,30 +291,36 @@ def get_top_items_with_insights(sp):
         st.markdown('</div>', unsafe_allow_html=True)
 
 # Personality Page with loading effect
-def personality_page():
+def personality_page(sp):
     st.header("Building Your Music Personality...")
 
-    # Add a "loading" effect but no flickering
+    # Extract user data to create consistent personality
+    top_tracks = sp.current_user_top_tracks(time_range='long_term', limit=50)
+    top_genres = [genre for artist in top_tracks['items'] for genre in artist['artists'][0].get('genres', [])]
+    
+    # Define a consistent personality based on the user's top genres and tracks
+    genre_preference = random.choice(top_genres) if top_genres else "pop"
+    personality_map = {
+        "pop": ("Groove Enthusiast", "#ffd700"),
+        "rock": ("Melody Explorer", "#ff4081"),
+        "indie": ("Rhythm Wanderer", "#00ff7f"),
+        "jazz": ("Harmony Seeker", "#1e90ff"),
+        "electronic": ("Beat Adventurer", "#8a2be2"),
+        "hip hop": ("Vibe Creator", "#ff6347"),
+        "classical": ("Tempo Navigator", "#00ced1")
+    }
+
+    # Assign personality based on data
+    fun_personality_name, associated_color = personality_map.get(genre_preference, ("Groove Enthusiast", "#ffd700"))
+
+    # Show progress bar to simulate loading
     progress = st.progress(0)
     for i in range(1, 101, 20):
         time.sleep(0.5)
         progress.progress(i)
     progress.empty()
 
-    # Fun personality name generation with fixed colors
-    personality_map = {
-        "Melody Explorer": "#ff4081",
-        "Groove Enthusiast": "#ffd700",
-        "Rhythm Wanderer": "#00ff7f",
-        "Harmony Seeker": "#1e90ff",
-        "Beat Adventurer": "#8a2be2",   # New Personality
-        "Vibe Creator": "#ff6347",      # New Personality
-        "Tempo Navigator": "#00ced1"    # New Personality
-    }
-    
-    fun_personality_name, associated_color = random.choice(list(personality_map.items()))
-
-    # Display color visually with a fun background
+    # Display personality
     st.markdown(f'<div class="fun-bg" style="background-color:{associated_color};"></div>', unsafe_allow_html=True)
     st.markdown(f'<div class="fun-personality" style="color:{associated_color};">{fun_personality_name}</div>', unsafe_allow_html=True)
     
@@ -325,8 +331,8 @@ def personality_page():
     
     # Awarding a fun "Music Trophy" based on personality
     music_trophies = {
-        "Melody Explorer": "Golden Ear Trophy 🏆",
-        "Groove Enthusiast": "Beat King/Queen Crown 👑",
+        "Groove Enthusiast": "Golden Ear Trophy 🏆",
+        "Melody Explorer": "Beat King/Queen Crown 👑",
         "Rhythm Wanderer": "Sound Explorer's Badge 🏅",
         "Harmony Seeker": "Harmony Master Medallion 🎖️",
         "Beat Adventurer": "Adventure Beat Trophy 🏆",
@@ -354,7 +360,7 @@ if is_authenticated():
         elif page == "Your Top Songs, Artists, and Genres with Insights":
             get_top_items_with_insights(sp)
         elif page == "Your Listening Personality":
-            personality_page()
+            personality_page(sp)
 
     except Exception as e:
         st.error(f"Error loading the app: {e}")
