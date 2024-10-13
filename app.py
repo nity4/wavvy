@@ -45,6 +45,26 @@ st.markdown(
         font-weight: 400;
         color: #ff4081;
     }
+    .insight-box {
+        background-color: #2c2c2c;
+        border-radius: 15px;
+        padding: 15px;
+        margin-left: 20px;
+    }
+    .insight-header {
+        color: #ffd700;
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
+    .insight-detail {
+        color: #f5f5f5;
+        font-size: 1rem;
+        margin-top: 10px;
+    }
+    .genre-icon {
+        font-size: 1.2rem;
+        margin-right: 10px;
+    }
     .fun-personality {
         font-size: 2rem;
         font-weight: bold;
@@ -121,8 +141,8 @@ def fetch_audio_features_in_batches(sp, song_ids):
 
     return features
 
-# Filter songs by mood and intensity
-def filter_songs_by_mood(track_features, feeling, intensity):
+# Filter songs by mood and intensity, refining it to reduce "No tracks match" cases
+def filter_songs_by_mood(track_features, feeling, intensity, recent_genres):
     filtered_songs = []
     
     for track in track_features:
@@ -144,7 +164,9 @@ def filter_songs_by_mood(track_features, feeling, intensity):
         elif feeling == "Adventurous":
             score += track.get('danceability', 0) * 5
 
-        if score > intensity * 1.8:
+        # Additional filter: check if the track matches recent genres to align with user's taste
+        track_genre = random.choice(recent_genres) if recent_genres else "pop"
+        if track_genre in recent_genres and score > intensity * 1.8:
             filtered_songs.append(track)
     
     return filtered_songs
@@ -163,11 +185,12 @@ def discover_music_by_feelings(sp):
     try:
         if song_source == "Liked Songs":
             liked_songs = get_all_liked_songs(sp)
+            recent_genres = [track['track']['album']['genres'][0] for track in liked_songs if track['track']['album']['genres']]
             if len(liked_songs) > 0:
                 random.shuffle(liked_songs)
                 song_ids = [track['track']['id'] for track in liked_songs]
                 features = fetch_audio_features_in_batches(sp, song_ids)
-                filtered_songs = filter_songs_by_mood(features, feeling, intensity)
+                filtered_songs = filter_songs_by_mood(features, feeling, intensity, recent_genres)
             else:
                 filtered_songs = []
         else:
@@ -203,46 +226,49 @@ def get_top_items_with_insights(sp):
     top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
     top_genres = [genre for artist in top_artists['items'] for genre in artist['genres']]
 
-    # Display top songs with full name
-    if top_tracks['items']:
-        st.subheader("Your Top Songs")
-        for i, track in enumerate(top_tracks['items']):
-            song_name = track['name']
-            artist_name = track['artists'][0]['name']
-            album_cover = track['album']['images'][0]['url']
-            st.image(album_cover, width=100, caption=f"{song_name} by {artist_name}")
+    col1, col2 = st.columns([3, 1])
 
-    # Display top artists with full name
-    if top_artists['items']:
-        st.subheader("Your Top Artists")
-        for i, artist in enumerate(top_artists['items']):
-            artist_name = artist['name']
-            artist_cover = artist['images'][0]['url']
-            st.image(artist_cover, width=100, caption=f"{artist_name}")
+    # Display top songs, artists, and genres on the left (col1)
+    with col1:
+        if top_tracks['items']:
+            st.subheader("Your Top Songs")
+            for i, track in enumerate(top_tracks['items']):
+                song_name = track['name']
+                artist_name = track['artists'][0]['name']
+                album_cover = track['album']['images'][0]['url']
+                st.image(album_cover, width=100, caption=f"{song_name} by {artist_name}")
 
-    # Display top genres
-    if top_genres:
-        st.subheader("Your Top Genres")
-        unique_genres = list(set(top_genres))[:5]
-        if unique_genres:
-            st.write("You're currently into these genres:")
-            for genre in unique_genres:
-                st.write(f"{genre.capitalize()}")
+        if top_artists['items']:
+            st.subheader("Your Top Artists")
+            for i, artist in enumerate(top_artists['items']):
+                artist_name = artist['name']
+                artist_cover = artist['images'][0]['url']
+                st.image(artist_cover, width=100, caption=f"{artist_name}")
 
-    # Display interesting insights
-    st.subheader("Interesting Insights")
-    
-    # Insight 1: Genre diversity
-    genre_count = len(set(top_genres))
-    st.write(f"You've explored {genre_count} different genres. You're a true explorer of sound!")
+        if top_genres:
+            st.subheader("Your Top Genres")
+            unique_genres = list(set(top_genres))[:5]
+            if unique_genres:
+                st.write("You're currently into these genres:")
+                for genre in unique_genres:
+                    icon = "🎸" if "rock" in genre else "🎶"
+                    st.write(f"<span class='genre-icon'>{icon}</span> {genre.capitalize()}", unsafe_allow_html=True)
 
-    # Insight 2: Discovering new artists
-    new_artists = len(set(artist['name'] for artist in top_artists['items']))
-    st.write(f"You've discovered {new_artists} new artists this {time_range.lower()}.")
+    # Display insights on the right (col2) inside a box
+    with col2:
+        st.markdown('<div class="insight-box">', unsafe_allow_html=True)
+        st.markdown('<div class="insight-header">Interesting Insights</div>', unsafe_allow_html=True)
 
-    # Insight 3: Listening habits
-    adventurous_genre = random.choice(unique_genres) if unique_genres else "pop"
-    st.write(f"Your taste gravitates toward {adventurous_genre.capitalize()}, which shows you're always seeking something fresh and exciting.")
+        genre_count = len(set(top_genres))
+        st.write(f"<div class='insight-detail'>You've explored {genre_count} different genres. You're a true explorer of sound!</div>", unsafe_allow_html=True)
+
+        new_artists = len(set(artist['name'] for artist in top_artists['items']))
+        st.write(f"<div class='insight-detail'>You've discovered {new_artists} new artists this {time_range.lower()}.</div>", unsafe_allow_html=True)
+
+        adventurous_genre = random.choice(unique_genres) if unique_genres else "pop"
+        st.write(f"<div class='insight-detail'>Your taste gravitates toward {adventurous_genre.capitalize()}, which shows you're always seeking something fresh and exciting.</div>", unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # Personality Page with loading effect
 def personality_page():
