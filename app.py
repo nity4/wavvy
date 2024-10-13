@@ -73,44 +73,41 @@ st.markdown(
     """, unsafe_allow_html=True
 )
 
-# Authentication Helpers
+
+# Helper Function to Check if User is Authenticated
 def is_authenticated():
-    return st.session_state.get('token_info') is not None
+    return "token_info" in st.session_state and st.session_state['token_info']
 
+
+# Helper Function to Refresh Token if Expired
 def refresh_token():
-    if st.session_state['token_info']:
-        if sp_oauth.is_token_expired(st.session_state['token_info']):
-            token_info = sp_oauth.refresh_access_token(st.session_state['token_info']['refresh_token'])
-            st.session_state['token_info'] = token_info
+    if is_authenticated() and sp_oauth.is_token_expired(st.session_state['token_info']):
+        token_info = sp_oauth.refresh_access_token(st.session_state['token_info']['refresh_token'])
+        st.session_state['token_info'] = token_info
 
+
+# Authentication Function
 def authenticate_user():
     try:
-        # Check if token info is already stored in session
-        if "token_info" in st.session_state and st.session_state['token_info']:
-            token_info = st.session_state['token_info']
-
-            # Check if the token has expired and refresh if needed
-            if sp_oauth.is_token_expired(token_info):
-                token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-                st.session_state['token_info'] = token_info
-
+        # Check if user is already authenticated
+        if is_authenticated():
             st.success("You're already authenticated!")
-            return True  # User is authenticated
+            return True
 
-        # If not authenticated, check if authorization code exists in the URL
+        # Check if authorization code is present in URL query parameters
         if "code" in st.experimental_get_query_params():
             code = st.experimental_get_query_params()["code"][0]
 
-            # Exchange the code for an access token
+            # Get access token using the authorization code
             token_info = sp_oauth.get_access_token(code)
-            st.session_state['token_info'] = token_info  # Store token info in session state
+            st.session_state['token_info'] = token_info  # Store token in session state
 
-            # Clear the query params after login
-            st.experimental_set_query_params()  # Remove 'code' from URL
+            # Clear the query params (remove 'code' from URL) after successful authentication
+            st.experimental_set_query_params()  # This clears the 'code' parameter
             st.success("Authentication successful! Please refresh the page.")
             return True
 
-        # If no token and no code, present the login link
+        # If not authenticated, provide the login link
         else:
             auth_url = sp_oauth.get_authorize_url()
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: #ff4081;">Login with Spotify</a>', unsafe_allow_html=True)
@@ -119,6 +116,24 @@ def authenticate_user():
     except Exception as e:
         st.error(f"Authentication error: {e}")
         return False
+
+
+# Main App Flow
+if authenticate_user():
+    try:
+        # Refresh token if necessary
+        refresh_token()
+        sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
+
+        # Now you can proceed with your app's functionality
+        st.write("Welcome to your personalized music experience!")
+        # Add more functionality here (e.g., mood-based discovery, insights, etc.)
+
+    except Exception as e:
+        st.error(f"Error loading the app: {e}")
+else:
+    st.write("Welcome to **Wavvy** 🌊")
+    st.write("Login to explore your personalized music experience.")
 
 
 # Function to fetch all liked songs from the user's library
