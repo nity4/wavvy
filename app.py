@@ -226,15 +226,25 @@ def comprehensive_insights(sp):
     except Exception as e:
         st.error(f"Error fetching insights: {e}")
 
-# Dynamic Music Personality and Color Reveal
 def music_personality_analysis(sp):
     st.header("Discover Your Music Personality 🧠")
     st.write("Let's analyze your music taste and assign you a unique music personality.")
 
     try:
+        # Fetch top tracks and extract genres from albums
         results = sp.current_user_top_tracks(limit=50)
-        top_genres = [track['album']['genres'] for track in results['items'] if 'genres' in track['album']]
+        top_genres = [track['album'].get('genres', []) for track in results['items'] if 'genres' in track['album']]
 
+        # Flatten the list of genres
+        top_genres = [genre for sublist in top_genres for genre in sublist]
+
+        # Backup plan: if no genres found from tracks, use top artists' genres
+        if not top_genres:
+            st.write("Not enough genre data from your tracks, fetching your top artists for genre analysis...")
+            top_artists = sp.current_user_top_artists(limit=5)
+            top_genres = [genre for artist in top_artists['items'] for genre in artist.get('genres', [])]
+
+        # Analyze music personality based on genres
         if top_genres:
             st.write("Analyzing your music personality...")
             progress_bar = st.progress(0)
@@ -242,11 +252,11 @@ def music_personality_analysis(sp):
                 time.sleep(0.01)
                 progress_bar.progress(percent + 1)
 
+            # Assign personality based on the available genres
             personality_type, color, label = assign_personality_and_color(top_genres)
             st.markdown(f"<div class='personality-box' style='color:{color};'>You're a **{personality_type}**! ({label})</div>", unsafe_allow_html=True)
             st.markdown(f"<div style='width:100%; height:120px; background-color:{color}; border-radius:10px;'></div>", unsafe_allow_html=True)
             st.write(f"Your music color is **{color}**!")
-
         else:
             st.write("You're a mystery! We couldn't get enough data, so you're an Explorer with a *Gray* personality.")
 
