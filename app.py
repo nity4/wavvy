@@ -119,7 +119,7 @@ def discover_music_by_feelings(sp):
     st.write("Tell me how you're feeling, and I'll craft the perfect playlist for your mood.")
 
     # Mood and intensity input
-    feeling = st.selectbox("What's your mood today?", ["Happy", "Sad", "Chill", "Hype", "Romantic"])
+    feeling = st.selectbox("What's your mood today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
     intensity = st.slider(f"How {feeling} are you feeling?", 1, 10, help="Adjust how strongly you're feeling that vibe.")
     
     song_type = st.radio("Pick your source:", ["Shuffle My Liked Songs", "Discover New Vibes"])
@@ -143,24 +143,24 @@ def discover_music_by_feelings(sp):
         features = sp.audio_features(tracks=song_ids)
 
         filtered_songs = []
-for i, song in enumerate(liked_songs):
-    feature = features[i]
-    if feature:
-        valence, energy, danceability, tempo, acousticness = feature['valence'], feature['energy'], feature['danceability'], feature['tempo'], feature['acousticness']
-        
-        # Add more robust mood filtering logic
-        if feeling == "Happy" and valence > 0.7 and energy >= intensity / 10:
-            filtered_songs.append(song)
-        elif feeling == "Sad" and valence < 0.3 and energy <= intensity / 10 and acousticness > 0.5:
-            filtered_songs.append(song)
-        elif feeling == "Chill" and energy < 0.5 and tempo < 100 and acousticness > 0.5:
-            filtered_songs.append(song)
-        elif feeling == "Hype" and energy > 0.8 and tempo > 120:
-            filtered_songs.append(song)
-        elif feeling == "Romantic" and valence > 0.6 and 60 <= tempo <= 90:
-            filtered_songs.append(song)
-
-
+        for i, song in enumerate(liked_songs):
+            feature = features[i]
+            if feature:
+                valence, energy, danceability, tempo, acousticness = feature['valence'], feature['energy'], feature['danceability'], feature['tempo'], feature['acousticness']
+                
+                # Add more robust mood filtering logic
+                if feeling == "Happy" and valence > 0.7 and energy >= intensity / 10:
+                    filtered_songs.append(song)
+                elif feeling == "Sad" and valence < 0.3 and energy <= intensity / 10 and acousticness > 0.5:
+                    filtered_songs.append(song)
+                elif feeling == "Chill" and energy < 0.5 and tempo < 100 and acousticness > 0.5:
+                    filtered_songs.append(song)
+                elif feeling == "Hype" and energy > 0.8 and tempo > 120:
+                    filtered_songs.append(song)
+                elif feeling == "Romantic" and valence > 0.6 and 60 <= tempo <= 90:
+                    filtered_songs.append(song)
+                elif feeling == "Adventurous" and danceability > 0.6 and tempo > 100:
+                    filtered_songs.append(song)
 
         if filtered_songs:
             st.subheader(f"Here's your {feeling.lower()} playlist:")
