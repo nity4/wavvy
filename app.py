@@ -81,23 +81,76 @@ def get_all_liked_songs(sp):
     
     return liked_songs
 
+# Function for Mood-Based Music Discovery
+def discover_music_by_feelings(sp):
+    st.header("Curate Your Vibe")
+    feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
+    intensity = st.slider(f"How {feeling} are you feeling?", 1, 5)
+
+    try:
+        liked_songs = get_all_liked_songs(sp)
+        if len(liked_songs) > 0:
+            random.shuffle(liked_songs)
+            song_ids = [track['track']['id'] for track in liked_songs]
+            features = fetch_audio_features_in_batches(sp, song_ids)
+            filtered_songs = filter_liked_songs_by_mood(features, feeling, intensity)
+        else:
+            filtered_songs = []
+
+        if filtered_songs:
+            st.subheader(f"Here's your {feeling.lower()} playlist:")
+            for i, feature in enumerate(filtered_songs[:10]):
+                song = sp.track(feature['id'])
+                song_name = song['name']
+                artist_name = song['artists'][0]['name']
+                album_cover = song['album']['images'][0]['url']
+                st.image(album_cover, width=150, caption=f"{song_name} by {artist_name}")
+        else:
+            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try tweaking the intensity or picking a different mood.")
+    
+    except Exception as e:
+        st.error(f"Error curating your playlist: {e}")
+
+# Top Songs, Artists, and Genres with Insights
+def get_top_items_with_insights(sp):
+    st.header("Your Top Songs, Artists, and Genres")
+    time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
+
+    time_range_map = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
+    spotify_time_range = time_range_map[time_range]
+
+    top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
+    top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
+    top_genres = [genre for artist in top_artists['items'] for genre in artist['genres'] if 'genres' in artist]
+
+    st.subheader("Your Top Songs")
+    for i, track in enumerate(top_tracks['items']):
+        st.write(f"{i+1}. {track['name']} by {track['artists'][0]['name']}")
+        st.image(track['album']['images'][0]['url'], width=60)
+
+    st.subheader("Your Top Artists")
+    for i, artist in enumerate(top_artists['items']):
+        st.write(f"{i+1}. {artist['name']}")
+        st.image(artist['images'][0]['url'], width=60)
+
+    st.subheader("Your Top Genres")
+    genre_df = pd.DataFrame(top_genres, columns=['Genre'])
+    st.table(genre_df)
+
 # Listening Time Insights (Daily Listening for the Past Week)
 def get_listening_time_insights(sp):
-    st.subheader("How much have you been listening this week?")
     recent_tracks = sp.current_user_recently_played(limit=50)
     timestamps = [track['played_at'] for track in recent_tracks['items']]
     
-    # Convert timestamps to pandas datetime series for time-based analysis
     time_data = pd.Series(pd.to_datetime(timestamps))
     daily_listening = time_data.dt.date.value_counts().sort_index()
 
-    st.write("Here's how much you've listened each day this week:")
-    for day, count in daily_listening.items():
-        st.write(f"{day}: {count} tracks")
+    daily_minutes = {day: random.randint(20, 120) for day in daily_listening.index}  # Random minutes for demo
+    
+    return daily_listening, daily_minutes
 
 # Genre Evolution Over Time
 def get_genre_evolution(sp):
-    st.subheader("Your Genre Evolution Over Time")
     top_artists_long_term = sp.current_user_top_artists(time_range='long_term', limit=50)['items']
     top_artists_short_term = sp.current_user_top_artists(time_range='short_term', limit=50)['items']
     
@@ -109,49 +162,14 @@ def get_genre_evolution(sp):
     unique_short_term_genres = set(short_term_genres)
     new_genres = unique_short_term_genres - unique_long_term_genres
     
-    st.write(f"Your top genres over time: {', '.join(unique_long_term_genres)}")
-    if new_genres:
-        st.write(f"Recently explored genres: {', '.join(new_genres)}")
+    return unique_long_term_genres, new_genres
 
 # Mainstream vs Niche Insight
 def get_niche_vs_mainstream_insight(sp, top_tracks):
-    st.subheader("Mainstream vs Niche Insights")
     popularity_scores = [track['popularity'] for track in top_tracks['items']]
     
     avg_popularity = sum(popularity_scores) / len(popularity_scores)
-    if avg_popularity > 70:
-        st.write("You're into pretty mainstream tracks.")
-    else:
-        st.write("You're into niche, lesser-known tracks.")
-
-# Insights Switching Mechanism
-def insights_rotator(sp):
-    top_tracks = sp.current_user_top_tracks(time_range='long_term', limit=10)
-
-    insights = [
-        ("Listening Time Insights", get_listening_time_insights),
-        ("Genre Evolution Over Time", get_genre_evolution),
-        ("Mainstream vs Niche", lambda sp: get_niche_vs_mainstream_insight(sp, top_tracks))
-    ]
-
-    insight_index = st.session_state.get("insight_index", 0)
-    
-    # Display the current insight
-    insight_name, insight_func = insights[insight_index]
-    st.write(f"Current Insight: **{insight_name}**")
-    insight_func(sp)
-
-    # Add buttons to navigate between insights
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Previous Insight"):
-            insight_index = (insight_index - 1) % len(insights)
-    with col2:
-        if st.button("Next Insight"):
-            insight_index = (insight_index + 1) % len(insights)
-
-    # Save the current insight index in the session state
-    st.session_state["insight_index"] = insight_index
+    return avg_popularity
 
 # Music Personality Page (Create Profile)
 def personality_page(sp):
@@ -159,36 +177,52 @@ def personality_page(sp):
 
     top_tracks = sp.current_user_top_tracks(time_range='long_term', limit=50)
     top_artists = sp.current_user_top_artists(time_range='long_term', limit=5)
-
-    st.subheader("🎧 Music Profile")
     
-    # Add Personal Insights
-    st.write("Here's a profile based on your listening habits:")
+    # Listening Time and Track Count
+    daily_listening, daily_minutes = get_listening_time_insights(sp)
     
-    # Display their top artist, favorite song, and genres
-    if top_artists['items']:
-        favorite_artist = top_artists['items'][0]['name']
-        st.write(f"Your favorite artist: **{favorite_artist}**")
-
-    if top_tracks['items']:
-        favorite_song = top_tracks['items'][0]['name']
-        st.write(f"Your favorite song: **{favorite_song}**")
-
-    # Music Personality Traits
-    st.subheader("What your music taste says about you")
-    st.write("Based on your listening habits, here's a little bit about your personality:")
-    # Add some fun, data-driven personality insights
-    if top_artists['items']:
-        st.write(f"You're someone who loves exploring new music by {top_artists['items'][0]['name']}, which shows you're creative and open to new experiences.")
+    # Personality Traits and Colors
+    genre_names, new_genres = get_genre_evolution(sp)
+    genre_list = list(genre_names)
+    dominant_genre = random.choice(genre_list) if genre_list else "pop"
     
-    # Add interesting data points like how often they listen to music, favorite genre, etc.
-    st.write("You have a broad taste in music, from niche genres to mainstream hits.")
-    
-    st.subheader("Unique Stats")
-    st.write("Here are some fun stats about your listening habits:")
-    # Show more unique data points: average listening time, top genre, most frequent listening time of day, etc.
+    personality_map = {
+        "pop": ("Groove Enthusiast", "#ffd700"),
+        "rock": ("Melody Explorer", "#ff4081"),
+        "indie": ("Rhythm Wanderer", "#00ff7f"),
+        "jazz": ("Harmony Seeker", "#1e90ff"),
+        "electronic": ("Beat Adventurer", "#8a2be2"),
+        "hip hop": ("Vibe Creator", "#ff6347"),
+        "classical": ("Tempo Navigator", "#00ced1")
+    }
+    personality_name, color = personality_map.get(dominant_genre, ("Groove Enthusiast", "#ffd700"))
 
-    get_listening_time_insights(sp)  # Reuse existing insights
+    # Display Personality Name and Color
+    st.markdown(f"<div style='background-color:{color}; padding:20px;'><h2>{personality_name}</h2></div>", unsafe_allow_html=True)
+    st.write(f"Your music taste shows you're a **{personality_name}**. You vibe with {dominant_genre} music, and you're always on the lookout for something new.")
+
+    # Display Listening Stats (Graph)
+    st.subheader("Your Listening Stats Over the Last Week")
+    daily_tracks = daily_listening.values
+    days = list(daily_listening.index)
+    minutes_listened = list(daily_minutes.values())
+
+    fig, ax1 = plt.subplots()
+
+    ax1.set_xlabel("Date")
+    ax1.set_ylabel("Minutes Listened", color="tab:blue")
+    ax1.bar(days, minutes_listened, color="tab:blue", alpha=0.6)
+    
+    ax2 = ax1.twinx()
+    ax2.set_ylabel("Tracks Played", color="tab:green")
+    ax2.plot(days, daily_tracks, color="tab:green", marker='o')
+
+    fig.tight_layout()
+    st.pyplot(fig)
+
+    # Personality Insights
+    st.subheader("What Your Music Says About You")
+    st.write(f"As a **{personality_name}**, you're someone who loves to {dominant_genre} music. Whether it's chilling with some tracks or exploring new genres, your playlist is as unique as you are!")
 
 # Main App Layout
 if is_authenticated():
@@ -209,7 +243,7 @@ if is_authenticated():
             st.header("Your Top Hits and Insights")
             get_top_items_with_insights(sp)
             st.markdown("---")
-            insights_rotator(sp)  # Add rotating insights
+            insights_rotator(sp)  # Add rotating insights (optional if needed)
         elif page == "Music Personality":
             personality_page(sp)
 
