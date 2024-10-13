@@ -184,11 +184,36 @@ def discover_music_by_feelings(sp):
         if song_type == "Shuffle Liked Songs":
             liked_songs = get_all_liked_songs(sp)
             random.shuffle(liked_songs)
+            song_ids = [track['track']['id'] for track in liked_songs]  # 'track' exists in liked songs data
         else:
             seed_artists = [artist['id'] for artist in sp.current_user_top_artists(limit=5)['items']]
             results = sp.recommendations(seed_artists=seed_artists, limit=50)
-            liked_songs = results['tracks']
+            song_ids = [track['id'] for track in results['tracks']]  # No 'track' key in recommendations data
 
+        # Fetch audio features in batches to avoid URL length issues
+        features = fetch_audio_features_in_batches(sp, song_ids)
+
+        # Apply refined filters
+        filtered_songs = filter_songs_by_mood(features, feeling, intensity)
+
+        if filtered_songs:
+            st.subheader(f"Here's your {feeling.lower()} playlist:")
+            for i, feature in enumerate(filtered_songs[:10]):
+                if song_type == "Shuffle Liked Songs":
+                    song = liked_songs[i]['track']
+                else:
+                    song = results['tracks'][i]
+
+                song_name = song['name']
+                artist_name = song['artists'][0]['name']
+                album_cover = song['album']['images'][0]['url']
+                st.image(album_cover, width=150)
+                st.write(f"**{song_name}** by *{artist_name}*")
+        else:
+            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try tweaking the intensity or picking a different mood.")
+
+    except Exception as e:
+        st.error(f"Error curating your playlist: {e}")
         song_ids = [track['track']['id'] if song_type == "Shuffle Liked Songs" else track['id'] for track in liked_songs]
 
         # Fetch audio features in batches to avoid URL length issues
