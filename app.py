@@ -91,12 +91,12 @@ def authenticate_user():
     try:
         # Check if user is already authenticated
         if is_authenticated():
-            st.success("You're already authenticated!")
-            return True
+            return True  # User is authenticated
 
         # Check if authorization code is present in URL query parameters
-        if "code" in st.experimental_get_query_params():
-            code = st.experimental_get_query_params()["code"][0]
+        query_params = st.experimental_get_query_params()
+        if "code" in query_params:
+            code = query_params["code"][0]
 
             # Get access token using the authorization code
             token_info = sp_oauth.get_access_token(code)
@@ -104,8 +104,8 @@ def authenticate_user():
 
             # Clear the query params (remove 'code' from URL) after successful authentication
             st.experimental_set_query_params()  # This clears the 'code' parameter
-            st.success("Authentication successful! Please refresh the page.")
-            return True
+
+            return True  # Authentication is successful
 
         # If not authenticated, provide the login link
         else:
@@ -134,6 +134,7 @@ if authenticate_user():
 else:
     st.write("Welcome to **Wavvy** 🌊")
     st.write("Login to explore your personalized music experience.")
+    
 
 
 # Function to fetch all liked songs from the user's library
