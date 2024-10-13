@@ -3,7 +3,6 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import random
 import time
-import pandas as pd
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -135,6 +134,40 @@ def fetch_audio_features_in_batches(sp, song_ids):
         features.extend(audio_features)
 
     return features
+
+# The missing filter_liked_songs_by_mood function
+def filter_liked_songs_by_mood(track_features, feeling, intensity):
+    filtered_songs = []
+    fallback_songs = []
+    
+    for track in track_features:
+        valence = track.get('valence', 0)
+        energy = track.get('energy', 0)
+        danceability = track.get('danceability', 0)
+        tempo = track.get('tempo', 0)
+        score = 0
+
+        # Adjust the scoring to match mood and intensity
+        if feeling == "Happy":
+            score += (valence - 0.6) * 10 + (energy - intensity / 5) * 5
+        elif feeling == "Sad":
+            score += (0.3 - valence) * 10 + (energy - 0.4) * 5
+        elif feeling == "Chill":
+            score += (0.4 - energy) * 7 + (danceability - 0.4) * 5
+        elif feeling == "Hype":
+            score += (energy - 0.7) * 12 + (tempo - 120) * 0.1
+        elif feeling == "Romantic":
+            score += (valence - 0.5) * 5 + (danceability - 0.4) * 5
+        elif feeling == "Adventurous":
+            score += danceability * 5 + (tempo - 120) * 0.1
+
+        if score > intensity * 1.2:
+            filtered_songs.append(track)
+        elif score > intensity * 0.8:
+            fallback_songs.append(track)
+
+    # If no exact matches found, return fallback songs
+    return filtered_songs if filtered_songs else fallback_songs
 
 # Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
