@@ -38,18 +38,30 @@ st.markdown(
 if 'token_info' not in st.session_state:
     st.session_state['token_info'] = None
 
-# Define helper function to check if the user is authenticated
+# Helper function to check if the user is authenticated
 def is_authenticated():
     return st.session_state['token_info'] is not None
 
+# Helper function to check if the token is expired and refresh if needed
+def refresh_token():
+    if st.session_state['token_info']:
+        if sp_oauth.is_token_expired(st.session_state['token_info']):
+            token_info = sp_oauth.refresh_access_token(st.session_state['token_info']['refresh_token'])
+            st.session_state['token_info'] = token_info
+
+# Function to authenticate user with Spotify
 def authenticate_user():
     try:
         if "code" in st.experimental_get_query_params():
             code = st.experimental_get_query_params()["code"][0]
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
-            # Instead of rerunning, use st.experimental_set_query_params to change state
-            st.experimental_set_query_params(code="")  # Clear the code so it doesn't keep rerunning
+            # Clear the code parameter from the URL after successful authentication
+            st.experimental_set_query_params(code=None)
+            st.experimental_rerun()
+        else:
+            auth_url = sp_oauth.get_authorize_url()
+            st.markdown(f'<a href="{auth_url}" target="_self">Click here to authorize with Spotify</a>', unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Authentication error: {e}")
 
@@ -65,20 +77,16 @@ def personality_based_recommendations(sp):
         st.write(f"Based on your personality ({personality_type}) and your current mood ({current_mood}), here are some recommended tracks for you:")
 
         # Fetch top track recommendations based on personality and mood
-        try:
-            recommended_tracks = sp.recommendations(seed_genres=['pop', 'chill'], limit=5)
-            for track in recommended_tracks['tracks']:
-                album_cover = track['album']['images'][0]['url']
-                track_name = track['name']
-                artist_name = track['artists'][0]['name']
-                st.image(album_cover, width=150)
-                st.write(f"**{track_name}** by *{artist_name}*")
-                st.write("---")
-        except Exception as e:
-            st.error(f"Error fetching recommendations from Spotify: {e}")
-            return
+        recommended_tracks = sp.recommendations(seed_genres=['pop', 'chill'], limit=5)
+        for track in recommended_tracks['tracks']:
+            album_cover = track['album']['images'][0]['url']
+            track_name = track['name']
+            artist_name = track['artists'][0]['name']
+            st.image(album_cover, width=150)
+            st.write(f"**{track_name}** by *{artist_name}*")
+            st.write("---")
     except Exception as e:
-        st.error(f"An error occurred in personality-based recommendations: {e}")
+        st.error(f"Error fetching recommendations from Spotify: {e}")
 
 # Function for Predictive Music Recommendation Engine (Life Soundtrack)
 def predictive_recommendations():
@@ -179,6 +187,7 @@ def musical_wellness():
 # Main Flow of the App
 if is_authenticated():
     try:
+        refresh_token()  # Refresh the token if expired
         sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
         # Main navigation
@@ -191,23 +200,3 @@ if is_authenticated():
             "Wellness Insights"
         ])
 
-        if section == "Personality-Based Recommendations":
-            personality_based_recommendations(sp)
-        elif section == "Predictive Soundtrack":
-            predictive_recommendations()
-        elif section == "Music Archetypes":
-            music_archetypes()
-        elif section == "Social Connectivity":
-            social_connectivity(sp)
-        elif section == "Music Journaling":
-            music_journaling()
-        elif section == "Wellness Insights":
-            musical_wellness()
-
-    except Exception as e:
-        st.error(f"Error loading the app: {e}")
-
-else:
-    st.write("Welcome to **Wavvy** 〰")
-    st.write("Wavvy offers you a personal reflection on your emotional and personality-driven journey through music.")
-    authenticate_user()
