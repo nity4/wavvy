@@ -73,18 +73,15 @@ st.markdown(
     """, unsafe_allow_html=True
 )
 
-
 # Helper Function to Check if User is Authenticated
 def is_authenticated():
     return "token_info" in st.session_state and st.session_state['token_info']
-
 
 # Helper Function to Refresh Token if Expired
 def refresh_token():
     if is_authenticated() and sp_oauth.is_token_expired(st.session_state['token_info']):
         token_info = sp_oauth.refresh_access_token(st.session_state['token_info']['refresh_token'])
         st.session_state['token_info'] = token_info
-
 
 # Authentication Function
 def authenticate_user():
@@ -109,8 +106,6 @@ def authenticate_user():
 
         # If not authenticated, provide the login link
         else:
-            auth_url = sp_oauth.get_authorize_url()
-            st.markdown(f'<a href="{auth_url}" target="_self" style="color: #ff4081;">Login with Spotify</a>', unsafe_allow_html=True)
             return False
 
     except Exception as e:
@@ -134,7 +129,8 @@ if authenticate_user():
 else:
     st.write("Welcome to **Wavvy** 🌊")
     st.write("Login to explore your personalized music experience.")
-    
+    auth_url = sp_oauth.get_authorize_url()
+    st.markdown(f'<a href="{auth_url}" target="_self" style="color: #ff4081;">Login with Spotify</a>', unsafe_allow_html=True)
 
 
 # Function to fetch all liked songs from the user's library
