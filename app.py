@@ -150,15 +150,16 @@ def discover_music_by_feelings(sp):
                 
                 # Add more robust mood filtering logic
                 if feeling == "Happy" and valence > 0.7 and energy >= intensity / 10:
-                    filtered_songs.append(song)
-                elif feeling == "Sad" and valence < 0.3 and energy <= intensity / 10 and acousticness > 0.5:
-                    filtered_songs.append(song)
-                elif feeling == "Chill" and energy < 0.5 and tempo < 100 and acousticness > 0.5:
-                    filtered_songs.append(song)
-                elif feeling == "Hype" and energy > 0.8 and tempo > 120:
-                    filtered_songs.append(song)
-                elif feeling == "Romantic" and valence > 0.6 and 60 <= tempo <= 90:
     filtered_songs.append(song)
+elif feeling == "Sad" and valence < 0.3 and energy <= intensity / 10 and acousticness > 0.5:
+    filtered_songs.append(song)
+elif feeling == "Chill" and energy < 0.5 and tempo < 100 and acousticness > 0.5:
+    filtered_songs.append(song)
+elif feeling == "Hype" and energy > 0.8 and tempo > 120:
+    filtered_songs.append(song)
+elif feeling == "Romantic" and valence > 0.6 and 60 <= tempo <= 90:
+    filtered_songs.append(song)
+
 
         if filtered_songs:
             st.subheader(f"Here's your {feeling.lower()} playlist:")
