@@ -212,4 +212,5 @@ if is_authenticated():
 
 else:
     st.write("Welcome to **Wavvy** 〰")
-    st.write("Wavvy offers you a personal reflection on your emotional and personality-driven
+    st.write("Wavvy offers you a personal reflection on your emotional and personality-driven journey through music.")
+    authenticate_user()
