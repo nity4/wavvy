@@ -156,8 +156,7 @@ def filter_songs_by_mood(track_features, feeling, intensity):
     
     return filtered_songs
 
-
-  # Fetch top songs, artists, and genres with a single time range filter and insights
+# Fetch top songs, artists, and genres with insights
 def get_top_items_with_insights(sp):
     st.header("Your Top Songs, Artists, and Genres with Insights")
 
@@ -238,7 +237,6 @@ def get_top_items_with_insights(sp):
         
         st.markdown('</div>', unsafe_allow_html=True)
 
-
 # Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
     st.header("Curated Music for Your Mood")
@@ -272,33 +270,6 @@ def discover_music_by_feelings(sp):
 
     except Exception as e:
         st.error(f"Error curating your playlist: {e}")
-
-# Comprehensive insights and stats with improved flow
-def comprehensive_insights(sp):
-    st.header("Your Music Journey: Insights")
-
-    try:
-        # Fetch user's top items based on time range selection
-        time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1, key="insights_radio")
-        spotify_time_range = {
-            'This Week': 'short_term',
-            'This Month': 'medium_term',
-            'This Year': 'long_term'
-        }[time_range]
-
-        # Fetch top tracks
-        top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
-        # Fetch top artists
-        top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
-
-        # Display top items (songs, artists, genres)
-        get_top_items(sp)
-
-        # Show fun insights (pass the time_range variable to the function)
-        show_fun_insights(sp, top_artists, top_tracks, time_range)
-
-    except Exception as e:
-        st.error(f"Error fetching insights: {e}")
 
 # Music Personality and Color Assignment
 def assign_personality_and_color(genres):
@@ -376,7 +347,7 @@ if is_authenticated():
         if section == "Mood-Based Music Discovery":
             discover_music_by_feelings(sp)
         elif section == "Your Music Insights":
-            comprehensive_insights(sp)
+            get_top_items_with_insights(sp)
         elif section == "Your Music Personality":
             music_personality_analysis(sp)
 
