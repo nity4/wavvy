@@ -138,33 +138,43 @@ def filter_songs_by_mood(track_features, feeling, intensity):
         speechiness = track.get('speechiness', 0)
         instrumentalness = track.get('instrumentalness', 0)
 
-        # Scoring system based on mood and intensity
+        # Initialize a score for each track
         score = 0
+        
+        # Modify scoring based on mood
         if feeling == "Happy":
             score += (valence - 0.7) * 10
             score += (energy - (intensity / 10)) * 5
             score += (tempo - 100) * 2
             score += (liveness - 0.5) * 2
+        
         elif feeling == "Sad":
             score += (0.3 - valence) * 10
-            score += (acousticness - 0.5) * 5
-            score -= energy * 5
+            score += (acousticness - 0.5) * 7  # Stronger weight for acousticness
+            score -= (energy - (0.3 * intensity / 10)) * 5  # Reduce energy sharply
+
         elif feeling == "Chill":
-            score += (0.5 - energy) * 5
-            score += (tempo < 100) * 2
+            score += (0.5 - energy) * 7  # Prioritize low energy
+            score += (tempo < 100) * 2  # Lower tempo is better
             score += instrumentalness * 2
+        
         elif feeling == "Hype":
-            score += (energy - 0.8) * 10
+            score += (energy - 0.8) * 12  # Strong focus on energy
             score += (tempo - 120) * 5
+            score += danceability * 3  # More danceability for hype
+        
         elif feeling == "Romantic":
             score += (valence - 0.6) * 5
-            score += (tempo >= 60 and tempo <= 90) * 5
+            score += (tempo >= 60 and tempo <= 90) * 6  # Emphasize a narrower tempo range
+            score += acousticness * 3  # Add more weight to acoustic for intimacy
+
         elif feeling == "Adventurous":
             score += danceability * 5
-            score += (tempo - 100) * 5
-        
-        # Adjust based on intensity (higher intensity means higher energy/tempo)
-        if score > (intensity * 1.5):  # Threshold based on intensity
+            score += (tempo - 100) * 4
+            score += instrumentalness * 3  # Experimental tracks get a boost
+
+        # Filter by intensity scaling
+        if score > intensity * 1.8:  # Tighten the threshold for filtering
             filtered_songs.append(track)
     
     return filtered_songs
@@ -207,27 +217,6 @@ def discover_music_by_feelings(sp):
                 song_name = song['name']
                 artist_name = song['artists'][0]['name']
                 album_cover = song['album']['images'][0]['url']
-                st.image(album_cover, width=150)
-                st.write(f"**{song_name}** by *{artist_name}*")
-        else:
-            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try tweaking the intensity or picking a different mood.")
-
-    except Exception as e:
-        st.error(f"Error curating your playlist: {e}")
-        song_ids = [track['track']['id'] if song_type == "Shuffle Liked Songs" else track['id'] for track in liked_songs]
-
-        # Fetch audio features in batches to avoid URL length issues
-        features = fetch_audio_features_in_batches(sp, song_ids)
-
-        # Apply refined filters
-        filtered_songs = filter_songs_by_mood(features, feeling, intensity)
-
-        if filtered_songs:
-            st.subheader(f"Here's your {feeling.lower()} playlist:")
-            for track in filtered_songs[:10]:
-                song_name = track['track']['name'] if song_type == "Shuffle Liked Songs" else track['name']
-                artist_name = track['track']['artists'][0]['name'] if song_type == "Shuffle Liked Songs" else track['artists'][0]['name']
-                album_cover = track['track']['album']['images'][0]['url'] if song_type == "Shuffle Liked Songs" else track['album']['images'][0]['url']
                 st.image(album_cover, width=150)
                 st.write(f"**{song_name}** by *{artist_name}*")
         else:
