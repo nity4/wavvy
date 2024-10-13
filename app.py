@@ -115,6 +115,8 @@ def authenticate_user():
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: #ff4081;">Login with Spotify</a>', unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Authentication error: {e}")
+        
+
 # Fetch all liked songs from the user's library
 def get_all_liked_songs(sp):
     liked_songs = []
@@ -140,63 +142,42 @@ def fetch_audio_features_in_batches(sp, song_ids):
 
     return features
 
-# Filter liked songs by mood and intensity with improved accuracy
+# Improved filtering of liked songs by mood and intensity
 def filter_liked_songs_by_mood(track_features, feeling, intensity):
     filtered_songs = []
+    fallback_songs = []
     
     for track in track_features:
         valence = track.get('valence', 0)
         energy = track.get('energy', 0)
         danceability = track.get('danceability', 0)
+        tempo = track.get('tempo', 0)
         score = 0
 
-        # Fine-tuned scoring for better mood-based suggestions
+        # Adjust the scoring to match mood and intensity
         if feeling == "Happy":
-            score += (valence - 0.7) * 10 + (energy - intensity / 10) * 5
+            score += (valence - 0.6) * 10 + (energy - intensity / 10) * 5
         elif feeling == "Sad":
-            score += (0.3 - valence) * 10
+            score += (0.3 - valence) * 10 + (energy - 0.4) * 5
         elif feeling == "Chill":
-            score += (0.5 - energy) * 7
+            score += (0.4 - energy) * 7 + (danceability - 0.4) * 5
         elif feeling == "Hype":
-            score += (energy - 0.8) * 12
+            score += (energy - 0.7) * 12 + (tempo - 120) * 0.1
         elif feeling == "Romantic":
-            score += (valence - 0.6) * 5
+            score += (valence - 0.5) * 5 + (danceability - 0.4) * 5
         elif feeling == "Adventurous":
-            score += danceability * 5
+            score += danceability * 5 + (tempo - 120) * 0.1
 
-        if score > intensity * 1.5:
+        # Use more lenient fallback filtering
+        if score > intensity * 1.2:
             filtered_songs.append(track)
+        elif score > intensity * 0.8:
+            fallback_songs.append(track)
 
-    return filtered_songs
+    # If no exact matches found, return fallback songs
+    return filtered_songs if filtered_songs else fallback_songs
 
-# Recommend new songs based on user's listening habits and mood
-def recommend_new_songs_by_mood(sp, recent_tracks, feeling, intensity):
-    # Analyze recent listening patterns to match with recommendations
-    genres = set([genre for track in recent_tracks for genre in track['album'].get('genres', [])])
-    recency = [track['album']['release_date'] for track in recent_tracks]
-    latest_release_year = max([int(date.split('-')[0]) for date in recency if date])
-
-    seed_genres = list(genres)[:2] if genres else ["pop"]
-    seed_tracks = [track['id'] for track in recent_tracks[:5]] if recent_tracks else None
-
-    # Determine if user prefers newer songs or older songs
-    if latest_release_year >= 2019:
-        release_range = "new"  # Recent releases
-    else:
-        release_range = "nostalgic"  # Songs from past 5 years
-
-    # Request recommendations from Spotify based on mood and recent habits
-    recommendations = sp.recommendations(seed_tracks=seed_tracks, seed_genres=seed_genres, limit=20)
-    
-    # Filter recommendations by mood
-    song_ids = [track['id'] for track in recommendations['tracks']]
-    audio_features = fetch_audio_features_in_batches(sp, song_ids)
-    
-    filtered_songs = filter_liked_songs_by_mood(audio_features, feeling, intensity)
-    
-    return filtered_songs
-
-# Mood-Based Music Discovery with added recommendation and timeline filter
+# Mood-Based Music Discovery with enhanced fallback mechanism
 def discover_music_by_feelings(sp):
     st.header("Curated Music for Your Mood")
     st.write("Select your mood, and we'll build the perfect playlist.")
@@ -204,23 +185,15 @@ def discover_music_by_feelings(sp):
     feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
     intensity = st.slider(f"How {feeling} are you feeling?", 1, 10)
     
-    # Added song source filter: Liked songs or new discovery
-    song_source = st.radio("Pick your song source:", ["Liked Songs", "Discover New Songs"], index=0)
-
     try:
-        if song_source == "Liked Songs":
-            liked_songs = get_all_liked_songs(sp)
-            if len(liked_songs) > 0:
-                random.shuffle(liked_songs)
-                song_ids = [track['track']['id'] for track in liked_songs]
-                features = fetch_audio_features_in_batches(sp, song_ids)
-                filtered_songs = filter_liked_songs_by_mood(features, feeling, intensity)
-            else:
-                filtered_songs = []
+        liked_songs = get_all_liked_songs(sp)
+        if len(liked_songs) > 0:
+            random.shuffle(liked_songs)  # Shuffle to avoid bias from first tracks
+            song_ids = [track['track']['id'] for track in liked_songs]
+            features = fetch_audio_features_in_batches(sp, song_ids)
+            filtered_songs = filter_liked_songs_by_mood(features, feeling, intensity)
         else:
-            # Analyze user's recent listening habits
-            recent_tracks = sp.current_user_recently_played(limit=50)['items']
-            filtered_songs = recommend_new_songs_by_mood(sp, recent_tracks, feeling, intensity)
+            filtered_songs = []
 
         if filtered_songs:
             st.subheader(f"Here's your {feeling.lower()} playlist:")
@@ -235,6 +208,7 @@ def discover_music_by_feelings(sp):
     
     except Exception as e:
         st.error(f"Error curating your playlist: {e}")
+
 
 # Insights Page with Top Songs, Artists, and Genres
 def get_top_items_with_insights(sp):
