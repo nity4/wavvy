@@ -62,8 +62,13 @@ st.markdown(
     }
     .fun-personality {
         font-size: 2rem;
-        color: #ff4081;
         font-weight: bold;
+    }
+    .fun-bg {
+        width: 100%;
+        height: 50px;
+        margin-bottom: 20px;
+        border-radius: 5px;
     }
     </style>
     """, unsafe_allow_html=True
@@ -190,7 +195,7 @@ def discover_music_by_feelings(sp):
 
 # Insights Page with Top Songs, Artists, and Genres
 def get_top_items_with_insights(sp):
-    st.header("Your Top Songs, Artists, and Genres with Insights")
+    st.header("Your Top Songs, Artists, and Genres with Creative Insights")
 
     time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1, key="time_range_radio")
     time_range_map = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
@@ -231,33 +236,39 @@ def get_top_items_with_insights(sp):
             for genre in unique_genres:
                 st.write(f"🎶 - {genre.capitalize()}")
 
-    # Display insights
-    st.subheader("Listening Insights")
-    if top_tracks['items']:
-        most_played_song = top_tracks['items'][0]['name']
-        st.write(f"**Your most played song:** {most_played_song}")
+    # Display creative insights
+    st.subheader("Creative Insights")
     
-    if top_artists['items']:
-        most_played_artist = top_artists['items'][0]['name']
-        st.write(f"**Your most played artist:** {most_played_artist}")
-
+    # Insight 1: Genre diversity
     genre_count = len(set(top_genres))
-    st.write(f"**You've explored** {genre_count} **unique genres**.")
-    
+    st.write(f"**You've explored** {genre_count} **unique genres**, making you quite the music explorer!")
+
+    # Insight 2: Discovering new artists
     new_artists = len(set(artist['name'] for artist in top_artists['items']))
-    st.write(f"**You've discovered** {new_artists} **new artists** this {time_range.lower()}.")
+    st.write(f"**You've discovered** {new_artists} **new artists** during this {time_range.lower()}. Your taste is expanding!")
+
+    # Insight 3: Unique listening trends
+    adventurous_genre = random.choice(unique_genres) if unique_genres else "pop"
+    st.write(f"**Your most adventurous genre**: {adventurous_genre.capitalize()}. You like to keep things interesting!")
 
 # Personality Page
 def personality_page():
     st.header("Your Listening Personality")
     
+    # Fun personality name generation
     fun_personality_name = random.choice(["Melody Explorer", "Groove Enthusiast", "Rhythm Wanderer", "Harmony Seeker"])
+    
+    # Random color assignment
     associated_color = random.choice(["#ff4081", "#ffd700", "#00ff7f", "#1e90ff"])
 
+    # Display color visually with a fun background
+    st.markdown(f'<div class="fun-bg" style="background-color:{associated_color};"></div>', unsafe_allow_html=True)
     st.markdown(f'<div class="fun-personality" style="color:{associated_color};">{fun_personality_name}</div>', unsafe_allow_html=True)
     
-    st.write(f"Based on your listening habits, you seem to be a **{fun_personality_name}**. Your musical choices are vibrant and reflect a love for {random.choice(['adventurous', 'chill', 'exciting', 'romantic'])} tunes!")
-    st.write(f"The color {associated_color} represents your musical vibe—bright, energetic, and always in tune with the mood.")
+    # Personality description and compliments
+    st.write(f"As a **{fun_personality_name}**, you're someone who is deeply connected to music and its ability to shape emotions.")
+    st.write("Your music choices reflect your personality as someone who loves variety, isn't afraid to explore different vibes, and values emotional depth.")
+    st.write("You're a true connoisseur of sound, and your taste deserves compliments for always being fresh and unique!")
 
 # Main App Flow
 if is_authenticated():
@@ -265,7 +276,8 @@ if is_authenticated():
         refresh_token()
         sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
-        page = st.sidebar.selectbox("Choose a Page", [
+        # Page switching options displayed on screen
+        page = st.radio("Choose a Page", [
             "Mood-Based Music Discovery", 
             "Your Top Songs, Artists, and Genres with Insights",
             "Your Listening Personality"
