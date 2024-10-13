@@ -207,17 +207,23 @@ def personality_page(sp):
     days = list(daily_listening.index)
     minutes_listened = list(daily_minutes.values())
 
-    fig, ax1 = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    ax1.set_xlabel("Date")
-    ax1.set_ylabel("Minutes Listened", color="tab:blue")
-    ax1.bar(days, minutes_listened, color="tab:blue", alpha=0.6)
+    ax.bar(days, minutes_listened, color="#1e90ff", alpha=0.8, label="Minutes Listened")
+    ax.set_xlabel("Day", fontsize=12)
+    ax.set_ylabel("Minutes Listened", fontsize=12, color="#1e90ff")
     
-    ax2 = ax1.twinx()
-    ax2.set_ylabel("Tracks Played", color="tab:green")
-    ax2.plot(days, daily_tracks, color="tab:green", marker='o')
+    ax2 = ax.twinx()
+    ax2.plot(days, daily_tracks, color="#ff4081", marker='o', label="Tracks Played", linewidth=2)
+    ax2.set_ylabel("Tracks Played", fontsize=12, color="#ff4081")
 
+    ax.set_title("Your Daily Listening Activity", fontsize=16)
     fig.tight_layout()
+
+    # Add legends
+    ax.legend(loc="upper left")
+    ax2.legend(loc="upper right")
+
     st.pyplot(fig)
 
     # Personality Insights
@@ -242,8 +248,6 @@ if is_authenticated():
         elif page == "Your Top Hits":
             st.header("Your Top Hits and Insights")
             get_top_items_with_insights(sp)
-            st.markdown("---")
-            insights_rotator(sp)  # Add rotating insights (optional if needed)
         elif page == "Music Personality":
             personality_page(sp)
 
