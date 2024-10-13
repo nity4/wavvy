@@ -124,7 +124,52 @@ def fetch_audio_features_in_batches(sp, song_ids):
 
     return features
 
-# Enhanced Mood-Based Music Discovery
+# Enhanced Mood-Based Music Discovery with Refined Filters
+def filter_songs_by_mood(track_features, feeling, intensity):
+    filtered_songs = []
+    
+    for i, track in enumerate(track_features):
+        valence = track.get('valence', 0)
+        energy = track.get('energy', 0)
+        tempo = track.get('tempo', 0)
+        danceability = track.get('danceability', 0)
+        acousticness = track.get('acousticness', 0)
+        liveness = track.get('liveness', 0)
+        speechiness = track.get('speechiness', 0)
+        instrumentalness = track.get('instrumentalness', 0)
+
+        # Scoring system based on mood and intensity
+        score = 0
+        if feeling == "Happy":
+            score += (valence - 0.7) * 10
+            score += (energy - (intensity / 10)) * 5
+            score += (tempo - 100) * 2
+            score += (liveness - 0.5) * 2
+        elif feeling == "Sad":
+            score += (0.3 - valence) * 10
+            score += (acousticness - 0.5) * 5
+            score -= energy * 5
+        elif feeling == "Chill":
+            score += (0.5 - energy) * 5
+            score += (tempo < 100) * 2
+            score += instrumentalness * 2
+        elif feeling == "Hype":
+            score += (energy - 0.8) * 10
+            score += (tempo - 120) * 5
+        elif feeling == "Romantic":
+            score += (valence - 0.6) * 5
+            score += (tempo >= 60 and tempo <= 90) * 5
+        elif feeling == "Adventurous":
+            score += danceability * 5
+            score += (tempo - 100) * 5
+        
+        # Adjust based on intensity (higher intensity means higher energy/tempo)
+        if score > (intensity * 1.5):  # Threshold based on intensity
+            filtered_songs.append(track)
+    
+    return filtered_songs
+
+# Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
     st.header("Curated Music for Your Mood")
     st.write("Select your mood, and we'll build the perfect playlist.")
@@ -135,9 +180,9 @@ def discover_music_by_feelings(sp):
 
     try:
         st.write("Creating your playlist...")
-        
+
         if song_type == "Shuffle Liked Songs":
-            liked_songs = get_all_liked_songs(sp)  # Fetch all liked songs
+            liked_songs = get_all_liked_songs(sp)
             random.shuffle(liked_songs)
         else:
             seed_artists = [artist['id'] for artist in sp.current_user_top_artists(limit=5)['items']]
@@ -149,23 +194,8 @@ def discover_music_by_feelings(sp):
         # Fetch audio features in batches to avoid URL length issues
         features = fetch_audio_features_in_batches(sp, song_ids)
 
-        filtered_songs = []
-        for i, song in enumerate(liked_songs):
-            feature = features[i]
-            if feature:
-                valence, energy, danceability, tempo, acousticness = feature['valence'], feature['energy'], feature['danceability'], feature['tempo'], feature['acousticness']
-                if feeling == "Happy" and valence > 0.7 and energy >= intensity / 10:
-                    filtered_songs.append(song)
-                elif feeling == "Sad" and valence < 0.3 and energy <= intensity / 10 and acousticness > 0.5:
-                    filtered_songs.append(song)
-                elif feeling == "Chill" and energy < 0.5 and tempo < 100:
-                    filtered_songs.append(song)
-                elif feeling == "Hype" and energy > 0.8 and tempo > 120:
-                    filtered_songs.append(song)
-                elif feeling == "Romantic" and valence > 0.6 and 60 <= tempo <= 90:
-                    filtered_songs.append(song)
-                elif feeling == "Adventurous" and danceability > 0.6 and tempo > 100:
-                    filtered_songs.append(song)
+        # Apply refined filters
+        filtered_songs = filter_songs_by_mood(features, feeling, intensity)
 
         if filtered_songs:
             st.subheader(f"Here's your {feeling.lower()} playlist:")
