@@ -103,6 +103,21 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
     # If no exact matches found, return fallback songs
     return filtered_songs if filtered_songs else fallback_songs
 
+# Function to fetch top artists and compare for new artist discovery
+def get_new_artists(sp, time_range):
+    # Fetch the user's long-term top artists to act as the baseline
+    long_term_artists = sp.current_user_top_artists(time_range='long_term', limit=50)['items']
+    long_term_artist_names = set(artist['name'] for artist in long_term_artists)
+    
+    # Fetch top artists for the selected time frame (week, month, year)
+    time_frame_artists = sp.current_user_top_artists(time_range=time_range, limit=50)['items']
+    time_frame_artist_names = set(artist['name'] for artist in time_frame_artists)
+    
+    # Identify new artists in the selected time frame that are not in the long-term baseline
+    new_artists = time_frame_artist_names - long_term_artist_names
+    
+    return len(new_artists), new_artists  # Return the count of new artists and their names
+
 # Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
     st.header("Curated Music for Your Mood")
