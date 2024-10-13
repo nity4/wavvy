@@ -188,7 +188,7 @@ def discover_music_by_feelings(sp):
     except Exception as e:
         st.error(f"Error curating your playlist: {e}")
 
-# Get and display top items with filtering and insights
+# Insights Page with Top Songs, Artists, and Genres
 def get_top_items_with_insights(sp):
     st.header("Your Top Songs, Artists, and Genres with Insights")
 
@@ -222,12 +222,42 @@ def get_top_items_with_insights(sp):
             with cols[i % 5]:
                 st.image(artist_cover, width=100, caption=f"{artist_name[:10]}...")
 
-    # Personality Fun Section
-    st.subheader("Your Listening Personality")
+    # Display top genres
+    if top_genres:
+        st.subheader("Your Top Genres")
+        unique_genres = list(set(top_genres))[:5]
+        if unique_genres:
+            st.write("You're currently into these genres:")
+            for genre in unique_genres:
+                st.write(f"🎶 - {genre.capitalize()}")
+
+    # Display insights
+    st.subheader("Listening Insights")
+    if top_tracks['items']:
+        most_played_song = top_tracks['items'][0]['name']
+        st.write(f"**Your most played song:** {most_played_song}")
+    
+    if top_artists['items']:
+        most_played_artist = top_artists['items'][0]['name']
+        st.write(f"**Your most played artist:** {most_played_artist}")
+
+    genre_count = len(set(top_genres))
+    st.write(f"**You've explored** {genre_count} **unique genres**.")
+    
+    new_artists = len(set(artist['name'] for artist in top_artists['items']))
+    st.write(f"**You've discovered** {new_artists} **new artists** this {time_range.lower()}.")
+
+# Personality Page
+def personality_page():
+    st.header("Your Listening Personality")
+    
     fun_personality_name = random.choice(["Melody Explorer", "Groove Enthusiast", "Rhythm Wanderer", "Harmony Seeker"])
     associated_color = random.choice(["#ff4081", "#ffd700", "#00ff7f", "#1e90ff"])
 
     st.markdown(f'<div class="fun-personality" style="color:{associated_color};">{fun_personality_name}</div>', unsafe_allow_html=True)
+    
+    st.write(f"Based on your listening habits, you seem to be a **{fun_personality_name}**. Your musical choices are vibrant and reflect a love for {random.choice(['adventurous', 'chill', 'exciting', 'romantic'])} tunes!")
+    st.write(f"The color {associated_color} represents your musical vibe—bright, energetic, and always in tune with the mood.")
 
 # Main App Flow
 if is_authenticated():
@@ -235,15 +265,18 @@ if is_authenticated():
         refresh_token()
         sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
-        section = st.radio("Choose an Experience:", [
+        page = st.sidebar.selectbox("Choose a Page", [
             "Mood-Based Music Discovery", 
-            "Your Music Insights"
+            "Your Top Songs, Artists, and Genres with Insights",
+            "Your Listening Personality"
         ], key="main_radio")
 
-        if section == "Mood-Based Music Discovery":
+        if page == "Mood-Based Music Discovery":
             discover_music_by_feelings(sp)
-        elif section == "Your Music Insights":
+        elif page == "Your Top Songs, Artists, and Genres with Insights":
             get_top_items_with_insights(sp)
+        elif page == "Your Listening Personality":
+            personality_page()
 
     except Exception as e:
         st.error(f"Error loading the app: {e}")
