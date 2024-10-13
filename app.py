@@ -22,8 +22,8 @@ st.markdown(
     """
     <style>
     body {
-        background-color: #f5f5f5;  /* Light background for better contrast with black text */
-        color: #000000;  /* Black text for better visibility */
+        background-color: #f5f5f5;
+        color: #000000;
         font-family: 'Roboto', sans-serif;
     }
     .stButton>button {
@@ -166,6 +166,24 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
 
     # If no exact matches found, return fallback songs
     return filtered_songs if filtered_songs else fallback_songs
+
+# Recommend new songs based on user's listening habits and mood
+def recommend_new_songs_by_mood(sp, recent_tracks, feeling, intensity):
+    # Analyze recent listening patterns to match with recommendations
+    genres = set([genre for track in recent_tracks for genre in track['track']['artists'][0].get('genres', [])])
+    seed_genres = list(genres)[:2] if genres else ["pop"]
+    seed_tracks = [track['track']['id'] for track in recent_tracks[:5]] if recent_tracks else None
+
+    # Request recommendations from Spotify based on mood and recent habits
+    recommendations = sp.recommendations(seed_tracks=seed_tracks, seed_genres=seed_genres, limit=20)
+    
+    # Filter recommendations by mood
+    song_ids = [track['id'] for track in recommendations['tracks']]
+    audio_features = fetch_audio_features_in_batches(sp, song_ids)
+    
+    filtered_songs = filter_liked_songs_by_mood(audio_features, feeling, intensity)
+    
+    return filtered_songs
 
 # Mood-Based Music Discovery with enhanced fallback mechanism
 def discover_music_by_feelings(sp):
