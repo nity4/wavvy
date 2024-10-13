@@ -99,7 +99,6 @@ def authenticate_user():
     except Exception as e:
         st.error(f"Authentication error: {e}")
 
-
 # Function to fetch all liked songs from the user's library
 def get_all_liked_songs(sp):
     liked_songs = []
@@ -182,30 +181,7 @@ def discover_music_by_feelings(sp):
     except Exception as e:
         st.error(f"Error curating your playlist: {e}")
 
-
-# Main App Flow
-if is_authenticated():
-    try:
-        refresh_token()
-        sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
-
-        section = st.radio("Choose an Experience:", [
-            "Mood-Based Music Discovery", 
-            "Your Music Insights", 
-            "Your Music Personality"
-        ])
-
-        if section == "Mood-Based Music Discovery":
-            discover_music_by_feelings(sp)
-        # Other sections omitted for brevity
-    except Exception as e:
-        st.error(f"Error loading the app: {e}")
-else:
-    st.write("Welcome to **Wavvy** 🌊")
-    st.write("Login to explore your personalized music experience.")
-    authenticate_user()
-
-# Enhanced Insights with Fun Stats
+# Fun Stats and Music Insights
 def comprehensive_insights(sp):
     st.header("Your Music Journey: Insights")
     st.write("Here's a deeper dive into your music habits. Let's explore what makes your taste unique.")
@@ -221,15 +197,9 @@ def comprehensive_insights(sp):
         total_tracks = len(recent_tracks['items'])
         listening_time = total_tracks * 3  # Assuming each track is ~3 minutes long
 
-        # Fun insights about user's listening habits
         st.subheader("Recent Listening Stats")
         st.write(f"Tracks Played: {total_tracks}")
         st.write(f"Estimated Listening Time: {listening_time} minutes")
-
-        # Fun fact: Favorite listening time
-        current_hour = time.localtime().tm_hour
-        time_of_day = 'morning' if current_hour < 12 else 'afternoon' if current_hour < 18 else 'night'
-        st.write(f"Most Active Listening Time: You seem to vibe the most during the {time_of_day}.")
 
         # Top 5 Artists and Genres
         st.subheader("Your Top 5 Artists")
@@ -333,7 +303,6 @@ def assign_personality_and_color(genres):
         if genre in genre_string:
             return personality, color, label
     return "Explorer", "#808080", "The Wanderer"  # Default if no match
-
 
 # Main App Flow
 if is_authenticated():
