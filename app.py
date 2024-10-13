@@ -85,35 +85,33 @@ def refresh_token():
 
 def authenticate_user():
     try:
-        # Check if there's a token in session state already
+        # Check if token is already in session state
         if "token_info" in st.session_state and st.session_state['token_info']:
             token_info = st.session_state['token_info']
 
-            # Check if token is expired and refresh if necessary
+            # Refresh the token if it's expired
             if sp_oauth.is_token_expired(token_info):
                 token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
                 st.session_state['token_info'] = token_info
 
             st.success("You're already authenticated!")
-            return True  # User is authenticated
+            return True
 
-        # Check if there is an authorization code in the URL (redirected from Spotify)
+        # Check for authorization code in URL (after redirect from Spotify)
         if "code" in st.experimental_get_query_params():
             code = st.experimental_get_query_params()["code"][0]
 
-            # Exchange the code for an access token
+            # Exchange the authorization code for access token
             token_info = sp_oauth.get_access_token(code)
-            st.session_state['token_info'] = token_info  # Save token info in session state
+            st.session_state['token_info'] = token_info  # Store token in session state
 
-            # Clean the URL after successful login
+            # Clear the query params (remove 'code' from URL)
             st.experimental_set_query_params(code=None)
-            st.success("You're authenticated! Refresh to get your music data.")
-            
-            # Automatically reload the page
-            st.experimental_rerun()
+
+            st.success("You're authenticated! Please refresh the page.")
             return True
 
-        # If no token and no code, present the login link
+        # If no token or code, display login link
         else:
             auth_url = sp_oauth.get_authorize_url()
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: #ff4081;">Login with Spotify</a>', unsafe_allow_html=True)
