@@ -99,18 +99,17 @@ def authenticate_user():
     except Exception as e:
         st.error(f"Authentication error: {e}")
 
-# Fetch all liked songs
-def get_all_liked_songs(sp):
-    liked_songs = []
-    results = sp.current_user_saved_tracks(limit=50, offset=0)
-    total_songs = results['total']
-    
-    while len(liked_songs) < total_songs:
-        liked_songs.extend(results['items'])
-        offset = len(liked_songs)
-        results = sp.current_user_saved_tracks(limit=50, offset=offset)
-    
-    return liked_songs
+# Function to fetch audio features in batches to avoid the 414 error
+def fetch_audio_features_in_batches(sp, song_ids):
+    features = []
+    batch_size = 100  # Spotify's limit for batch requests
+
+    for i in range(0, len(song_ids), batch_size):
+        batch = song_ids[i:i + batch_size]
+        audio_features = sp.audio_features(tracks=batch)
+        features.extend(audio_features)
+
+    return features
 
 # Enhanced Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
@@ -133,7 +132,9 @@ def discover_music_by_feelings(sp):
             liked_songs = results['tracks']
 
         song_ids = [track['track']['id'] if song_type == "Shuffle Liked Songs" else track['id'] for track in liked_songs]
-        features = sp.audio_features(tracks=song_ids)
+
+        # Fetch audio features in batches to avoid URL length issues
+        features = fetch_audio_features_in_batches(sp, song_ids)
 
         filtered_songs = []
         for i, song in enumerate(liked_songs):
@@ -166,6 +167,7 @@ def discover_music_by_feelings(sp):
 
     except Exception as e:
         st.error(f"Error curating your playlist: {e}")
+
 
 # Main App Flow
 if is_authenticated():
