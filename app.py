@@ -112,7 +112,7 @@ def get_top_items(sp, column, time_range):
         'This Year': 'long_term'
     }
 
-    spotify_time_range = time_range_map[time_range]
+    spotify_time_range = time_range_map[time_range]  # Correct time range for the API
     column.write(f"Showing data for: **{time_range}**")
 
     # Fetch top tracks
@@ -205,7 +205,7 @@ def comprehensive_insights(sp):
 if is_authenticated():
     try:
         refresh_token()
-        sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
+        sp = spotipy.Spotipy(auth=st.session_state['token_info']['access_token'])
 
         section = st.radio("Choose an Experience:", [
             "Mood-Based Music Discovery", 
