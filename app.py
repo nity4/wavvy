@@ -3,6 +3,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import matplotlib.pyplot as plt
+import time
 
 # Spotify API credentials stored in Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -29,6 +30,9 @@ st.markdown(
     .stButton>button {
         background-color: #ff5f6d;
         color: white;
+    }
+    .stImage {
+        border-radius: 10px;
     }
     </style>
     """, unsafe_allow_html=True
@@ -70,76 +74,117 @@ def authenticate_user():
     except Exception as e:
         st.error(f"Authentication error: {e}")
 
-# Feature 1: Personality-Based Recommendations from Liked Songs
-def personality_based_recommendations(sp):
+# Feature 1: Discover Music Based on Feelings
+def discover_music_by_feelings(sp):
     try:
-        st.header("Discover Music Based on Your Personality 🎧")
-        
+        st.header("Discover Music Based on Your Feelings 🎶")
+
+        # Ask user how they're feeling and intensity
+        feeling = st.selectbox("How are you feeling right now?", ["Happy", "Sad", "Calm", "Energetic"])
+        intensity = st.slider(f"How {feeling} are you feeling?", 1, 10)
+
         # Fetch liked songs
         results = sp.current_user_saved_tracks(limit=50)
-        liked_songs = [track['track']['name'] for track in results['items']]
-        
-        st.write("Here are some recommendations from your liked songs:")
-        for song in liked_songs[:10]:  # Display 10 liked songs
-            st.write(f"🎵 {song}")
+        liked_songs = results['items']
+
+        # Filter songs based on feelings (mock filtering logic for now)
+        st.write(f"Here are some {feeling.lower()} songs based on your intensity level of {intensity}:")
+        for track in liked_songs[:10]:  # Display 10 liked songs
+            album_cover = track['track']['album']['images'][0]['url']
+            song_name = track['track']['name']
+            artist_name = track['track']['artists'][0]['name']
+            st.image(album_cover, width=150)
+            st.write(f"🎵 **{song_name}** by *{artist_name}*")
 
     except Exception as e:
         st.error(f"Error fetching liked songs: {e}")
 
-# Feature 2: Scenario-Based Recommendations from Liked Songs
-def scenario_based_recommendations(sp):
+# Feature 2: Unique Data Insights
+def unique_data_insights(sp):
     try:
-        st.header("Find Songs for Your Current Mood or Scenario 🎭")
+        st.header("Your Unique Data Insights 📊")
         
-        # Get user input for the scenario
-        scenario = st.text_input("Describe your current scenario (e.g., breakup, calm, studying):")
-        
-        if scenario:
-            # Fetch liked songs (you can add more sophisticated filtering based on song features)
-            results = sp.current_user_saved_tracks(limit=50)
-            liked_songs = [track['track']['name'] for track in results['items']]
-            
-            st.write(f"Here are some songs from your liked tracks that might fit your mood ({scenario}):")
-            for song in liked_songs[:10]:  # You can customize this recommendation logic
-                st.write(f"🎧 {song}")
-    except Exception as e:
-        st.error(f"Error fetching scenario-based recommendations: {e}")
+        # Fetch top artists
+        top_artists = sp.current_user_top_artists(limit=5)
+        artist_names = [artist['name'] for artist in top_artists['items']]
+        top_genres = [artist['genres'] for artist in top_artists['items']]
 
-# Feature 3: Music Personality Analysis
+        st.write(f"Your top artists are:")
+        for artist in artist_names:
+            st.write(f"🎤 {artist}")
+        
+        st.write(f"Top genres you listen to:")
+        for genre_list in top_genres:
+            st.write(f"🎧 {', '.join(genre_list)}")
+        
+        # Example interesting insights:
+        # Mock insights based on random data, you can replace this with more accurate ones
+        st.write("Interesting insight: You seem to be exploring **new genres** lately! 🎶")
+
+    except Exception as e:
+        st.error(f"Error fetching data insights: {e}")
+
+# Feature 3: Music Personality & Color (with tension-building)
 def music_personality_analysis(sp):
     try:
         st.header("Your Music Personality & Color 🎨")
         
-        # Fetch liked songs
+        # Fetch top genres and tracks
         results = sp.current_user_top_tracks(limit=50)
         top_genres = [track['album']['genres'] for track in results['items'] if 'genres' in track['album']]
 
-        # Analyze and assign a personality type
+        # Analyze and assign a personality type with tension-building
         if top_genres:
-            personality_type = "Adventurer" if "rock" in top_genres else "Calm"
-            color = "Blue" if personality_type == "Calm" else "Red"
-            
-            st.write(f"Your personality type is: **{personality_type}**")
-            st.write(f"Your associated color is: **{color}**")
+            st.write("Analyzing your music taste...")
+            progress_bar = st.progress(0)
+            for percent in range(100):
+                time.sleep(0.03)
+                progress_bar.progress(percent + 1)
+
+            personality_type, color = assign_personality_and_color(top_genres)
+            st.write(f"**Your personality type is:** *{personality_type}*")
+            st.write(f"**Your associated color is:** *{color}*")
         else:
             st.write("Not enough data to determine your personality.")
     except Exception as e:
         st.error(f"Error analyzing your music personality: {e}")
 
-# Feature 4: Daily Insights Based on Recent Songs
+# Function to assign a personality type and color based on top genres
+def assign_personality_and_color(genres):
+    if "rock" in genres:
+        return "Adventurer", "Red"
+    elif "pop" in genres:
+        return "Trendsetter", "Yellow"
+    elif "jazz" in genres:
+        return "Calm", "Blue"
+    else:
+        return "Explorer", "Green"
+
+# Feature 4: Daily Listening Insights (more engaging insights)
 def daily_music_insights(sp):
     try:
         st.header("Your Daily Music Insights 📅")
         
         # Fetch recently played tracks
         results = sp.current_user_recently_played(limit=10)
-        recent_tracks = [track['track']['name'] for track in results['items']]
+        recent_tracks = results['items']
         
         st.write("Here’s what your recent listening says about you:")
-        for track in recent_tracks:
-            st.write(f"🎶 You listened to: {track}")
+        total_tracks = len(recent_tracks)
+        listening_time = total_tracks * 3  # Assume each song is 3 minutes, as an example
+
+        st.write(f"🎶 You've listened to **{total_tracks} tracks** today, totaling about **{listening_time} minutes**.")
         
-        st.write("Based on your recent listening habits, you're feeling energetic and upbeat today!")
+        st.write("Some of your recent listens:")
+        for track in recent_tracks[:5]:
+            song_name = track['track']['name']
+            album_cover = track['track']['album']['images'][0]['url']
+            artist_name = track['track']['artists'][0]['name']
+            st.image(album_cover, width=100)
+            st.write(f"🎧 **{song_name}** by *{artist_name}*")
+        
+        # Provide an interesting insight based on listening habits
+        st.write("Insight: You've been branching out and exploring new music lately! 🎧")
     except Exception as e:
         st.error(f"Error fetching daily insights: {e}")
 
@@ -151,19 +196,19 @@ if is_authenticated():
 
         # Main navigation
         section = st.radio("Explore your music journey", [
-            "Personality-Based Recommendations", 
-            "Scenario-Based Recommendations", 
-            "Music Personality Analysis", 
-            "Daily Insights"
+            "Discover Music Based on Feelings", 
+            "Unique Data Insights", 
+            "Music Personality & Color", 
+            "Daily Listening Insights"
         ])
 
-        if section == "Personality-Based Recommendations":
-            personality_based_recommendations(sp)
-        elif section == "Scenario-Based Recommendations":
-            scenario_based_recommendations(sp)
-        elif section == "Music Personality Analysis":
+        if section == "Discover Music Based on Feelings":
+            discover_music_by_feelings(sp)
+        elif section == "Unique Data Insights":
+            unique_data_insights(sp)
+        elif section == "Music Personality & Color":
             music_personality_analysis(sp)
-        elif section == "Daily Insights":
+        elif section == "Daily Listening Insights":
             daily_music_insights(sp)
 
     except Exception as e:
