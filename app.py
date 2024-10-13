@@ -212,7 +212,7 @@ def get_top_items_with_insights(sp):
 def get_most_active_listening_time(sp, time_range):
     recent_tracks = sp.current_user_recently_played(limit=50)
     timestamps = [track['played_at'] for track in recent_tracks['items']]
-    time_data = pd.to_datetime(timestamps).tz_convert('UTC')
+    time_data = pd.Series(pd.to_datetime(timestamps)).dt.tz_convert('UTC')
 
     if time_range == 'short_term':
         time_data = time_data[time_data >= (pd.Timestamp.now(tz='UTC') - pd.DateOffset(weeks=1))]
@@ -221,8 +221,11 @@ def get_most_active_listening_time(sp, time_range):
     else:
         time_data = time_data[time_data >= (pd.Timestamp.now(tz='UTC') - pd.DateOffset(years=1))]
 
-    active_hour = time_data.dt.hour.value_counts().idxmax() if not time_data.empty else "N/A"
-    return f"{active_hour}:00 - {active_hour + 1}:00" if active_hour != "N/A" else "No data"
+    if not time_data.empty:
+        active_hour = time_data.dt.hour.value_counts().idxmax()
+        return f"{active_hour}:00 - {active_hour + 1}:00"
+    else:
+        return "No data"
 
 # Helper for Rarest Genre
 def get_rarest_genre(genres):
