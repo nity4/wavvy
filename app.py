@@ -85,33 +85,32 @@ def refresh_token():
 
 def authenticate_user():
     try:
-        # Check if token is already in session state
+        # Check if token info is already stored in session
         if "token_info" in st.session_state and st.session_state['token_info']:
             token_info = st.session_state['token_info']
 
-            # Refresh the token if it's expired
+            # Check if the token has expired and refresh if needed
             if sp_oauth.is_token_expired(token_info):
                 token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
                 st.session_state['token_info'] = token_info
 
             st.success("You're already authenticated!")
-            return True
+            return True  # User is authenticated
 
-        # Check for authorization code in URL (after redirect from Spotify)
+        # If not authenticated, check if authorization code exists in the URL
         if "code" in st.experimental_get_query_params():
             code = st.experimental_get_query_params()["code"][0]
 
-            # Exchange the authorization code for access token
+            # Exchange the code for an access token
             token_info = sp_oauth.get_access_token(code)
-            st.session_state['token_info'] = token_info  # Store token in session state
+            st.session_state['token_info'] = token_info  # Store token info in session state
 
-            # Clear the query params (remove 'code' from URL)
-            st.experimental_set_query_params(code=None)
-
-            st.success("You're authenticated! Please refresh the page.")
+            # Clear the query params after login
+            st.experimental_set_query_params()  # Remove 'code' from URL
+            st.success("Authentication successful! Please refresh the page.")
             return True
 
-        # If no token or code, display login link
+        # If no token and no code, present the login link
         else:
             auth_url = sp_oauth.get_authorize_url()
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: #ff4081;">Login with Spotify</a>', unsafe_allow_html=True)
@@ -120,6 +119,7 @@ def authenticate_user():
     except Exception as e:
         st.error(f"Authentication error: {e}")
         return False
+
 
 # Function to fetch all liked songs from the user's library
 def get_all_liked_songs(sp):
