@@ -25,11 +25,11 @@ st.markdown(
     <style>
     body {
         background-color: #000000;
-        color: white;
+        color: black;
     }
     .stButton>button {
         background-color: #ff5f6d;
-        color: white;
+        color: black;
     }
     .stImage {
         border-radius: 10px;
