@@ -204,4 +204,4 @@ if is_authenticated():
             social_connectivity(sp)
         elif section == "Music Journaling":
             music_journaling()
-        elif section == "Wellness
+        elif section == "Wellness"
