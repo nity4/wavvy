@@ -183,22 +183,31 @@ def get_top_items_with_insights(sp):
         st.write(f"{i+1}. {artist['name']}")
         st.image(artist['images'][0]['url'], width=60)
 
-    st.subheader("Your Top Genres")
-    genre_df = pd.DataFrame(top_genres, columns=['Genre'])
-    st.table(genre_df)
+    st.subheader("Your Top 5 Genres")
+    top_5_genres = pd.Series(top_genres).value_counts().head(5).index.tolist()
+    st.write(", ".join(top_5_genres))
 
     # Unique and Exciting Insights
     st.write("### Interesting Insights You Didn't Know")
-    st.write(f"**Most Active Listening Time:** You tend to listen to music the most at **{get_most_active_listening_time(sp)}**.")
+    st.write(f"**Most Active Listening Time:** You tend to listen to music the most at **{get_most_active_listening_time(sp, spotify_time_range)}**.")
     st.write(f"**Diversity of Your Music Taste:** You have explored **{len(set(top_genres))} genres**.")
     st.write(f"**Rarest Genre:** {get_rarest_genre(top_genres)} is the rarest genre in your playlist!")
 
-# Helper for Most Active Listening Time
-def get_most_active_listening_time(sp):
+# Helper for Most Active Listening Time based on time range
+def get_most_active_listening_time(sp, time_range):
     recent_tracks = sp.current_user_recently_played(limit=50)
     timestamps = [track['played_at'] for track in recent_tracks['items']]
-    time_data = pd.to_datetime(timestamps).hour.value_counts().idxmax()
-    return f"{time_data}:00 - {time_data + 1}:00"
+    time_data = pd.to_datetime(timestamps)
+    
+    if time_range == 'short_term':
+        time_data = time_data[time_data >= (pd.Timestamp.now() - pd.DateOffset(weeks=1))]
+    elif time_range == 'medium_term':
+        time_data = time_data[time_data >= (pd.Timestamp.now() - pd.DateOffset(months=1))]
+    else:
+        time_data = time_data[time_data >= (pd.Timestamp.now() - pd.DateOffset(years=1))]
+
+    active_hour = time_data.dt.hour.value_counts().idxmax() if not time_data.empty else "N/A"
+    return f"{active_hour}:00 - {active_hour + 1}:00" if active_hour != "N/A" else "No data"
 
 # Helper for Rarest Genre
 def get_rarest_genre(genres):
