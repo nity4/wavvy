@@ -178,17 +178,24 @@ def filter_songs_by_mood(track_features, feeling, intensity):
             filtered_songs.append(track)
     
     return filtered_songs
-
-# Top songs and genres based on user-defined time range
-def get_top_items(sp, time_range='medium_term'):
-    st.header(f"Your Top Songs and Genres ({time_range.replace('_', ' ').title()})")
+# Fetch top songs, artists, and genres with time range filter and fun insights
+def get_top_items(sp):
+    st.header("Your Top Songs, Artists, and Genres")
     
     # Allow users to select time range for insights
-    time_range = st.radio("Select time range", ['short_term', 'medium_term', 'long_term'], index=1)
-    st.write(f"Showing data for: {time_range.replace('_', ' ').title()}")
+    time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
+    
+    time_range_map = {
+        'This Week': 'short_term',
+        'This Month': 'medium_term',
+        'This Year': 'long_term'
+    }
+    
+    spotify_time_range = time_range_map[time_range]
+    st.write(f"Showing data for: **{time_range}**")
 
     # Fetch top tracks
-    top_tracks = sp.current_user_top_tracks(time_range=time_range, limit=10)
+    top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
     if top_tracks['items']:
         st.subheader("Your Top Songs")
         for i, track in enumerate(top_tracks['items']):
@@ -196,12 +203,21 @@ def get_top_items(sp, time_range='medium_term'):
             artist_name = track['artists'][0]['name']
             album_cover = track['album']['images'][0]['url']
             st.image(album_cover, width=150, caption=f"{i+1}. {song_name} by {artist_name}")
-
     else:
-        st.write("You have no top songs for this time range.")
+        st.write(f"No top songs for {time_range}.")
+
+    # Fetch top artists
+    top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
+    if top_artists['items']:
+        st.subheader("Your Top Artists")
+        for i, artist in enumerate(top_artists['items']):
+            artist_name = artist['name']
+            artist_cover = artist['images'][0]['url']
+            st.image(artist_cover, width=150, caption=f"{i+1}. {artist_name}")
+    else:
+        st.write(f"No top artists for {time_range}.")
 
     # Fetch top genres from top artists
-    top_artists = sp.current_user_top_artists(time_range=time_range, limit=5)
     if top_artists['items']:
         st.subheader("Your Top Genres")
         all_genres = [genre for artist in top_artists['items'] for genre in artist['genres']]
@@ -210,25 +226,55 @@ def get_top_items(sp, time_range='medium_term'):
         if unique_genres:
             st.write("You're currently into these genres:")
             for genre in unique_genres:
-                st.write(f"- {genre.capitalize()}")
+                st.write(f"🎶 - {genre.capitalize()}")
         else:
-            st.write("No genres found for this time range.")
+            st.write(f"No genres found for {time_range}.")
     else:
-        st.write("You have no top genres for this time range.")
+        st.write(f"No top genres for {time_range}.")
 
 # Fun insights pop-up after data is loaded
-def show_fun_insights(sp, top_artists, top_tracks):
-    st.write("Interesting fact about your music taste.")
-    
-    # Example fun insight: Most played genre or artist
+def show_fun_insights(sp, top_artists, top_tracks, time_range):
+    st.write(f"Fun insights for **{time_range}**:")
+
     most_played_artist = top_artists['items'][0]['name'] if top_artists['items'] else 'Unknown Artist'
     most_played_song = top_tracks['items'][0]['name'] if top_tracks['items'] else 'Unknown Song'
+
+    st.toast(f"Your most played artist of {time_range} is **{most_played_artist}** with the song **{most_played_song}**.")
     
-    st.toast(f"You've been listening a lot to {most_played_artist}, especially their song {most_played_song}.")
-    
-    # Fun fact about listening habits
+    # Fun fact: Number of new artists discovered
     new_artists = len(set(track['artists'][0]['name'] for track in top_tracks['items']))
-    st.toast(f"You've discovered {new_artists} new artists recently. Keep exploring.")
+    st.toast(f"You've discovered **{new_artists}** new artists this {time_range.lower()}.")
+
+    # Fun fact: Genre diversity
+    all_genres = [genre for artist in top_artists['items'] for genre in artist['genres']]
+    genre_count = len(set(all_genres))
+    st.toast(f"Your listening span covered **{genre_count}** unique genres!")
+
+    # Fun fact: Song replay habit
+    repeat_songs = random.choice(top_tracks['items'])['name'] if top_tracks['items'] else None
+    if repeat_songs:
+        st.toast(f"You seem to love replaying **{repeat_songs}** quite a bit!")
+
+# Updated comprehensive insights with time range filter and fun facts
+def comprehensive_insights(sp):
+    st.header("Your Music Insights")
+
+    try:
+        # Fetch user's top items based on time range selection
+        time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
+        spotify_time_range = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}[time_range]
+
+        top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
+        top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
+
+        # Display top items
+        get_top_items(sp)
+
+        # Show fun insights
+        show_fun_insights(sp, top_artists, top_tracks, time_range)
+
+    except Exception as e:
+        st.error(f"Error fetching insights: {e}")
 
 # Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
