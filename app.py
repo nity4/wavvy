@@ -2,7 +2,7 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
-import matplotlib.pyplot as plt
+import random
 import time
 
 # Spotify API credentials stored in Streamlit Secrets
@@ -64,17 +64,16 @@ def authenticate_user():
             # Clear the code parameter from the URL after successful authentication
             st.experimental_set_query_params(code=None)
             
-            # Notify user to refresh manually (Streamlit no longer has automatic rerun)
             st.success("Authentication successful. Please refresh the page to continue.")
             if st.button("Refresh Now"):
-                st.experimental_set_query_params()  # This will reload the app
+                st.experimental_set_query_params()
         else:
             auth_url = sp_oauth.get_authorize_url()
             st.markdown(f'<a href="{auth_url}" target="_self">Click here to authorize with Spotify</a>', unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Authentication error: {e}")
 
-# Feature 1: Discover Music Based on Feelings
+# Feature 1: Discover Music Based on Feelings (with dynamic song filtering)
 def discover_music_by_feelings(sp):
     try:
         st.header("Discover Music Based on Your Feelings 🎶")
@@ -87,9 +86,18 @@ def discover_music_by_feelings(sp):
         results = sp.current_user_saved_tracks(limit=50)
         liked_songs = results['items']
 
-        # Filter songs based on feelings (mock filtering logic for now)
+        # Mock filtering based on mood and intensity (random filtering to simulate logic)
+        if feeling == "Happy":
+            filtered_songs = random.sample(liked_songs, min(len(liked_songs), 10)) if intensity > 5 else liked_songs[:5]
+        elif feeling == "Sad":
+            filtered_songs = liked_songs[:min(len(liked_songs), 5)] if intensity > 5 else liked_songs[-5:]
+        elif feeling == "Calm":
+            filtered_songs = liked_songs[-min(len(liked_songs), 10):] if intensity > 5 else liked_songs[:3]
+        else:
+            filtered_songs = random.sample(liked_songs, 10)
+
         st.write(f"Here are some {feeling.lower()} songs based on your intensity level of {intensity}:")
-        for track in liked_songs[:10]:  # Display 10 liked songs
+        for track in filtered_songs:  # Display filtered songs
             album_cover = track['track']['album']['images'][0]['url']
             song_name = track['track']['name']
             artist_name = track['track']['artists'][0]['name']
@@ -99,32 +107,47 @@ def discover_music_by_feelings(sp):
     except Exception as e:
         st.error(f"Error fetching liked songs: {e}")
 
-# Feature 2: Unique Data Insights
-def unique_data_insights(sp):
+# Feature 2: Comprehensive Insights (Merged Unique Data & Daily Listening)
+def comprehensive_insights(sp):
     try:
-        st.header("Your Unique Data Insights 📊")
-        
+        st.header("Your Comprehensive Music Insights 📊")
+
         # Fetch top artists
         top_artists = sp.current_user_top_artists(limit=5)
         artist_names = [artist['name'] for artist in top_artists['items']]
         top_genres = [artist['genres'] for artist in top_artists['items']]
 
-        st.write(f"Your top artists are:")
+        # Display top artists
+        st.subheader("Your Top Artists:")
         for artist in artist_names:
             st.write(f"🎤 {artist}")
-        
-        st.write(f"Top genres you listen to:")
+
+        # Display top genres
+        st.subheader("Top Genres You Listen To:")
         for genre_list in top_genres:
             st.write(f"🎧 {', '.join(genre_list)}")
-        
-        # Example interesting insights:
-        # Mock insights based on random data, you can replace this with more accurate ones
-        st.write("Interesting insight: You seem to be exploring **new genres** lately! 🎶")
+
+        # Fetch recent listening history
+        st.subheader("Recent Listening Insights:")
+        results = sp.current_user_recently_played(limit=10)
+        recent_tracks = results['items']
+        total_tracks = len(recent_tracks)
+        listening_time = total_tracks * 3  # Assume each song is 3 minutes
+
+        st.write(f"🎶 You've listened to **{total_tracks} tracks** today, totaling about **{listening_time} minutes**.")
+        for track in recent_tracks[:5]:
+            song_name = track['track']['name']
+            album_cover = track['track']['album']['images'][0]['url']
+            artist_name = track['track']['artists'][0]['name']
+            st.image(album_cover, width=100)
+            st.write(f"🎧 **{song_name}** by *{artist_name}*")
+
+        st.write("Insight: You've been exploring **new music** lately! 🎧")
 
     except Exception as e:
-        st.error(f"Error fetching data insights: {e}")
+        st.error(f"Error fetching comprehensive insights: {e}")
 
-# Feature 3: Music Personality & Color (with tension-building)
+# Feature 3: Music Personality & Color (improved with more variety)
 def music_personality_analysis(sp):
     try:
         st.header("Your Music Personality & Color 🎨")
@@ -133,7 +156,6 @@ def music_personality_analysis(sp):
         results = sp.current_user_top_tracks(limit=50)
         top_genres = [track['album']['genres'] for track in results['items'] if 'genres' in track['album']]
 
-        # Analyze and assign a personality type with tension-building
         if top_genres:
             st.write("Analyzing your music taste...")
             progress_bar = st.progress(0)
@@ -151,42 +173,20 @@ def music_personality_analysis(sp):
 
 # Function to assign a personality type and color based on top genres
 def assign_personality_and_color(genres):
-    if "rock" in genres:
-        return "Adventurer", "Red"
-    elif "pop" in genres:
-        return "Trendsetter", "Yellow"
-    elif "jazz" in genres:
-        return "Calm", "Blue"
-    else:
-        return "Explorer", "Green"
+    genre_string = ', '.join([g for sublist in genres for g in sublist])
+    personality_map = {
+        "rock": ("Adventurer", "Red"),
+        "pop": ("Trendsetter", "Yellow"),
+        "jazz": ("Calm", "Blue"),
+        "electronic": ("Innovator", "Purple"),
+        "hip hop": ("Rebel", "Black"),
+        "classical": ("Old Soul", "Gold"),
+    }
 
-# Feature 4: Daily Listening Insights (more engaging insights)
-def daily_music_insights(sp):
-    try:
-        st.header("Your Daily Music Insights 📅")
-        
-        # Fetch recently played tracks
-        results = sp.current_user_recently_played(limit=10)
-        recent_tracks = results['items']
-        
-        st.write("Here’s what your recent listening says about you:")
-        total_tracks = len(recent_tracks)
-        listening_time = total_tracks * 3  # Assume each song is 3 minutes, as an example
-
-        st.write(f"🎶 You've listened to **{total_tracks} tracks** today, totaling about **{listening_time} minutes**.")
-        
-        st.write("Some of your recent listens:")
-        for track in recent_tracks[:5]:
-            song_name = track['track']['name']
-            album_cover = track['track']['album']['images'][0]['url']
-            artist_name = track['track']['artists'][0]['name']
-            st.image(album_cover, width=100)
-            st.write(f"🎧 **{song_name}** by *{artist_name}*")
-        
-        # Provide an interesting insight based on listening habits
-        st.write("Insight: You've been branching out and exploring new music lately! 🎧")
-    except Exception as e:
-        st.error(f"Error fetching daily insights: {e}")
+    for genre, (personality, color) in personality_map.items():
+        if genre in genre_string:
+            return personality, color
+    return "Explorer", "Green"  # Default if no match
 
 # Main Flow of the App
 if is_authenticated():
@@ -197,19 +197,16 @@ if is_authenticated():
         # Main navigation
         section = st.radio("Explore your music journey", [
             "Discover Music Based on Feelings", 
-            "Unique Data Insights", 
-            "Music Personality & Color", 
-            "Daily Listening Insights"
+            "Comprehensive Insights", 
+            "Music Personality & Color"
         ])
 
         if section == "Discover Music Based on Feelings":
             discover_music_by_feelings(sp)
-        elif section == "Unique Data Insights":
-            unique_data_insights(sp)
+        elif section == "Comprehensive Insights":
+            comprehensive_insights(sp)
         elif section == "Music Personality & Color":
             music_personality_analysis(sp)
-        elif section == "Daily Listening Insights":
-            daily_music_insights(sp)
 
     except Exception as e:
         st.error(f"Error loading the app: {e}")
