@@ -16,20 +16,20 @@ SCOPE = 'user-library-read user-top-read user-read-recently-played'
 # Initialize Spotify OAuth
 sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=SCOPE)
 
-# Streamlit App Layout - Sleek Dark Mode
-st.set_page_config(page_title="Wavvy 〰", page_icon="〰", layout="centered", initial_sidebar_state="collapsed")
+# Streamlit App Layout - Sleek Dark Mode with Modern Touches
+st.set_page_config(page_title="Wavvy", page_icon="🌊", layout="centered", initial_sidebar_state="collapsed")
 
-# Apply CSS for visual appeal and Gen Z-friendly aesthetic
+# Apply CSS for modern, clean, and highly visual design
 st.markdown(
     """
     <style>
     body {
-        background-color: #1a1a1d;
-        color: #f5f5f5;
+        background-color: #0f0f0f;
+        color: #e5e5e5;
         font-family: 'Roboto', sans-serif;
     }
     .stButton>button {
-        background-color: #3f51b5;
+        background-color: #0073e6;
         color: #ffffff;
         border-radius: 12px;
         font-size: 1rem;
@@ -40,12 +40,12 @@ st.markdown(
         background-color: #ff4081;
     }
     .stImage {
-        border-radius: 15px;
-        margin-bottom: 12px;
+        border-radius: 10px;
+        margin-bottom: 20px;
     }
     h1, h2, h3 {
-        font-weight: 300;
-        color: #ffffff;
+        font-weight: 400;
+        color: #e5e5e5;
     }
     h1 {
         font-size: 3.5rem;
@@ -60,18 +60,6 @@ st.markdown(
         font-size: 1.5rem;
         margin-bottom: 1.5rem;
     }
-    .progress-bar {
-        background-color: #3f51b5;
-        height: 10px;
-        border-radius: 5px;
-    }
-    .personality-box {
-        font-size: 3rem;
-        color: #ffffff;
-        font-weight: bold;
-        margin-bottom: 2rem;
-        text-align: center;
-    }
     .insight-box {
         font-size: 1.25rem;
         margin-top: 1rem;
@@ -82,6 +70,13 @@ st.markdown(
     }
     .insight-box p {
         font-size: 1.2rem;
+    }
+    .personality-box {
+        font-size: 3rem;
+        color: #ffffff;
+        font-weight: bold;
+        margin-bottom: 2rem;
+        text-align: center;
     }
     </style>
     """, unsafe_allow_html=True
@@ -104,28 +99,28 @@ def authenticate_user():
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
             st.experimental_set_query_params(code=None)
-            st.success("You're all set! Refresh to see your insights.")
+            st.success("Authentication successful! Please refresh to dive into your insights.")
             if st.button("Refresh Now"):
                 st.experimental_set_query_params()
         else:
             auth_url = sp_oauth.get_authorize_url()
-            st.markdown(f'<a href="{auth_url}" target="_self" style="color: #ff4081;">Click here to authorize with Spotify</a>', unsafe_allow_html=True)
+            st.markdown(f'<a href="{auth_url}" target="_self" style="color: #ff4081;">Click here to log in with Spotify</a>', unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Authentication error: {e}")
 
-# Improved Mood-Based Music Discovery
+# Enhanced Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
-    st.header("Vibe-Based Music Discovery 🎧")
-    st.write("Tell me how you're feeling, and I'll craft the perfect playlist for your mood.")
+    st.header("Curated Music for Every Mood")
+    st.write("Tell us how you're feeling and we'll craft a playlist that perfectly fits your vibe.")
 
     # Mood and intensity input
-    feeling = st.selectbox("What's your mood today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
-    intensity = st.slider(f"How {feeling} are you feeling?", 1, 10, help="Adjust how strongly you're feeling that vibe.")
-    
-    song_type = st.radio("Pick your source:", ["Shuffle My Liked Songs", "Discover New Vibes"])
+    feeling = st.selectbox("How are you feeling today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
+    intensity = st.slider(f"How {feeling} are you feeling?", 1, 10, help="Slide to match your mood intensity.")
+
+    song_type = st.radio("Looking for something familiar or new?", ["Shuffle My Liked Songs", "Discover New Vibes"])
 
     try:
-        st.write("Curating the perfect vibe for you...")
+        st.write("Curating your playlist based on your mood...")
 
         if song_type == "Shuffle My Liked Songs":
             results = sp.current_user_saved_tracks(limit=50)
@@ -171,63 +166,82 @@ def discover_music_by_feelings(sp):
                 st.image(album_cover, width=150)
                 st.write(f"**{song_name}** by *{artist_name}*")
         else:
-            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try tweaking the intensity or choosing a different mood.")
+            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try tweaking the intensity or picking a different mood.")
 
     except Exception as e:
         st.error(f"Error curating your vibe: {e}")
 
-# Enhanced Insights with Fun Stats and Data Visualization
+# Enhanced Insights with Fun Stats and Data Without Graphs
 def comprehensive_insights(sp):
-    st.header("Your Music Insights Dashboard 📊")
-    st.write("Dive deep into your listening habits and discover fun insights about yourself.")
+    st.header("Your Music Journey: Insights")
+    st.write("Here's a deeper dive into your music habits. Let's explore what makes your taste unique.")
 
     try:
+        # Fetch user's top artists and genres
         top_artists = sp.current_user_top_artists(limit=5)
         artist_names = [artist['name'] for artist in top_artists['items']]
         top_genres = [artist['genres'] for artist in top_artists['items']]
 
-        # Display top artists with cool language
-        st.subheader("Your Top Artists:")
-        for artist in top_artists['items']:
-            st.image(artist['images'][0]['url'], width=150)
-            st.write(f"**{artist['name']}** - You're vibing with this artist lately!")
+        # Fetch recently played tracks
+        recent_tracks = sp.current_user_recently_played(limit=20)
+        total_tracks = len(recent_tracks['items'])
+        listening_time = total_tracks * 3  # Assuming each track is ~3 minutes long
 
-        # Top genres data visualization
-        genre_count = {}
-        for genre_list in top_genres:
-            for genre in genre_list:
-                genre_count[genre] = genre_count.get(genre, 0) + 1
+        # Fun insights about user's listening habits
+        st.subheader("Recent Listening Stats")
+        st.write(f"Tracks Played: {total_tracks}")
+        st.write(f"Estimated Listening Time: {listening_time} minutes")
 
-        if genre_count:
-            st.subheader("Your Favorite Genres:")
-            fig, ax = plt.subplots()
-            ax.bar(genre_count.keys(), genre_count.values(), color='#ff6347')
-            plt.xticks(rotation=45, ha='right')
-            plt.title("Top Genres", fontsize=16)
-            st.pyplot(fig)
-
-        # Fun insights about user’s habits
-        results = sp.current_user_recently_played(limit=20)
-        recent_tracks = results['items']
-        total_tracks = len(recent_tracks)
-        listening_time = total_tracks * 3  # Assume 3 minutes per track
-
-        st.subheader("Recent Listening Habits:")
-        st.write(f"You've played **{total_tracks} tracks** recently, clocking in about **{listening_time} minutes**.")
-        
-        # Fun fact: Most listened time of day
+        # Fun fact: Favorite listening time
         current_hour = time.localtime().tm_hour
         time_of_day = 'morning' if current_hour < 12 else 'afternoon' if current_hour < 18 else 'night'
-        st.write(f"🎧 You seem to listen most during the **{time_of_day}**!")
+        st.write(f"Most Active Listening Time: You seem to vibe the most during the {time_of_day}.")
 
-        new_artists_count = len(set(track['track']['artists'][0]['name'] for track in recent_tracks))
-        st.write(f"🔍 You've discovered **{new_artists_count} new artists** recently. Keep exploring!")
+        # Top 5 Artists and Genres
+        st.subheader("Your Top 5 Artists")
+        if artist_names:
+            for i, artist in enumerate(artist_names):
+                st.write(f"{i+1}. {artist}")
+        else:
+            st.write("We couldn't fetch your top artists. Explore more music to see your top artists here!")
+
+        st.subheader("Your Go-To Genres")
+        if top_genres:
+            all_genres = [genre for sublist in top_genres for genre in sublist]
+            unique_genres = list(set(all_genres))[:5]  # Limit to 5 unique genres
+            st.write("You seem to explore these genres:")
+            for genre in unique_genres:
+                st.write(f"- {genre.capitalize()}")
+        else:
+            st.write("We're still discovering your genre preferences. Keep listening to find out!")
+
+        # Show average track energy level based on recently played tracks
+        energy_levels = [sp.audio_features(track['track']['id'])[0]['energy'] for track in recent_tracks['items']]
+        avg_energy = sum(energy_levels) / len(energy_levels) if energy_levels else 0
+        energy_description = get_energy_description(avg_energy)
+
+        st.subheader("Your Vibe Energy")
+        st.write(f"Your recently played tracks are {energy_description} with an average energy level of {avg_energy:.2f}.")
+
+        # Insightful Fun Fact: New Artists Discovery
+        new_artists_count = len(set(track['track']['artists'][0]['name'] for track in recent_tracks['items']))
+        st.write(f"New Artists Discovered: You've found {new_artists_count} new artists recently! Keep exploring.")
 
     except Exception as e:
         st.error(f"Error fetching insights: {e}")
 
+# Helper function to describe the energy of the user's tracks
+def get_energy_description(energy_level):
+    if energy_level < 0.4:
+        return "pretty chill"
+    elif 0.4 <= energy_level < 0.7:
+        return "a balanced mix"
+    else:
+        return "high energy, ready to party!"
+
+# Dynamic Music Personality and Color Reveal
 def music_personality_analysis(sp):
-    st.header("Discover Your Music Personality 🧠")
+    st.header("Discover Your Music Personality")
     st.write("Let's analyze your music taste and assign you a unique music personality.")
 
     try:
@@ -308,6 +322,6 @@ if is_authenticated():
     except Exception as e:
         st.error(f"Error loading the app: {e}")
 else:
-    st.write("Welcome to **Wavvy** 〰")
-    st.write("Your music, your vibe. Get personalized insights, discover tracks that match your mood, and explore your unique music personality.")
+    st.write("Welcome to **Wavvy** 🌊")
+    st.write("Discover your unique music journey, explore tracks that match your mood, and unlock your personalized music personality.")
     authenticate_user()
