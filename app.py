@@ -56,9 +56,14 @@ def authenticate_user():
             code = st.experimental_get_query_params()["code"][0]
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
+
             # Clear the code parameter from the URL after successful authentication
             st.experimental_set_query_params(code=None)
-            st.experimental_rerun()
+            
+            # Notify user to refresh manually (Streamlit no longer has automatic rerun)
+            st.success("Authentication successful. Please refresh the page to continue.")
+            if st.button("Refresh Now"):
+                st.experimental_set_query_params()  # This will reload the app
         else:
             auth_url = sp_oauth.get_authorize_url()
             st.markdown(f'<a href="{auth_url}" target="_self">Click here to authorize with Spotify</a>', unsafe_allow_html=True)
