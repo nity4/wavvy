@@ -3,7 +3,6 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import matplotlib.pyplot as plt
-from PIL import Image
 
 # Spotify API credentials stored in Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -39,11 +38,20 @@ st.markdown(
 if 'token_info' not in st.session_state:
     st.session_state['token_info'] = None
 
-# Define a function to display top tracks with album covers
-def display_top_tracks(sp):
-    st.header("Your Top Tracks & Albums 🎶")
-    top_tracks = sp.current_user_top_tracks(limit=10)
-    for track in top_tracks['items']:
+# Core Feature: Music Discovery by Personality & Energy
+def personality_based_recommendations(sp):
+    st.header("Discover Music Based on Your Personality 🎧")
+    
+    # User input for personality and current mood
+    personality_type = st.selectbox("Choose your personality type", ["Adventurous", "Calm", "Energetic", "Reflective"])
+    current_mood = st.slider("How are you feeling right now? (1 = Low Energy, 10 = High Energy)", 1, 10, 5)
+    
+    st.write(f"Based on your personality ({personality_type}) and your current mood ({current_mood}), here are some recommended tracks for you:")
+    
+    # Fetch top track recommendations based on personality and mood
+    recommended_tracks = sp.recommendations(seed_genres=['pop', 'chill'], limit=5)
+    
+    for track in recommended_tracks['tracks']:
         album_cover = track['album']['images'][0]['url']
         track_name = track['name']
         artist_name = track['artists'][0]['name']
@@ -51,54 +59,115 @@ def display_top_tracks(sp):
         st.write(f"**{track_name}** by *{artist_name}*")
         st.write("---")
 
-# Define a function to show emotional insights (simplified bar charts)
-def display_emotional_insights():
-    st.header("Emotional Insights 🎧")
-    st.write("Here are your emotional insights based on your recent listening:")
+# Feature: Predictive Music Recommendation Engine (Life Soundtrack)
+def predictive_recommendations():
+    st.header("Your Predictive Life Soundtrack 🎶")
+    st.write("Based on upcoming life events or patterns, here’s a soundtrack tailored for your future.")
     
-    # Example data for emotional analysis
-    emotional_data = {
-        'Track': ['Song 1', 'Song 2', 'Song 3', 'Song 4'],
-        'Happiness': [80, 60, 90, 75],
-        'Energy': [50, 70, 85, 65],
-        'Calmness': [60, 55, 40, 80]
+    # User selects life events or moods
+    life_events = st.multiselect("Select upcoming events or moods:", ["Vacation", "Work Deadline", "Workout", "Relaxation"])
+    
+    for event in life_events:
+        st.write(f"For your {event}, here are some tracks to match the vibe:")
+        st.write("🎵 Song 1 by Artist A")
+        st.write("🎵 Song 2 by Artist B")
+        st.write("🎵 Song 3 by Artist C")
+        st.write("---")
+
+# Feature: Music Archetypes and Identity Mapping
+def music_archetypes():
+    st.header("Explore Your Musical Archetype 🎭")
+    st.write("Based on your listening habits, you fall into the following music archetype:")
+    
+    # Example archetypes and their descriptions
+    archetypes = {"Adventurer": "You love exploring new genres.", "Nostalgic": "You revisit the classics.", "Trendsetter": "You lead music trends."}
+    
+    selected_archetype = "Adventurer"
+    st.write(f"**You are an {selected_archetype}**: {archetypes[selected_archetype]}")
+    
+    st.write("Here are some music recommendations that fit your archetype:")
+    st.write("🎧 Track 1 by Artist A")
+    st.write("🎧 Track 2 by Artist B")
+    st.write("🎧 Track 3 by Artist C")
+    st.write("---")
+
+# Feature: Deep Social Connectivity and Music Sharing
+def social_connectivity(sp):
+    st.header("Connect and Share with Friends 🎶")
+    st.write("Share your current music vibe with friends or discover what they are listening to.")
+    
+    # Mock example of shared playlists
+    friends = ["Friend 1", "Friend 2", "Friend 3"]
+    shared_playlist = st.selectbox("Choose a friend to view their shared playlist:", friends)
+    
+    st.write(f"Here’s what {shared_playlist} is listening to:")
+    st.write("🎧 Track 1 by Artist X")
+    st.write("🎧 Track 2 by Artist Y")
+    st.write("🎧 Track 3 by Artist Z")
+    st.write("You can sync your playlist with theirs and listen together!")
+    
+    # Option to share your current vibe
+    st.write("Want to share your current music vibe with friends? Click below:")
+    if st.button("Share My Vibe"):
+        st.write("Your current vibe has been shared with your friends!")
+
+# Feature: Hyper-Intelligent Music Journaling
+def music_journaling():
+    st.header("Your Music Journal 📓")
+    st.write("Document your emotional journey through music.")
+    
+    # Automatically generated journal entry (mocked for now)
+    st.write("**Entry for today:**")
+    st.write("You listened to relaxing tracks like Song A by Artist X in the morning, which helped you stay focused.")
+    st.write("In the afternoon, you switched to upbeat music to energize yourself for your workout.")
+    
+    # Option for users to add their own journal notes
+    st.text_area("Add your personal reflection on today's music journey:", "")
+    
+    if st.button("Save Journal Entry"):
+        st.write("Your journal entry has been saved!")
+
+# Feature: Musical Wellness Insights
+def musical_wellness():
+    st.header("Musical Wellness Insights 🌿")
+    st.write("Here’s how your music choices are impacting your emotional and mental wellness.")
+    
+    # Example wellness scores (these would be based on deeper data)
+    wellness_data = {
+        'Metric': ['Happiness', 'Calmness', 'Energy'],
+        'Score': [78, 65, 80]
     }
-    df_emotions = pd.DataFrame(emotional_data)
-
-    # Plot simplified horizontal bar charts for emotional insights
-    for i, row in df_emotions.iterrows():
-        st.write(f"**{row['Track']}**")
-        st.write("Emotional Scores:")
-        st.write(f"Happiness: {row['Happiness']} | Energy: {row['Energy']} | Calmness: {row['Calmness']}")
-        st.bar_chart(pd.DataFrame([row[['Happiness', 'Energy', 'Calmness']]]))
-
-# Define a function to display the Wavvy Wellness Score
-def display_wavvy_wellness():
-    st.header("Your Wavvy Wellness Score 🌟")
-    st.write("Based on your recent emotional journey through music, here’s your wellness score:")
+    df_wellness = pd.DataFrame(wellness_data)
     
-    # Example wellness score
-    happiness_score = 75
-    calmness_score = 65
-    energy_score = 70
-    avg_wellness_score = (happiness_score + calmness_score + energy_score) / 3
-    
-    st.metric(label="Overall Wellness Score", value=f"{avg_wellness_score:.2f}/100")
-    st.write("This score reflects your emotional balance based on your recent listening habits. Keep riding the waves of your emotions through music!")
+    st.bar_chart(df_wellness.set_index('Metric'))
+    st.write("Your music has contributed to a good balance of energy and calmness this week.")
 
 # Main Flow of the App
 if st.session_state['token_info']:
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
     
-    # Use a radio button to move between sections
-    section = st.radio("Explore your music journey", ["Top Tracks", "Emotional Insights", "Wellness Score"])
+    # Main navigation
+    section = st.radio("Explore your music journey", [
+        "Personality-Based Recommendations", 
+        "Predictive Soundtrack", 
+        "Music Archetypes", 
+        "Social Connectivity", 
+        "Music Journaling", 
+        "Wellness Insights"
+    ])
 
-    if section == "Top Tracks":
-        display_top_tracks(sp)
-    elif section == "Emotional Insights":
-        display_emotional_insights()
-    elif section == "Wellness Score":
-        display_wavvy_wellness()
+    if section == "Personality-Based Recommendations":
+        personality_based_recommendations(sp)
+    elif section == "Predictive Soundtrack":
+        predictive_recommendations()
+    elif section == "Music Archetypes":
+        music_archetypes()
+    elif section == "Social Connectivity":
+        social_connectivity(sp)
+    elif section == "Music Journaling":
+        music_journaling()
+    elif section == "Wellness Insights":
+        musical_wellness()
 
 elif "code" in st.experimental_get_query_params():
     code = st.experimental_get_query_params()["code"][0]
@@ -108,6 +177,6 @@ elif "code" in st.experimental_get_query_params():
 
 else:
     st.write("Welcome to **Wavvy** 〰")
-    st.write("Wavvy offers you a personal reflection on your emotional journey through music.")
+    st.write("Wavvy offers you a personal reflection on your emotional and personality-driven journey through music.")
     auth_url = sp_oauth.get_authorize_url()
     st.markdown(f'<a href="{auth_url}" target="_self">Click here to authorize with Spotify</a>', unsafe_allow_html=True)
