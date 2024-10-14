@@ -7,16 +7,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 
-CLIENT_ID = 'your_client_id'
-CLIENT_SECRET = 'your_client_secret'
-REDIRECT_URI = 'https://wvvy701.streamlit.app/'
-
-scope = "user-library-read user-top-read"
+CLIENT_ID = st.secrets["spotify"]["client_id"]
+CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
+REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 
 sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=scope)
 
-auth_url = sp_oauth.get_authorize_url()
-print(f"Navigate to this URL to authenticate: {auth_url}")
 
 # App Layout and Configuration
 st.set_page_config(page_title="Wvvy", page_icon="〰", layout="wide", initial_sidebar_state="expanded")
