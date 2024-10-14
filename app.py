@@ -12,16 +12,13 @@ CLIENT_ID = st.secrets["spotify"]["client_id"]
 CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = "http://localhost:8501/callback"
 
-# Spotify OAuth scope for access to user data
 SCOPE = 'user-library-read user-top-read user-read-recently-played'
 
-# Initialize Spotify OAuth object
+# Initialize Spotify OAuth
 sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=SCOPE)
 
-# Set up page configuration for Streamlit app
+# App Layout and Configuration
 st.set_page_config(page_title="Wvvy", page_icon="〰", layout="wide", initial_sidebar_state="expanded")
-
-# CSS for custom styling
 st.markdown("""
     <style>
     .main {
@@ -50,25 +47,21 @@ st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
 
 # Authentication Functions
 def is_authenticated():
-    """Check if the user is authenticated."""
     return st.session_state.get('token_info') is not None
 
 def refresh_token():
-    """Refresh the user's Spotify access token if expired."""
-    if st.session_state.get('token_info'):
-        if sp_oauth.is_token_expired(st.session_state['token_info']):
-            token_info = sp_oauth.refresh_access_token(st.session_state['token_info']['refresh_token'])
-            st.session_state['token_info'] = token_info
+    if 'token_info' in st.session_state and sp_oauth.is_token_expired(st.session_state['token_info']):
+        token_info = sp_oauth.refresh_access_token(st.session_state['token_info']['refresh_token'])
+        st.session_state['token_info'] = token_info
 
 def authenticate_user():
-    """Handle the user authentication with Spotify."""
     try:
         if "code" in st.experimental_get_query_params():
             code = st.experimental_get_query_params()["code"][0]
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
             st.experimental_set_query_params(code=None)
-            st.success("You're in. Refresh to access your music data.")
+            st.success("You're in! Refresh the page to access your music data.")
             if st.button("Refresh Now"):
                 st.experimental_set_query_params()
         else:
@@ -79,14 +72,12 @@ def authenticate_user():
 
 # Loading Animation
 def show_loading_animation(text="Loading..."):
-    """Display a loading animation during data fetching."""
     st.markdown(f"<div class='loading-text'>{text}</div>", unsafe_allow_html=True)
     with st.spinner("Processing..."):
-        time.sleep(2)  # Simulate a loading process
+        time.sleep(2)  # Simulating a loading process
 
 # Helper Functions
 def get_all_liked_songs(sp):
-    """Fetch all liked songs from the user's Spotify account."""
     liked_songs = []
     try:
         results = sp.current_user_saved_tracks(limit=50, offset=0)
@@ -104,7 +95,6 @@ def get_all_liked_songs(sp):
 
 # Fetch Audio Features in Batches (Spotify API has a limit on batch size)
 def fetch_audio_features_in_batches(sp, song_ids):
-    """Fetch audio features for a list of tracks in batches."""
     features = []
     try:
         batch_size = 100  # Spotify's limit for batch requests
@@ -119,7 +109,6 @@ def fetch_audio_features_in_batches(sp, song_ids):
 
 # Filter Liked Songs by Mood
 def filter_liked_songs_by_mood(track_features, feeling, intensity):
-    """Filter liked songs based on the selected mood and intensity."""
     filtered_songs = []
     fallback_songs = []
 
@@ -156,7 +145,6 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
 
 # Function for Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
-    """Allow the user to discover music based on their mood."""
     st.header("Curate Your Vibe")
     feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
     intensity = st.slider(f"How {feeling} are you feeling?", 1, 5)
@@ -188,7 +176,6 @@ def discover_music_by_feelings(sp):
 
 # Unique Insights Based on Data
 def get_top_items_with_insights(sp):
-    """Display top songs, artists, and genres along with interesting insights."""
     st.header("Your Top Songs, Artists, and Genres")
     time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
 
@@ -231,8 +218,7 @@ if is_authenticated():
             discover_music_by_feelings(sp)
         elif page == "Your Top Hits":
             get_top_items_with_insights(sp)
-        elif page == "Music Personality":
-            personality_page(sp)
+        # Define the Music Personality page if needed
 
     except Exception as e:
         st.error(f"Error loading the app: {e}")
