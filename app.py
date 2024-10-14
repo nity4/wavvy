@@ -10,7 +10,7 @@ import time
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
 CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
-REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
+REDIRECT_URI = "http://localhost:8501/callback"
 
 # Spotify OAuth scope for access to user data
 SCOPE = 'user-library-read user-top-read user-read-recently-played'
