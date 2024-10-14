@@ -7,12 +7,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 
+# Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
 CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 
-sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=scope)
+scope = "user-library-read user-top-read"
 
+# Initialize Spotify OAuth
+sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=scope)
 
 # App Layout and Configuration
 st.set_page_config(page_title="Wvvy", page_icon="〰", layout="wide", initial_sidebar_state="expanded")
@@ -66,6 +69,7 @@ def authenticate_user():
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; background-color: #ff4081; padding: 10px; border-radius: 8px;">Login with Spotify</a>', unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Authentication error: {e}")
+        
 
 # Loading Animation
 def show_loading_animation(text="Loading..."):
