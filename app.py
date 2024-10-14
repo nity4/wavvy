@@ -9,7 +9,7 @@ import time
 
 CLIENT_ID = 'your_client_id'
 CLIENT_SECRET = 'your_client_secret'
-REDIRECT_URI = 'http://localhost:8501/callback'
+REDIRECT_URI = 'https://wvvy701.streamlit.app/'
 
 scope = "user-library-read user-top-read"
 
