@@ -12,13 +12,16 @@ CLIENT_ID = st.secrets["spotify"]["client_id"]
 CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 
+# Spotify OAuth scope for access to user data
 SCOPE = 'user-library-read user-top-read user-read-recently-played'
 
-# Initialize Spotify OAuth
+# Initialize Spotify OAuth object
 sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=SCOPE)
 
-# App Layout and Configuration
+# Set up page configuration for Streamlit app
 st.set_page_config(page_title="Wvvy", page_icon="〰", layout="wide", initial_sidebar_state="expanded")
+
+# CSS for custom styling
 st.markdown("""
     <style>
     .main {
@@ -47,15 +50,18 @@ st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
 
 # Authentication Functions
 def is_authenticated():
+    """Check if the user is authenticated."""
     return st.session_state.get('token_info') is not None
 
 def refresh_token():
-    if st.session_state['token_info']:
+    """Refresh the user's Spotify access token if expired."""
+    if st.session_state.get('token_info'):
         if sp_oauth.is_token_expired(st.session_state['token_info']):
             token_info = sp_oauth.refresh_access_token(st.session_state['token_info']['refresh_token'])
             st.session_state['token_info'] = token_info
 
 def authenticate_user():
+    """Handle the user authentication with Spotify."""
     try:
         if "code" in st.experimental_get_query_params():
             code = st.experimental_get_query_params()["code"][0]
@@ -73,12 +79,14 @@ def authenticate_user():
 
 # Loading Animation
 def show_loading_animation(text="Loading..."):
+    """Display a loading animation during data fetching."""
     st.markdown(f"<div class='loading-text'>{text}</div>", unsafe_allow_html=True)
     with st.spinner("Processing..."):
-        time.sleep(2)  # Simulating a loading process
+        time.sleep(2)  # Simulate a loading process
 
 # Helper Functions
 def get_all_liked_songs(sp):
+    """Fetch all liked songs from the user's Spotify account."""
     liked_songs = []
     try:
         results = sp.current_user_saved_tracks(limit=50, offset=0)
@@ -96,6 +104,7 @@ def get_all_liked_songs(sp):
 
 # Fetch Audio Features in Batches (Spotify API has a limit on batch size)
 def fetch_audio_features_in_batches(sp, song_ids):
+    """Fetch audio features for a list of tracks in batches."""
     features = []
     try:
         batch_size = 100  # Spotify's limit for batch requests
@@ -110,6 +119,7 @@ def fetch_audio_features_in_batches(sp, song_ids):
 
 # Filter Liked Songs by Mood
 def filter_liked_songs_by_mood(track_features, feeling, intensity):
+    """Filter liked songs based on the selected mood and intensity."""
     filtered_songs = []
     fallback_songs = []
 
@@ -146,6 +156,7 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
 
 # Function for Mood-Based Music Discovery
 def discover_music_by_feelings(sp):
+    """Allow the user to discover music based on their mood."""
     st.header("Curate Your Vibe")
     feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
     intensity = st.slider(f"How {feeling} are you feeling?", 1, 5)
@@ -177,6 +188,7 @@ def discover_music_by_feelings(sp):
 
 # Unique Insights Based on Data
 def get_top_items_with_insights(sp):
+    """Display top songs, artists, and genres along with interesting insights."""
     st.header("Your Top Songs, Artists, and Genres")
     time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
 
@@ -201,122 +213,6 @@ def get_top_items_with_insights(sp):
     st.subheader("Your Top 5 Genres")
     top_5_genres = pd.Series(top_genres).value_counts().head(5).index.tolist()
     st.write(", ".join(top_5_genres))
-
-    # Unique and Exciting Insights
-    st.write("### Interesting Insights You Didn't Know")
-    st.write(f"**Most Active Listening Time:** You tend to listen to music the most at **{get_most_active_listening_time(sp, spotify_time_range)}**.")
-    st.write(f"**Diversity of Your Music Taste:** You have explored **{len(set(top_genres))} genres**.")
-    st.write(f"**Rarest Genre:** {get_rarest_genre(top_genres)} is the rarest genre in your playlist!")
-
-# Helper for Most Active Listening Time based on time range
-def get_most_active_listening_time(sp, time_range):
-    recent_tracks = sp.current_user_recently_played(limit=50)
-    timestamps = [track['played_at'] for track in recent_tracks['items']]
-    time_data = pd.Series(pd.to_datetime(timestamps)).dt.tz_convert('UTC')
-
-    if time_range == 'short_term':
-        time_data = time_data[time_data >= (pd.Timestamp.now(tz='UTC') - pd.DateOffset(weeks=1))]
-    elif time_range == 'medium_term':
-        time_data = time_data[time_data >= (pd.Timestamp.now(tz='UTC') - pd.DateOffset(months=1))]
-    else:
-        time_data = time_data[time_data >= (pd.Timestamp.now(tz='UTC') - pd.DateOffset(years=1))]
-
-    if not time_data.empty:
-        active_hour = time_data.dt.hour.value_counts().idxmax()
-        return f"{active_hour}:00 - {active_hour + 1}:00"
-    else:
-        return "No data"
-
-# Helper for Rarest Genre
-def get_rarest_genre(genres):
-    genre_counts = pd.Series(genres).value_counts()
-    return genre_counts.idxmin()
-
-# Listening Time Insights (Daily Listening for the Past Week)
-def get_listening_time_insights(sp):
-    recent_tracks = sp.current_user_recently_played(limit=50)
-    timestamps = [track['played_at'] for track in recent_tracks['items']]
-    
-    time_data = pd.Series(pd.to_datetime(timestamps))
-    daily_listening = time_data.dt.date.value_counts().sort_index()
-
-    # Simulating daily minutes listened for demo purposes
-    daily_minutes = {day: random.randint(20, 120) for day in daily_listening.index}  # Random minutes for demo
-    
-    return daily_listening, daily_minutes
-
-# Music Personality Page (Create Profile)
-def personality_page(sp):
-    st.header("Your Music Personality")
-
-    # Personality Traits and Colors based on Data
-    top_genres = [genre for artist in sp.current_user_top_artists(time_range='long_term', limit=50)['items'] for genre in artist['genres']]
-    
-    dominant_genre = pd.Series(top_genres).mode()[0]  # Most common genre
-    top_tracks_features = sp.current_user_top_tracks(limit=50)['items']
-
-    avg_valence = np.mean([sp.audio_features(track['id'])[0]['valence'] for track in top_tracks_features])
-    avg_energy = np.mean([sp.audio_features(track['id'])[0]['energy'] for track in top_tracks_features])
-
-    # Decide the personality based on valence (happiness) and energy
-    if avg_valence > 0.5 and avg_energy > 0.5:
-        personality_name, color_name = "Groove Enthusiast", "Gold"
-        color = "#ffd700"
-    elif avg_valence > 0.5:
-        personality_name, color_name = "Harmony Seeker", "Sky Blue"
-        color = "#87CEEB"
-    elif avg_energy > 0.5:
-        personality_name, color_name = "Rhythm Wanderer", "Lime Green"
-        color = "#32CD32"
-    else:
-        personality_name, color_name = "Melody Explorer", "Lavender"
-        color = "#E6E6FA"
-
-    # Display Personality Name and Color
-    st.markdown(f"<div style='background-color:{color}; padding:20px;'><h2>{personality_name}</h2></div>", unsafe_allow_html=True)
-    st.write(f"As a **{personality_name}**, you vibe with {dominant_genre} music. Your personality reflects **{color_name}**, symbolizing your energetic and creative spirit!")
-
-    # Display Listening Stats (Graph)
-    st.subheader("Your Listening Stats Over the Last Week")
-    daily_listening, daily_minutes = get_listening_time_insights(sp)
-    daily_tracks = daily_listening.values
-    days = list(daily_listening.index)
-    minutes_listened = list(daily_minutes.values())
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    # Bar chart for minutes listened
-    bars = ax.bar(days, minutes_listened, color=plt.cm.viridis(np.linspace(0.2, 0.8, len(days))), alpha=0.8)
-    ax.set_xlabel("Day", fontsize=12)
-    ax.set_ylabel("Minutes Listened", fontsize=12, color="#1e90ff")
-    ax.set_title("Your Daily Listening Activity", fontsize=16)
-
-    # Adding values on top of bars
-    for bar in bars:
-        yval = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2, yval + 2, f"{int(yval)}", ha='center', va='bottom', fontsize=10)
-
-    # Line chart for tracks played
-    ax2 = ax.twinx()
-    ax2.plot(days, daily_tracks, color="#ff4081", marker='o', linewidth=2.5, label="Tracks Played")
-    ax2.set_ylabel("Tracks Played", fontsize=12, color="#ff4081")
-
-    # Add legends
-    ax.legend(["Minutes Listened"], loc="upper left")
-    ax2.legend(loc="upper right")
-
-    # Grid and formatting
-    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
-    fig.tight_layout()
-
-    st.pyplot(fig)
-
-    # Total Tracks Played and Total Minutes Listened
-    total_tracks = sum(daily_tracks)
-    total_minutes = sum(minutes_listened)
-
-    st.write(f"**Total Tracks Played This Week:** {total_tracks}")
-    st.write(f"**Total Minutes Listened This Week:** {total_minutes} minutes")
 
 # Main App Layout
 if is_authenticated():
