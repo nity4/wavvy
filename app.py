@@ -7,15 +7,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 
-# Spotify API credentials from Streamlit Secrets
-CLIENT_ID = st.secrets["spotify"]["client_id"]
-CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
-REDIRECT_URI = "http://localhost:8501/callback"
+CLIENT_ID = 'your_client_id'
+CLIENT_SECRET = 'your_client_secret'
+REDIRECT_URI = 'http://localhost:8501/callback'
 
-SCOPE = 'user-library-read user-top-read user-read-recently-played'
+scope = "user-library-read user-top-read"
 
-# Initialize Spotify OAuth
-sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=SCOPE)
+sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=scope)
+
+auth_url = sp_oauth.get_authorize_url()
+print(f"Navigate to this URL to authenticate: {auth_url}")
 
 # App Layout and Configuration
 st.set_page_config(page_title="Wvvy", page_icon="〰", layout="wide", initial_sidebar_state="expanded")
