@@ -64,7 +64,7 @@ st.markdown("""
     }
     /* Set text color for select box and slider labels */
     .stSelectbox label, .stSlider label {
-        color: black !important;
+        color: white !important;
     }
     /* Set black color for options in selectbox */
     .stSelectbox .css-1wa3eu0-placeholder, .stSelectbox .css-2b097c-container {
