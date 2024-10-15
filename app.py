@@ -1,7 +1,6 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import random
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -28,7 +27,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS styling for black and green gradient and white text
+# Custom CSS styling
 st.markdown("""
     <style>
     body {
@@ -63,6 +62,9 @@ st.markdown("""
     }
     .main {
         font-family: 'Courier New', Courier, monospace;
+    }
+    .stSelectbox, .stSlider {
+        color: black !important;  /* Black text for the mood options */
     }
     </style>
 """, unsafe_allow_html=True)
@@ -106,7 +108,13 @@ def get_liked_songs(sp):
     liked_songs = []
     for item in results['items']:
         track = item['track']
-        liked_songs.append(f"{track['name']} by {track['artists'][0]['name']}")
+        liked_songs.append({
+            "name": track['name'],
+            "artist": track['artists'][0]['name'],
+            "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
+            "energy": random.uniform(0, 1),  # Simulate energy feature (0-1)
+            "valence": random.uniform(0, 1)  # Simulate valence feature (0-1)
+        })
     return liked_songs
 
 # Function to retrieve new song recommendations
@@ -114,15 +122,42 @@ def get_new_discoveries(sp):
     recommendations = sp.recommendations(seed_genres=["pop", "rock", "hip-hop"], limit=50)
     new_songs = []
     for track in recommendations['tracks']:
-        new_songs.append(f"{track['name']} by {track['artists'][0]['name']}")
+        new_songs.append({
+            "name": track['name'],
+            "artist": track['artists'][0]['name'],
+            "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
+            "energy": random.uniform(0, 1),  # Simulate energy feature (0-1)
+            "valence": random.uniform(0, 1)  # Simulate valence feature (0-1)
+        })
     return new_songs
 
-# Function to display songs in a structured manner
+# Function to filter songs based on mood and intensity
+def filter_songs(songs, mood, intensity):
+    mood_ranges = {
+        "Happy": (0.7, 1),
+        "Calm": (0.3, 0.6),
+        "Energetic": (0.6, 1),
+        "Sad": (0, 0.3)
+    }
+    
+    mood_range = mood_ranges[mood]
+    filtered_songs = [song for song in songs if mood_range[0] <= song['valence'] <= mood_range[1] and song['energy'] >= (intensity / 10)]
+    
+    return filtered_songs
+
+# Function to display songs with their cover images
 def display_songs(song_list, title):
     st.write(f"### {title}")
     if song_list:
-        for i, song in enumerate(song_list, start=1):
-            st.write(f"{i}. {song}")
+        for song in song_list:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if song["cover"]:
+                    st.image(song["cover"], width=80)
+                else:
+                    st.write("No cover")
+            with col2:
+                st.write(f"**{song['name']}** by {song['artist']}")
     else:
         st.write("No songs found.")
 
@@ -143,11 +178,13 @@ if is_authenticated():
 
         with tab1:
             liked_songs = get_liked_songs(sp)
-            display_songs(liked_songs, "Your Liked Songs")
+            filtered_liked_songs = filter_songs(liked_songs, mood, intensity)
+            display_songs(filtered_liked_songs, "Your Liked Songs")
 
         with tab2:
             new_songs = get_new_discoveries(sp)
-            display_songs(new_songs, "New Song Discoveries")
+            filtered_new_songs = filter_songs(new_songs, mood, intensity)
+            display_songs(filtered_new_songs, "New Song Discoveries")
         
     except Exception as e:
         st.error(f"Error loading the app: {e}")
