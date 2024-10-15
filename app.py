@@ -210,9 +210,6 @@ def display_songs(song_list, title):
 # Main app logic
 if is_authenticated():
     try:
-        refresh_token()
-        st.success("You are logged in! Your Spotify data is ready for analysis.")
-
         st.markdown("""
     <div style='color: white; font-size: 18px; font-weight: bold;'>
         You are logged in! Your Spotify data is ready for analysis.
