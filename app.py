@@ -28,7 +28,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for black font on select boxes
+# Custom CSS for white text but keeping top banner and dropdown unaffected
 st.markdown("""
     <style>
     body {
@@ -58,8 +58,14 @@ st.markdown("""
         font-weight: bold;
         margin-top: 30px;
     }
-    .stSelectbox label, .stSlider label {
+    .stMarkdown, .stButton, .stSlider {
+        color: white !important;
+    }
+    .stSelectbox label {
         color: black !important;
+    }
+    .stSelectbox .css-1d391kg {
+        color: black !important;  /* Ensuring dropdown items are black */
     }
     </style>
 """, unsafe_allow_html=True)
@@ -216,4 +222,4 @@ if is_authenticated():
 else:
     st.write("Welcome to Wvvy")
     st.write("Login to explore your personalized music experience.")
-    authenticate_user()
+    authenticate
