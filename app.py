@@ -30,12 +30,16 @@ st.set_page_config(
 # Custom CSS styling for app layout and UI with black and green gradient background
 st.markdown("""
     <style>
+    body {
+        background-image: linear-gradient(to right, black, #1DB954);  /* Black to Spotify Green */
+        color: white; /* Text color set to white for better contrast */
+    }
     .main {
         background-color: black;
         font-family: 'Courier New', Courier, monospace;
     }
     .stApp {
-        background-image: linear-gradient(to right, black, #1DB954);  /* Black to Spotify Green */
+        background-color: transparent;
     }
     .header-title {
         font-size: 3em;
