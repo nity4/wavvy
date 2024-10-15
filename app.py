@@ -28,7 +28,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for white text but keeping top banner and dropdown unaffected
+# Custom CSS for white text in body and normal text for select elements
 st.markdown("""
     <style>
     body {
@@ -58,14 +58,14 @@ st.markdown("""
         font-weight: bold;
         margin-top: 30px;
     }
-    .stMarkdown, .stButton, .stSlider {
-        color: white !important;
+    .stSelectbox label, .stSlider label, .stTabs label {
+        color: black !important;  /* Make dropdown and slider labels black */
     }
-    .stSelectbox label {
-        color: black !important;
+    .stMarkdown, .stButton, .stSlider, .stTabs, .stTabs label {
+        color: black !important;  /* Ensure text in these components is black */
     }
-    .stSelectbox .css-1d391kg {
-        color: black !important;  /* Ensuring dropdown items are black */
+    .stMarkdown div {
+        color: white !important;  /* Make general text white */
     }
     </style>
 """, unsafe_allow_html=True)
@@ -222,4 +222,4 @@ if is_authenticated():
 else:
     st.write("Welcome to Wvvy")
     st.write("Login to explore your personalized music experience.")
-    authenticate
+    authenticate_user()
