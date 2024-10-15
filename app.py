@@ -2,6 +2,9 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import random
+import pandas as pd
+import datetime
+import time  # For handling delays in retries
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -118,13 +121,43 @@ def authenticate_user():
             unsafe_allow_html=True
         )
 
-# Retrieve liked songs and audio features (valence, energy, tempo)
+# Helper Function for Handling Spotify API Rate Limit (429 Error)
+def handle_spotify_rate_limit(sp_func, *args, max_retries=5):
+    retries = 0
+    while retries < max_retries:
+        try:
+            return sp_func(*args)
+        except spotipy.SpotifyException as e:
+            if e.http_status == 429:
+                # Get the 'Retry-After' header value to know how long to wait
+                retry_after = int(e.headers.get("Retry-After", 1))  # default to 1 second if header is missing
+                st.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
+                time.sleep(retry_after)  # Sleep for 'Retry-After' seconds
+                retries += 1
+            else:
+                st.error(f"Error: {e}")
+                break
+    st.error(f"Max retries exceeded ({max_retries}). Please try again later.")
+
+# Fetch audio features for a batch of tracks (with 429 handling)
+def fetch_audio_features(sp, track_ids):
+    audio_features = []
+    batch_size = 50  # Fetch in batches of 50 to avoid rate limits
+    for i in range(0, len(track_ids), batch_size):
+        batch_ids = track_ids[i:i + batch_size]
+        features = handle_spotify_rate_limit(sp.audio_features, batch_ids)
+        if features:
+            audio_features.extend(features)
+    return audio_features
+
+# Example function to get liked songs and audio features (with 429 error handling)
 def get_liked_songs(sp):
-    results = sp.current_user_saved_tracks(limit=50)
+    results = handle_spotify_rate_limit(sp.current_user_saved_tracks, limit=50)
     liked_songs = []
     for item in results['items']:
         track = item['track']
-        audio_features = sp.audio_features(track['id'])[0]
+        track_id = track['id']
+        audio_features = fetch_audio_features(sp, [track_id])[0]
         liked_songs.append({
             "name": track['name'],
             "artist": track['artists'][0]['name'],
@@ -135,94 +168,49 @@ def get_liked_songs(sp):
         })
     return liked_songs
 
-# Retrieve recommendations based on user's listening habits
+# Retrieve recommendations based on user's listening habits (with 429 error handling)
 def get_new_discoveries(sp):
-    # Fetch top tracks and artists based on user's listening history
-    top_tracks_results = sp.current_user_top_tracks(limit=5, time_range="medium_term")['items']
-    top_artists_results = sp.current_user_top_artists(limit=5, time_range="medium_term")['items']
+    top_tracks_results = handle_spotify_rate_limit(sp.current_user_top_tracks, limit=5, time_range="medium_term")['items']
+    top_artists_results = handle_spotify_rate_limit(sp.current_user_top_artists, limit=5, time_range="medium_term")['items']
     
     top_tracks = [track['id'] for track in top_tracks_results]
     top_genres = [artist['genres'][0] for artist in top_artists_results if artist['genres']]
 
-    # Ensure we don't exceed the limit of 5 seeds
-    seed_tracks = top_tracks[:3]  # Limit to 3 tracks
-    seed_genres = top_genres[:2]  # Limit to 2 genres
+    seed_tracks = top_tracks[:3]
+    seed_genres = top_genres[:2]
 
-    # Handle cases where there are no genres or tracks
     if not seed_tracks and not seed_genres:
-        seed_tracks = ['4uLU6hMCjMI75M1A2tKUQC']  # A default track seed (50 Cent - In Da Club)
-    
-    try:
-        recommendations = sp.recommendations(seed_tracks=seed_tracks, seed_genres=seed_genres, limit=50)
-        new_songs = []
-        for track in recommendations['tracks']:
-            audio_features = sp.audio_features(track['id'])[0]
-            new_songs.append({
-                "name": track['name'],
-                "artist": track['artists'][0]['name'],
-                "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
-                "energy": audio_features["energy"],
-                "valence": audio_features["valence"],
-                "tempo": audio_features["tempo"]
-            })
-        return new_songs
-    except Exception as e:
-        st.error(f"Error fetching recommendations: {e}")
-        return []
+        seed_tracks = ['4uLU6hMCjMI75M1A2tKUQC']  # Default track seed
 
-# Enhanced mood classification based on valence and tempo
-def filter_songs(songs, mood, intensity):
-    mood_ranges = {
-        "Happy": {"valence": (0.6, 1), "tempo": (100, 200)},
-        "Calm": {"valence": (0.3, 0.5), "tempo": (40, 100)},
-        "Energetic": {"valence": (0.5, 1), "tempo": (120, 200)},
-        "Sad": {"valence": (0, 0.3), "tempo": (40, 80)}
-    }
+    recommendations = handle_spotify_rate_limit(sp.recommendations, seed_tracks=seed_tracks, seed_genres=seed_genres, limit=50)
     
-    mood_filter = mood_ranges[mood]
-    
-    # Apply mood and intensity filtering
-    filtered_songs = [
-        song for song in songs
-        if mood_filter["valence"][0] <= song["valence"] <= mood_filter["valence"][1]
-        and mood_filter["tempo"][0] <= song["tempo"] <= mood_filter["tempo"][1]
-        and song['energy'] >= (intensity / 5)
-    ]
-    
-    return filtered_songs
-
-# Function to display songs with their cover images
-def display_songs(song_list, title):
-    st.write(f"### {title}")
-    if song_list:
-        for song in song_list:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                if song["cover"]:
-                    st.image(song["cover"], width=80)
-                else:
-                    st.write("No cover")
-            with col2:
-                st.write(f"**{song['name']}** by {song['artist']}")
-    else:
-        st.write("No songs found.")
+    new_songs = []
+    for track in recommendations['tracks']:
+        audio_features = fetch_audio_features(sp, [track['id']])[0]
+        new_songs.append({
+            "name": track['name'],
+            "artist": track['artists'][0]['name'],
+            "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
+            "energy": audio_features["energy"],
+            "valence": audio_features["valence"],
+            "tempo": audio_features["tempo"]
+        })
+    return new_songs
 
 # Main app logic
 if is_authenticated():
     try:
         st.markdown("""
-    <div style='color: white; font-size: 18px; font-weight: bold;'>
-        You are logged in! Your Spotify data is ready for analysis.
-    </div>
-""", unsafe_allow_html=True)
+        <div style='color: white; font-size: 18px; font-weight: bold;'>
+            You are logged in! Your Spotify data is ready for analysis.
+        </div>
+        """, unsafe_allow_html=True)
 
         sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
         
-        # Mood and Intensity filters
         mood = st.selectbox("Choose your mood:", ["Happy", "Calm", "Energetic", "Sad"])
-        intensity = st.slider("Choose intensity:", 1, 5, 3)  # Adjusted intensity to 1-5
-        
-        # Tabs for liked songs and new discoveries
+        intensity = st.slider("Choose intensity:", 1, 5, 3)
+
         tab1, tab2 = st.tabs(["Liked Songs", "New Discoveries"])
 
         with tab1:
