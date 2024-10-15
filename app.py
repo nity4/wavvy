@@ -108,7 +108,7 @@ def authenticate_user():
         try:
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
-            st.experimental_set_query_params()
+            st.set_query_params()  # Replacing deprecated experimental_set_query_params
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
                 st.experimental_rerun()
@@ -122,18 +122,19 @@ def authenticate_user():
         )
 
 # Helper Function for Handling Spotify API Rate Limit (429 Error)
-def handle_spotify_rate_limit(sp_func, *args, max_retries=5, **kwargs):
+def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
     retries = 0
+    wait_time = 1  # Start with 1 second wait time
     while retries < max_retries:
         try:
             return sp_func(*args, **kwargs)
         except spotipy.SpotifyException as e:
             if e.http_status == 429:
-                # Get the 'Retry-After' header value to know how long to wait
-                retry_after = int(e.headers.get("Retry-After", 1))  # default to 1 second if header is missing
+                retry_after = int(e.headers.get("Retry-After", wait_time))  # default to 1 second if header is missing
                 st.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
                 time.sleep(retry_after)  # Sleep for 'Retry-After' seconds
                 retries += 1
+                wait_time *= 2  # Double the wait time after each retry (exponential backoff)
             else:
                 st.error(f"Error: {e}")
                 break
