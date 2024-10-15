@@ -40,7 +40,7 @@ st.markdown("""
         background: linear-gradient(to right, black, #1DB954) !important;
     }
 
-    /* Customize the Wvvy header text */
+    /* Customize the Wvvy header text without shadow */
     .header-title {
         font-size: 5em; /* Larger font size */
         font-weight: bold;
@@ -49,7 +49,7 @@ st.markdown("""
         padding-top: 50px;
         margin-bottom: 20px;
         letter-spacing: 5px; /* Adds spacing between letters for style */
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7); /* Adds shadow for depth */
+        /* Removed text-shadow */
     }
 
     /* Style for the login button */
