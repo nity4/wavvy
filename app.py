@@ -77,14 +77,15 @@ def refresh_token():
         st.session_state['token_info'] = token_info
 
 def authenticate_user():
-    query_params = st.query_params  # Updated from st.experimental_get_query_params()
+    query_params = st.experimental_get_query_params()  # Fetch query params
     
     if "code" in query_params:
-        code = query_params["code"]
+        code = query_params["code"][0]  # Get the auth code from the query parameters
         try:
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
-            st.experimental_set_query_params()  # Clear the query params
+            # Clear query parameters after authentication to avoid re-running
+            st.experimental_set_query_params()  
             st.success("You're authenticated! You can now access your music data.")
         except Exception as e:
             st.error(f"Authentication error: {e}")
