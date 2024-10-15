@@ -27,33 +27,29 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS styling for app layout and UI with black and green gradient background
+# Custom CSS styling to apply black and green gradient to the entire app
 st.markdown("""
     <style>
+    /* Set background to black and green gradient */
     body {
-        background-image: linear-gradient(to right, black, #1DB954);  /* Black to Spotify Green */
-        color: white; /* Text color set to white for better contrast */
+        background: linear-gradient(to right, black, #1DB954) !important;
     }
+
+    /* Apply the gradient background to the main container and sidebar */
+    .stApp {
+        background: linear-gradient(to right, black, #1DB954) !important;
+    }
+
+    /* Force text color to white for visibility */
+    .header-title, .login-button, .success, .error, h1, h2, h3, h4, h5, h6, p {
+        color: white !important;
+    }
+
     .main {
-        background-color: black;
         font-family: 'Courier New', Courier, monospace;
     }
-    .stApp {
-        background-color: transparent;
-    }
-    .header-title {
-        font-size: 3em;
-        color: white;
-        font-weight: bold;
-        text-align: center;
-        padding-top: 20px;
-    }
-    .loading-text {
-        font-size: 1.5em;
-        color: white;
-        text-align: center;
-        padding: 20px;
-    }
+
+    /* Style the login button */
     .login-button {
         color: white;
         background-color: #1DB954;  /* Spotify Green */
