@@ -28,7 +28,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for text and background colors
+# Custom CSS for black and green background, and white text
 st.markdown("""
     <style>
     /* Background gradient for the entire app */
@@ -36,19 +36,14 @@ st.markdown("""
         background: linear-gradient(to right, black, #1DB954) !important;
     }
 
-    /* Make the background of the main app content transparent */
-    .stApp {
-        background: transparent !important;
-    }
-
     /* Ensure all text is white */
     h1, h2, h3, h4, h5, h6, p, div, span, label, .stMarkdown, .success, .error, .warning {
         color: white !important;
     }
 
-    /* Make the background of the mood and intensity filter dropdown transparent */
-    .stSelectbox, .stSlider {
-        background: transparent !important;
+    /* Keep the mood and intensity filter dropdowns with black text */
+    .stSelectbox label, .stSlider label {
+        color: black !important;
     }
 
     /* Header styling */
@@ -230,4 +225,3 @@ if is_authenticated():
 else:
     st.write("Welcome to Wvvy")
     st.write("Login to explore your personalized music experience.")
-    authenticate_user()
