@@ -14,7 +14,13 @@ REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 scope = "user-library-read user-top-read"
 
 # Initialize Spotify OAuth object
-sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=scope)
+sp_oauth = SpotifyOAuth(
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    redirect_uri=REDIRECT_URI,
+    scope=scope,
+    cache_path=".cache"  # Optional: Specify a cache path
+)
 
 # Set Streamlit page configuration
 st.set_page_config(
@@ -39,12 +45,22 @@ st.markdown("""
         color: white;
         font-weight: bold;
         text-align: center;
+        padding-top: 20px;
     }
     .loading-text {
         font-size: 1.5em;
         color: white;
         text-align: center;
         padding: 20px;
+    }
+    .login-button {
+        color: white;
+        background-color: #ff4081;
+        padding: 10px 20px;
+        border-radius: 8px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -53,7 +69,7 @@ st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
 
 # Authentication Functions
 def is_authenticated():
-    return st.session_state.get('token_info') is not None
+    return 'token_info' in st.session_state and st.session_state['token_info'] is not None
 
 def refresh_token():
     if 'token_info' in st.session_state and sp_oauth.is_token_expired(st.session_state['token_info']):
@@ -61,17 +77,24 @@ def refresh_token():
         st.session_state['token_info'] = token_info
 
 def authenticate_user():
-    if "code" in st.experimental_get_query_params():
-        code = st.experimental_get_query_params()["code"][0]
-        token_info = sp_oauth.get_access_token(code)
-        st.session_state['token_info'] = token_info
-        st.experimental_set_query_params(code=None)
-        st.success("You're authenticated! Refresh the page to access your music data.")
-        if st.button("Refresh Now"):
-            st.experimental_set_query_params()
+    query_params = st.query_params  # Updated from st.experimental_get_query_params()
+    
+    if "code" in query_params:
+        code = query_params["code"]
+        try:
+            token_info = sp_oauth.get_access_token(code)
+            st.session_state['token_info'] = token_info
+            st.experimental_set_query_params()  # Clear the query params
+            st.success("You're authenticated! You can now access your music data.")
+        except Exception as e:
+            st.error(f"Authentication error: {e}")
     else:
         auth_url = sp_oauth.get_authorize_url()
-        st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; background-color: #ff4081; padding: 10px; border-radius: 8px;">Login with Spotify</a>', unsafe_allow_html=True)
+        # Open in a new tab to avoid iframe issues
+        st.markdown(
+            f'<a href="{auth_url}" target="_blank" class="login-button">Login with Spotify</a>',
+            unsafe_allow_html=True
+        )
 
 # Loading Animation
 def show_loading_animation(text="Loading..."):
@@ -116,6 +139,9 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
     fallback_songs = []
 
     for track in track_features:
+        if track is None:
+            continue  # Skip if audio features are not available
+
         valence = track.get('valence', 0)
         energy = track.get('energy', 0)
         danceability = track.get('danceability', 0)
@@ -150,14 +176,14 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
 def discover_music_by_feelings(sp):
     st.header("Curate Your Vibe")
     feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
-    intensity = st.slider(f"How {feeling} are you feeling?", 1, 5)
+    intensity = st.slider(f"How {feeling.lower()} are you feeling?", 1, 5)
 
     try:
         liked_songs = get_all_liked_songs(sp)
         if len(liked_songs) > 0:
             show_loading_animation(text="Creating your vibe-based playlist...")
             random.shuffle(liked_songs)
-            song_ids = [track['track']['id'] for track in liked_songs]
+            song_ids = [track['track']['id'] for track in liked_songs if track['track']['id'] is not None]
             features = fetch_audio_features_in_batches(sp, song_ids)
             filtered_songs = filter_liked_songs_by_mood(features, feeling, intensity)
         else:
@@ -165,12 +191,14 @@ def discover_music_by_feelings(sp):
 
         if filtered_songs:
             st.subheader(f"Here's your {feeling.lower()} playlist:")
-            for feature in filtered_songs[:10]:
-                song = sp.track(feature['id'])
-                song_name = song['name']
-                artist_name = song['artists'][0]['name']
-                album_cover = song['album']['images'][0]['url']
-                st.image(album_cover, width=150, caption=f"{song_name} by {artist_name}")
+            cols = st.columns(2)
+            for i, feature in enumerate(filtered_songs[:10]):
+                with cols[i % 2]:
+                    song = sp.track(feature['id'])
+                    song_name = song['name']
+                    artist_name = song['artists'][0]['name']
+                    album_cover = song['album']['images'][0]['url']
+                    st.image(album_cover, width=150, caption=f"{song_name} by {artist_name}")
         else:
             st.write(f"No tracks match your {feeling.lower()} vibe right now. Try adjusting the intensity or picking a different mood.")
     
@@ -192,17 +220,31 @@ def get_top_items_with_insights(sp):
 
     st.subheader("Your Top Songs")
     for i, track in enumerate(top_tracks['items']):
-        st.write(f"{i+1}. {track['name']} by {track['artists'][0]['name']}")
-        st.image(track['album']['images'][0]['url'], width=60)
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.image(track['album']['images'][0]['url'], width=60)
+        with col2:
+            st.write(f"**{i+1}. {track['name']}** by {track['artists'][0]['name']}")
 
     st.subheader("Your Top Artists")
     for i, artist in enumerate(top_artists['items']):
-        st.write(f"{i+1}. {artist['name']}")
-        st.image(artist['images'][0]['url'], width=60)
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.image(artist['images'][0]['url'], width=60)
+        with col2:
+            st.write(f"**{i+1}. {artist['name']}**")
 
     st.subheader("Your Top 5 Genres")
-    top_5_genres = pd.Series(top_genres).value_counts().head(5).index.tolist()
-    st.write(", ".join(top_5_genres))
+    if top_genres:
+        top_5_genres = pd.Series(top_genres).value_counts().head(5).index.tolist()
+        st.write(", ".join(top_5_genres))
+    else:
+        st.write("No genre information available.")
+
+# Optional: Implement Music Personality section
+def music_personality(sp):
+    st.header("Music Personality Insights")
+    st.write("Coming soon! Explore more about your music personality based on your listening habits.")
 
 # Main app logic
 if is_authenticated():
@@ -221,7 +263,8 @@ if is_authenticated():
             discover_music_by_feelings(sp)
         elif page == "Your Top Hits":
             get_top_items_with_insights(sp)
-        # Implement Music Personality section if required
+        elif page == "Music Personality":
+            music_personality(sp)
 
     except Exception as e:
         st.error(f"Error loading the app: {e}")
