@@ -101,7 +101,7 @@ def refresh_token():
         st.session_state['token_info'] = token_info
 
 def authenticate_user():
-    query_params = st.query_params()  # Replace experimental_get_query_params with st.query_params
+    query_params = st.query_params  # Remove parentheses to access as an attribute
     
     if "code" in query_params:
         code = query_params["code"][0]
@@ -130,8 +130,8 @@ def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
             return sp_func(*args, **kwargs)
         except spotipy.SpotifyException as e:
             if e.http_status == 429:
-                retry_after = int(e.headers.get("Retry-After", wait_time))  # default to 1 second if header is missing
-                st.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
+                retry_after = int(e.headers.get("Retry-After", wait_time)) if e.headers and "Retry-After" in e.headers else wait_time
+                st.warning(f"Rate limit reached. Retrying after {retry_after} seconds... (Attempt {retries + 1}/{max_retries})")
                 time.sleep(retry_after)  # Sleep for 'Retry-After' seconds
                 retries += 1
                 wait_time *= 2  # Double the wait time after each retry (exponential backoff)
@@ -139,6 +139,7 @@ def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
                 st.error(f"Error: {e}")
                 break
     st.error(f"Max retries exceeded ({max_retries}). Please try again later.")
+    return None
 
 # Fetch audio features for a batch of tracks (with 429 handling)
 def fetch_audio_features(sp, track_ids):
@@ -154,6 +155,8 @@ def fetch_audio_features(sp, track_ids):
 # Example function to get liked songs and audio features (with 429 error handling)
 def get_liked_songs(sp):
     results = handle_spotify_rate_limit(sp.current_user_saved_tracks, limit=50)
+    if not results:
+        return []  # If max retries exceeded, return empty list to prevent crashes
     liked_songs = []
     for item in results['items']:
         track = item['track']
@@ -171,11 +174,14 @@ def get_liked_songs(sp):
 
 # Retrieve recommendations based on user's listening habits (with 429 error handling)
 def get_new_discoveries(sp):
-    top_tracks_results = handle_spotify_rate_limit(sp.current_user_top_tracks, limit=5, time_range="medium_term")['items']
-    top_artists_results = handle_spotify_rate_limit(sp.current_user_top_artists, limit=5, time_range="medium_term")['items']
+    top_tracks_results = handle_spotify_rate_limit(sp.current_user_top_tracks, limit=5, time_range="medium_term")
+    top_artists_results = handle_spotify_rate_limit(sp.current_user_top_artists, limit=5, time_range="medium_term")
     
-    top_tracks = [track['id'] for track in top_tracks_results]
-    top_genres = [artist['genres'][0] for artist in top_artists_results if artist['genres']]
+    if not top_tracks_results or not top_artists_results:
+        return []  # Return empty if max retries exceeded
+    
+    top_tracks = [track['id'] for track in top_tracks_results['items']]
+    top_genres = [artist['genres'][0] for artist in top_artists_results['items'] if artist['genres']]
 
     seed_tracks = top_tracks[:3]
     seed_genres = top_genres[:2]
@@ -184,6 +190,9 @@ def get_new_discoveries(sp):
         seed_tracks = ['4uLU6hMCjMI75M1A2tKUQC']  # Default track seed
 
     recommendations = handle_spotify_rate_limit(sp.recommendations, seed_tracks=seed_tracks, seed_genres=seed_genres, limit=50)
+    
+    if not recommendations:
+        return []  # Return empty if max retries exceeded
     
     new_songs = []
     for track in recommendations['tracks']:
@@ -216,13 +225,19 @@ if is_authenticated():
 
         with tab1:
             liked_songs = get_liked_songs(sp)
-            filtered_liked_songs = filter_songs(liked_songs, mood, intensity)
-            display_songs(filtered_liked_songs, "Your Liked Songs")
+            if liked_songs:
+                filtered_liked_songs = filter_songs(liked_songs, mood, intensity)
+                display_songs(filtered_liked_songs, "Your Liked Songs")
+            else:
+                st.warning("No liked songs available.")
 
         with tab2:
             new_songs = get_new_discoveries(sp)
-            filtered_new_songs = filter_songs(new_songs, mood, intensity)
-            display_songs(filtered_new_songs, "New Song Discoveries")
+            if new_songs:
+                filtered_new_songs = filter_songs(new_songs, mood, intensity)
+                display_songs(filtered_new_songs, "New Song Discoveries")
+            else:
+                st.warning("No new discoveries available.")
         
     except Exception as e:
         st.error(f"Error loading the app: {e}")
