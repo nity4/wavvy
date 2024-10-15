@@ -27,15 +27,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS styling for app layout and UI
+# Custom CSS styling for app layout and UI with black and green gradient background
 st.markdown("""
     <style>
     .main {
-        background-color: #f4f4f4;
+        background-color: black;
         font-family: 'Courier New', Courier, monospace;
     }
     .stApp {
-        background-image: linear-gradient(to right, #ff4081, #ff6347);
+        background-image: linear-gradient(to right, black, #1DB954);  /* Black to Spotify Green */
     }
     .header-title {
         font-size: 3em;
@@ -52,7 +52,7 @@ st.markdown("""
     }
     .login-button {
         color: white;
-        background-color: #ff4081;
+        background-color: #1DB954;  /* Spotify Green */
         padding: 10px 20px;
         border-radius: 8px;
         text-align: center;
@@ -89,11 +89,10 @@ def authenticate_user():
             st.error(f"Authentication error: {e}")
     else:
         auth_url = sp_oauth.get_authorize_url()
-        # Direct the user to click and login without opening a new tab
-        st.markdown(
-            f'<a href="{auth_url}" class="login-button">Login with Spotify</a>',
-            unsafe_allow_html=True
-        )
+        # Directly display the Spotify login URL button within the same tab
+        if st.button("Login with Spotify"):
+            st.experimental_set_query_params(code=auth_url)
+            st.experimental_rerun()
 
 # Main app logic
 if is_authenticated():
