@@ -212,7 +212,13 @@ if is_authenticated():
     try:
         refresh_token()
         st.success("You are logged in! Your Spotify data is ready for analysis.")
-        
+
+        st.markdown("""
+    <div style='color: white; font-size: 18px; font-weight: bold;'>
+        You are logged in! Your Spotify data is ready for analysis.
+    </div>
+""", unsafe_allow_html=True)
+
         sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
         
         # Mood and Intensity filters
