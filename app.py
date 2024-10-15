@@ -101,7 +101,7 @@ def refresh_token():
         st.session_state['token_info'] = token_info
 
 def authenticate_user():
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params()  # Replace experimental_get_query_params with st.query_params
     
     if "code" in query_params:
         code = query_params["code"][0]
