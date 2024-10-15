@@ -28,7 +28,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for white text in body and normal text for select elements
+# Custom CSS for white text in the main body and normal text for select elements
 st.markdown("""
     <style>
     body {
@@ -58,14 +58,29 @@ st.markdown("""
         font-weight: bold;
         margin-top: 30px;
     }
-    .stSelectbox label, .stSlider label, .stTabs label {
-        color: black !important;  /* Make dropdown and slider labels black */
+    /* Set white text for markdown and body */
+    .stMarkdown p, .stMarkdown h3 {
+        color: white !important;
     }
-    .stMarkdown, .stButton, .stSlider, .stTabs, .stTabs label {
-        color: black !important;  /* Ensure text in these components is black */
+    /* Set text color for select box and slider labels */
+    .stSelectbox label, .stSlider label {
+        color: black !important;
     }
-    .stMarkdown div {
-        color: white !important;  /* Make general text white */
+    /* Set black color for options in selectbox */
+    .stSelectbox .css-1wa3eu0-placeholder, .stSelectbox .css-2b097c-container {
+        color: black !important;
+    }
+    /* Set text color for slider numbers */
+    .stSlider .css-164nlkn .css-qrbaxs {
+        color: white !important;
+    }
+    /* Adjust background and text color for tabs */
+    .stTabs [role="tab"] {
+        color: white !important;
+    }
+    .stTabs [role="tabpanel"] {
+        background-color: rgba(0, 0, 0, 0.5) !important;
+        color: white !important;
     }
     </style>
 """, unsafe_allow_html=True)
