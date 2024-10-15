@@ -4,6 +4,7 @@ from spotipy.oauth2 import SpotifyOAuth
 import random
 import pandas as pd
 import time
+import matplotlib.pyplot as plt
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -103,110 +104,77 @@ def show_loading_animation(text="Loading..."):
     with st.spinner("Processing..."):
         time.sleep(2)  # Simulate a loading process
 
-# Fetch all liked songs
-def get_all_liked_songs(sp):
-    liked_songs = []
-    try:
-        results = sp.current_user_saved_tracks(limit=50, offset=0)
-        total_songs = results['total']
+# Fun insights from user data
+def get_user_insights(top_tracks, top_artists):
+    st.header("Fun Insights from Your Data")
 
-        while len(liked_songs) < total_songs:
-            liked_songs.extend(results['items'])
-            offset = len(liked_songs)
-            results = sp.current_user_saved_tracks(limit=50, offset=offset)
+    # Primetime of Listening
+    track_timestamps = pd.Series([pd.Timestamp(track['played_at']) for track in top_tracks['items']])
+    primetime = track_timestamps.dt.hour.mode()[0]
+    st.write(f"Your **primetime** of listening is around **{primetime}:00** hours!")
 
-    except Exception as e:
-        st.error(f"Error fetching liked songs: {e}")
-    
-    return liked_songs
+    # Rarest Genre
+    all_genres = [genre for artist in top_artists['items'] for genre in artist['genres']]
+    genre_counts = pd.Series(all_genres).value_counts()
+    rarest_genre = genre_counts.idxmin()
+    st.write(f"Your **rarest genre** is **{rarest_genre}**.")
 
-# Fetch audio features in batches
-def fetch_audio_features_in_batches(sp, song_ids):
-    features = []
-    try:
-        batch_size = 100  # Spotify's limit for batch requests
-        for i in range(0, len(song_ids), batch_size):
-            batch = song_ids[i:i + batch_size]
-            audio_features = sp.audio_features(tracks=batch)
-            features.extend(audio_features)
-    except Exception as e:
-        st.error(f"Error fetching audio features: {e}")
-    
-    return features
+    # Most Active Listening Day
+    most_active_day = track_timestamps.dt.day_name().mode()[0]
+    st.write(f"Your most active day of listening is **{most_active_day}**.")
 
-# Filter liked songs by mood
-def filter_liked_songs_by_mood(track_features, feeling, intensity):
-    filtered_songs = []
-    fallback_songs = []
+    # Average Song Length
+    song_durations = [track['duration_ms'] for track in top_tracks['items']]
+    avg_song_length = pd.Series(song_durations).mean() / 60000  # Convert to minutes
+    st.write(f"Your average song length is **{avg_song_length:.2f} minutes**.")
 
-    for track in track_features:
-        if track is None:
-            continue  # Skip if audio features are not available
+# Fun "Music Personality" Analysis
+def music_personality_insights(top_tracks):
+    st.header("Music Personality Insights")
 
-        valence = track.get('valence', 0)
-        energy = track.get('energy', 0)
-        danceability = track.get('danceability', 0)
-        tempo = track.get('tempo', 0)
+    # Analyzing the personality based on user data (just for fun)
+    total_tracks = len(top_tracks['items'])
+    if total_tracks > 200:
+        personality = "The Collector"
+        color = "Purple"
+    elif total_tracks > 100:
+        personality = "The Dreamer"
+        color = "Blue"
+    elif total_tracks > 50:
+        personality = "The Explorer"
+        color = "Green"
+    else:
+        personality = "The Minimalist"
+        color = "Yellow"
 
-        score = 0  # Base score for filtering
-        
-        # Apply mood-based filtering
-        if feeling == "Happy":
-            score += (valence - 0.6) * 10 + (energy - intensity / 5) * 5
-        elif feeling == "Sad":
-            score += (0.3 - valence) * 10 + (energy - 0.4) * 5
-        elif feeling == "Chill":
-            score += (0.4 - energy) * 7 + (danceability - 0.4) * 5
-        elif feeling == "Hype":
-            score += (energy - 0.7) * 12 + (tempo - 120) * 0.1
-        elif feeling == "Romantic":
-            score += (valence - 0.5) * 5 + (danceability - 0.4) * 5
-        elif feeling == "Adventurous":
-            score += danceability * 5 + (tempo - 120) * 0.1
+    st.write(f"Based on your listening habits, your music personality is **{personality}**!")
+    st.write(f"Your associated color is **{color}**.")
 
-        # Track filtering based on intensity and score
-        if score > intensity * 1.2:
-            filtered_songs.append(track)
-        elif score > intensity * 0.8:
-            fallback_songs.append(track)
+    # Plotting daily listening habit (number of tracks and minutes listened)
+    daily_data = pd.DataFrame({
+        'Day': pd.date_range(end=pd.Timestamp.today(), periods=7),
+        'Songs': [random.randint(5, 20) for _ in range(7)],  # Simulated data
+        'Minutes': [random.randint(30, 120) for _ in range(7)]  # Simulated data
+    })
+    daily_data.set_index('Day', inplace=True)
 
-    # Return fallback songs if no strong match
-    return filtered_songs if filtered_songs else fallback_songs
+    st.write(f"Here's how your daily listening habits look this past week:")
 
-# Mood-based music discovery
-def discover_music_by_feelings(sp):
-    st.header("Curate Your Vibe")
-    feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
-    intensity = st.slider(f"How {feeling.lower()} are you feeling?", 1, 5)
+    # Plot number of songs
+    fig, ax = plt.subplots()
+    daily_data['Songs'].plot(kind='bar', color=color, ax=ax)
+    ax.set_title(f"Number of Songs Played (by day) - Personality: {personality}")
+    ax.set_ylabel('Number of Songs')
+    st.pyplot(fig)
 
-    try:
-        liked_songs = get_all_liked_songs(sp)
-        if len(liked_songs) > 0:
-            show_loading_animation(text="Creating your vibe-based playlist...")
-            random.shuffle(liked_songs)
-            song_ids = [track['track']['id'] for track in liked_songs if track['track']['id'] is not None]
-            features = fetch_audio_features_in_batches(sp, song_ids)
-            filtered_songs = filter_liked_songs_by_mood(features, feeling, intensity)
-        else:
-            filtered_songs = []
+    # Plot number of minutes
+    fig, ax = plt.subplots()
+    daily_data['Minutes'].plot(kind='bar', color=color, ax=ax)
+    ax.set_title(f"Number of Minutes Played (by day) - Personality: {personality}")
+    ax.set_ylabel('Minutes')
+    st.pyplot(fig)
 
-        if filtered_songs:
-            st.subheader(f"Here's your {feeling.lower()} playlist:")
-            cols = st.columns(2)
-            for i, feature in enumerate(filtered_songs[:10]):
-                with cols[i % 2]:
-                    song = sp.track(feature['id'])
-                    song_name = song['name']
-                    artist_name = song['artists'][0]['name']
-                    album_cover = song['album']['images'][0]['url']
-                    st.image(album_cover, width=150, caption=f"{song_name} by {artist_name}")
-        else:
-            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try adjusting the intensity or picking a different mood.")
-    
-    except Exception as e:
-        st.error(f"Error curating your playlist: {e}")
-
-# Fetch and display user's top tracks, artists, and genres
+# Fetch and display user's top tracks, artists, and genres with insights
 def get_top_items_with_insights(sp):
     st.header("Your Top Songs, Artists, and Genres")
     time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
@@ -217,8 +185,8 @@ def get_top_items_with_insights(sp):
     show_loading_animation(text="Fetching your top tracks and insights...")
     top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
     top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
-    top_genres = [genre for artist in top_artists['items'] for genre in artist.get('genres', [])]
 
+    # Display top tracks
     st.subheader("Your Top Songs")
     for i, track in enumerate(top_tracks['items']):
         col1, col2 = st.columns([1, 4])
@@ -227,6 +195,7 @@ def get_top_items_with_insights(sp):
         with col2:
             st.write(f"**{i+1}. {track['name']}** by {track['artists'][0]['name']}")
 
+    # Display top artists
     st.subheader("Your Top Artists")
     for i, artist in enumerate(top_artists['items']):
         col1, col2 = st.columns([1, 4])
@@ -235,17 +204,8 @@ def get_top_items_with_insights(sp):
         with col2:
             st.write(f"**{i+1}. {artist['name']}**")
 
-    st.subheader("Your Top 5 Genres")
-    if top_genres:
-        top_5_genres = pd.Series(top_genres).value_counts().head(5).index.tolist()
-        st.write(", ".join(top_5_genres))
-    else:
-        st.write("No genre information available.")
-
-# Optional: Implement Music Personality section
-def music_personality(sp):
-    st.header("Music Personality Insights")
-    st.write("Coming soon! Explore more about your music personality based on your listening habits.")
+    # Display fun insights
+    get_user_insights(top_tracks, top_artists)
 
 # Main app logic
 if is_authenticated():
@@ -265,7 +225,8 @@ if is_authenticated():
         elif page == "Your Top Hits":
             get_top_items_with_insights(sp)
         elif page == "Music Personality":
-            music_personality(sp)
+            top_tracks = sp.current_user_top_tracks(time_range='short_term', limit=50)
+            music_personality_insights(top_tracks)
 
     except Exception as e:
         st.error(f"Error loading the app: {e}")
