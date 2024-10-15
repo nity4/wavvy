@@ -116,27 +116,38 @@ def get_liked_songs(sp):
 
 # Retrieve recommendations based on user's listening habits
 def get_new_discoveries(sp):
-    results = sp.current_user_top_tracks(limit=5, time_range="medium_term")
-    top_artists = sp.current_user_top_artists(limit=5, time_range="medium_term")['items']
+    # Fetch top tracks and artists based on user's listening history
+    top_tracks_results = sp.current_user_top_tracks(limit=5, time_range="medium_term")['items']
+    top_artists_results = sp.current_user_top_artists(limit=5, time_range="medium_term")['items']
     
-    # Seed recommendations with user's top genres and tracks
-    top_tracks = [track['id'] for track in results['items']]
-    top_genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
+    top_tracks = [track['id'] for track in top_tracks_results]
+    top_genres = [artist['genres'][0] for artist in top_artists_results if artist['genres']]
+
+    # Ensure we don't exceed the limit of 5 seeds
+    seed_tracks = top_tracks[:3]  # Limit to 3 tracks
+    seed_genres = top_genres[:2]  # Limit to 2 genres
+
+    # Handle cases where there are no genres or tracks
+    if not seed_tracks and not seed_genres:
+        seed_tracks = ['4uLU6hMCjMI75M1A2tKUQC']  # A default track seed (50 Cent - In Da Club)
     
-    recommendations = sp.recommendations(seed_tracks=top_tracks, seed_genres=top_genres, limit=50)
-    
-    new_songs = []
-    for track in recommendations['tracks']:
-        audio_features = sp.audio_features(track['id'])[0]
-        new_songs.append({
-            "name": track['name'],
-            "artist": track['artists'][0]['name'],
-            "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
-            "energy": audio_features["energy"],
-            "valence": audio_features["valence"],
-            "tempo": audio_features["tempo"]
-        })
-    return new_songs
+    try:
+        recommendations = sp.recommendations(seed_tracks=seed_tracks, seed_genres=seed_genres, limit=50)
+        new_songs = []
+        for track in recommendations['tracks']:
+            audio_features = sp.audio_features(track['id'])[0]
+            new_songs.append({
+                "name": track['name'],
+                "artist": track['artists'][0]['name'],
+                "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
+                "energy": audio_features["energy"],
+                "valence": audio_features["valence"],
+                "tempo": audio_features["tempo"]
+            })
+        return new_songs
+    except Exception as e:
+        st.error(f"Error fetching recommendations: {e}")
+        return []
 
 # Enhanced mood classification based on valence and tempo
 def filter_songs(songs, mood, intensity):
