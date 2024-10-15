@@ -3,8 +3,6 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import random
 import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
 import time
 
 # Spotify API credentials from Streamlit Secrets
@@ -12,13 +10,21 @@ CLIENT_ID = st.secrets["spotify"]["client_id"]
 CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 
+# Define the required scope for Spotify access
 scope = "user-library-read user-top-read"
 
-# Initialize Spotify OAuth
+# Initialize Spotify OAuth object
 sp_oauth = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=REDIRECT_URI, scope=scope)
 
-# App Layout and Configuration
-st.set_page_config(page_title="Wvvy", page_icon="〰", layout="wide", initial_sidebar_state="expanded")
+# Set Streamlit page configuration
+st.set_page_config(
+    page_title="Wvvy",
+    page_icon="〰",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS styling for app layout and UI
 st.markdown("""
     <style>
     .main {
@@ -41,7 +47,7 @@ st.markdown("""
         padding: 20px;
     }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
 
@@ -55,29 +61,25 @@ def refresh_token():
         st.session_state['token_info'] = token_info
 
 def authenticate_user():
-    try:
-        if "code" in st.experimental_get_query_params():
-            code = st.experimental_get_query_params()["code"][0]
-            token_info = sp_oauth.get_access_token(code)
-            st.session_state['token_info'] = token_info
-            st.experimental_set_query_params(code=None)
-            st.success("You're in! Refresh the page to access your music data.")
-            if st.button("Refresh Now"):
-                st.experimental_set_query_params()
-        else:
-            auth_url = sp_oauth.get_authorize_url()
-            st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; background-color: #ff4081; padding: 10px; border-radius: 8px;">Login with Spotify</a>', unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"Authentication error: {e}")
-        
+    if "code" in st.experimental_get_query_params():
+        code = st.experimental_get_query_params()["code"][0]
+        token_info = sp_oauth.get_access_token(code)
+        st.session_state['token_info'] = token_info
+        st.experimental_set_query_params(code=None)
+        st.success("You're authenticated! Refresh the page to access your music data.")
+        if st.button("Refresh Now"):
+            st.experimental_set_query_params()
+    else:
+        auth_url = sp_oauth.get_authorize_url()
+        st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; background-color: #ff4081; padding: 10px; border-radius: 8px;">Login with Spotify</a>', unsafe_allow_html=True)
 
 # Loading Animation
 def show_loading_animation(text="Loading..."):
     st.markdown(f"<div class='loading-text'>{text}</div>", unsafe_allow_html=True)
     with st.spinner("Processing..."):
-        time.sleep(2)  # Simulating a loading process
+        time.sleep(2)  # Simulate a loading process
 
-# Helper Functions
+# Fetch all liked songs
 def get_all_liked_songs(sp):
     liked_songs = []
     try:
@@ -94,7 +96,7 @@ def get_all_liked_songs(sp):
     
     return liked_songs
 
-# Fetch Audio Features in Batches (Spotify API has a limit on batch size)
+# Fetch audio features in batches
 def fetch_audio_features_in_batches(sp, song_ids):
     features = []
     try:
@@ -108,7 +110,7 @@ def fetch_audio_features_in_batches(sp, song_ids):
     
     return features
 
-# Filter Liked Songs by Mood
+# Filter liked songs by mood
 def filter_liked_songs_by_mood(track_features, feeling, intensity):
     filtered_songs = []
     fallback_songs = []
@@ -121,7 +123,7 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
 
         score = 0  # Base score for filtering
         
-        # Apply mood-based logic
+        # Apply mood-based filtering
         if feeling == "Happy":
             score += (valence - 0.6) * 10 + (energy - intensity / 5) * 5
         elif feeling == "Sad":
@@ -135,16 +137,16 @@ def filter_liked_songs_by_mood(track_features, feeling, intensity):
         elif feeling == "Adventurous":
             score += danceability * 5 + (tempo - 120) * 0.1
 
-        # Choose tracks with a score above the intensity threshold
+        # Track filtering based on intensity and score
         if score > intensity * 1.2:
             filtered_songs.append(track)
         elif score > intensity * 0.8:
             fallback_songs.append(track)
 
-    # If no strongly matching songs, return fallback songs
+    # Return fallback songs if no strong match
     return filtered_songs if filtered_songs else fallback_songs
 
-# Function for Mood-Based Music Discovery
+# Mood-based music discovery
 def discover_music_by_feelings(sp):
     st.header("Curate Your Vibe")
     feeling = st.selectbox("What's your vibe today?", ["Happy", "Sad", "Chill", "Hype", "Romantic", "Adventurous"])
@@ -163,19 +165,19 @@ def discover_music_by_feelings(sp):
 
         if filtered_songs:
             st.subheader(f"Here's your {feeling.lower()} playlist:")
-            for i, feature in enumerate(filtered_songs[:10]):
+            for feature in filtered_songs[:10]:
                 song = sp.track(feature['id'])
                 song_name = song['name']
                 artist_name = song['artists'][0]['name']
                 album_cover = song['album']['images'][0]['url']
                 st.image(album_cover, width=150, caption=f"{song_name} by {artist_name}")
         else:
-            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try tweaking the intensity or picking a different mood.")
+            st.write(f"No tracks match your {feeling.lower()} vibe right now. Try adjusting the intensity or picking a different mood.")
     
     except Exception as e:
         st.error(f"Error curating your playlist: {e}")
 
-# Unique Insights Based on Data
+# Fetch and display user's top tracks, artists, and genres
 def get_top_items_with_insights(sp):
     st.header("Your Top Songs, Artists, and Genres")
     time_range = st.radio("Select time range", ['This Week', 'This Month', 'This Year'], index=1)
@@ -186,7 +188,7 @@ def get_top_items_with_insights(sp):
     show_loading_animation(text="Fetching your top tracks and insights...")
     top_tracks = sp.current_user_top_tracks(time_range=spotify_time_range, limit=10)
     top_artists = sp.current_user_top_artists(time_range=spotify_time_range, limit=5)
-    top_genres = [genre for artist in top_artists['items'] for genre in artist['genres'] if 'genres' in artist]
+    top_genres = [genre for artist in top_artists['items'] for genre in artist.get('genres', [])]
 
     st.subheader("Your Top Songs")
     for i, track in enumerate(top_tracks['items']):
@@ -202,13 +204,13 @@ def get_top_items_with_insights(sp):
     top_5_genres = pd.Series(top_genres).value_counts().head(5).index.tolist()
     st.write(", ".join(top_5_genres))
 
-# Main App Layout
+# Main app logic
 if is_authenticated():
     try:
         refresh_token()
         sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
-        # Reorganizing the Page Flow
+        # Navigation for different pages
         page = st.sidebar.radio("Navigation", [
             "Wavvy", 
             "Your Top Hits", 
@@ -219,7 +221,7 @@ if is_authenticated():
             discover_music_by_feelings(sp)
         elif page == "Your Top Hits":
             get_top_items_with_insights(sp)
-        # Define the Music Personality page if needed
+        # Implement Music Personality section if required
 
     except Exception as e:
         st.error(f"Error loading the app: {e}")
