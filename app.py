@@ -94,9 +94,10 @@ def authenticate_user():
     else:
         auth_url = sp_oauth.get_authorize_url()
         # Directly display the Spotify login URL button within the same tab
-        if st.button("Login with Spotify"):
-            st.experimental_set_query_params(code=auth_url)
-            st.experimental_rerun()
+        st.markdown(
+            f'<a href="{auth_url}" class="login-button">Login with Spotify</a>',
+            unsafe_allow_html=True
+        )
 
 # Main app logic
 if is_authenticated():
