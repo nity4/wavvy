@@ -1,7 +1,7 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import random  # Import the random module
+import random
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -28,7 +28,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS styling for background, text color, and mood font color
+# Custom CSS for black font on select boxes
 st.markdown("""
     <style>
     body {
@@ -36,9 +36,6 @@ st.markdown("""
     }
     .stApp {
         background: linear-gradient(to right, black, #1DB954) !important;
-    }
-    h1, h2, h3, h4, h5, h6, p, div, span, label, .stMarkdown, .success, .error, .warning {
-        color: white !important;
     }
     .header-title {
         font-size: 5em;
@@ -61,11 +58,8 @@ st.markdown("""
         font-weight: bold;
         margin-top: 30px;
     }
-    .main {
-        font-family: 'Courier New', Courier, monospace;
-    }
     .stSelectbox label, .stSlider label {
-        color: black !important;  /* Set font color to black for mood and intensity options */
+        color: black !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -103,46 +97,65 @@ def authenticate_user():
             unsafe_allow_html=True
         )
 
-# Function to retrieve liked songs
+# Retrieve liked songs and audio features (valence, energy, tempo)
 def get_liked_songs(sp):
     results = sp.current_user_saved_tracks(limit=50)
     liked_songs = []
     for item in results['items']:
         track = item['track']
+        audio_features = sp.audio_features(track['id'])[0]
         liked_songs.append({
             "name": track['name'],
             "artist": track['artists'][0]['name'],
             "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
-            "energy": random.uniform(0, 1),  # Simulate energy feature (0-1)
-            "valence": random.uniform(0, 1)  # Simulate valence feature (0-1)
+            "energy": audio_features["energy"],
+            "valence": audio_features["valence"],
+            "tempo": audio_features["tempo"]
         })
     return liked_songs
 
-# Function to retrieve new song recommendations
+# Retrieve recommendations based on user's listening habits
 def get_new_discoveries(sp):
-    recommendations = sp.recommendations(seed_genres=["pop", "rock", "hip-hop"], limit=50)
+    results = sp.current_user_top_tracks(limit=5, time_range="medium_term")
+    top_artists = sp.current_user_top_artists(limit=5, time_range="medium_term")['items']
+    
+    # Seed recommendations with user's top genres and tracks
+    top_tracks = [track['id'] for track in results['items']]
+    top_genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
+    
+    recommendations = sp.recommendations(seed_tracks=top_tracks, seed_genres=top_genres, limit=50)
+    
     new_songs = []
     for track in recommendations['tracks']:
+        audio_features = sp.audio_features(track['id'])[0]
         new_songs.append({
             "name": track['name'],
             "artist": track['artists'][0]['name'],
             "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
-            "energy": random.uniform(0, 1),  # Simulate energy feature (0-1)
-            "valence": random.uniform(0, 1)  # Simulate valence feature (0-1)
+            "energy": audio_features["energy"],
+            "valence": audio_features["valence"],
+            "tempo": audio_features["tempo"]
         })
     return new_songs
 
-# Function to filter songs based on mood and intensity
+# Enhanced mood classification based on valence and tempo
 def filter_songs(songs, mood, intensity):
     mood_ranges = {
-        "Happy": (0.7, 1),
-        "Calm": (0.3, 0.6),
-        "Energetic": (0.6, 1),
-        "Sad": (0, 0.3)
+        "Happy": {"valence": (0.6, 1), "tempo": (100, 200)},
+        "Calm": {"valence": (0.3, 0.5), "tempo": (40, 100)},
+        "Energetic": {"valence": (0.5, 1), "tempo": (120, 200)},
+        "Sad": {"valence": (0, 0.3), "tempo": (40, 80)}
     }
     
-    mood_range = mood_ranges[mood]
-    filtered_songs = [song for song in songs if mood_range[0] <= song['valence'] <= mood_range[1] and song['energy'] >= (intensity / 5)]  # Adjusted for 1-5 range
+    mood_filter = mood_ranges[mood]
+    
+    # Apply mood and intensity filtering
+    filtered_songs = [
+        song for song in songs
+        if mood_filter["valence"][0] <= song["valence"] <= mood_filter["valence"][1]
+        and mood_filter["tempo"][0] <= song["tempo"] <= mood_filter["tempo"][1]
+        and song['energy'] >= (intensity / 5)
+    ]
     
     return filtered_songs
 
