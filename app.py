@@ -28,25 +28,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for black and green background, and white text
+# Custom CSS for black font on select boxes
 st.markdown("""
     <style>
-    /* Background gradient for the entire app */
     body {
         background: linear-gradient(to right, black, #1DB954) !important;
     }
-
-    /* Ensure all text is white */
-    h1, h2, h3, h4, h5, h6, p, div, span, label, .stMarkdown, .success, .error, .warning {
-        color: white !important;
+    .stApp {
+        background: linear-gradient(to right, black, #1DB954) !important;
     }
-
-    /* Keep the mood and intensity filter dropdowns with black text */
-    .stSelectbox label, .stSlider label {
-        color: black !important;
-    }
-
-    /* Header styling */
     .header-title {
         font-size: 5em;
         font-weight: bold;
@@ -56,8 +46,6 @@ st.markdown("""
         margin-bottom: 20px;
         letter-spacing: 5px;
     }
-
-    /* Login button */
     .login-button {
         color: white;
         background-color: #1DB954;
@@ -69,6 +57,9 @@ st.markdown("""
         display: inline-block;
         font-weight: bold;
         margin-top: 30px;
+    }
+    .stSelectbox label, .stSlider label {
+        color: black !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -225,3 +216,4 @@ if is_authenticated():
 else:
     st.write("Welcome to Wvvy")
     st.write("Login to explore your personalized music experience.")
+    authenticate_user()
