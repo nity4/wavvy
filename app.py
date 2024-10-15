@@ -28,15 +28,30 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for black font on select boxes
+# Custom CSS for background and text colors
 st.markdown("""
     <style>
+    /* White background for main app content */
+    .stApp {
+        background: white !important;
+    }
+    
+    /* Keep the banner with black/green gradient */
     body {
         background: linear-gradient(to right, black, #1DB954) !important;
     }
-    .stApp {
-        background: linear-gradient(to right, black, #1DB954) !important;
+
+    /* White text across the app */
+    h1, h2, h3, h4, h5, h6, p, div, span, label, .stMarkdown, .success, .error, .warning {
+        color: white !important;
     }
+    
+    /* Specific mood and intensity filter elements in black */
+    .stSelectbox label, .stSlider label {
+        color: black !important;
+    }
+    
+    /* Header styling */
     .header-title {
         font-size: 5em;
         font-weight: bold;
@@ -46,6 +61,8 @@ st.markdown("""
         margin-bottom: 20px;
         letter-spacing: 5px;
     }
+
+    /* Login button */
     .login-button {
         color: white;
         background-color: #1DB954;
@@ -57,9 +74,6 @@ st.markdown("""
         display: inline-block;
         font-weight: bold;
         margin-top: 30px;
-    }
-    .stSelectbox label, .stSlider label {
-        color: black !important;
     }
     </style>
 """, unsafe_allow_html=True)
