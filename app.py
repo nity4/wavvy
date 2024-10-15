@@ -101,14 +101,15 @@ def refresh_token():
         st.session_state['token_info'] = token_info
 
 def authenticate_user():
-    query_params = st.query_params  # Remove parentheses to access as an attribute
+    # Correct handling of query params
+    query_params = st.query_params  # No parentheses, accessing it as an attribute
     
     if "code" in query_params:
         code = query_params["code"][0]
         try:
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
-            st.set_query_params()  # Replacing deprecated experimental_set_query_params
+            st.set_query_params()  # Setting query params if needed
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
                 st.experimental_rerun()
