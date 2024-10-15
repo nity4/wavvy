@@ -1,7 +1,7 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import random 
+import random  # Import the random module
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -28,7 +28,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS styling
+# Custom CSS styling for background, text color, and mood font color
 st.markdown("""
     <style>
     body {
@@ -64,8 +64,8 @@ st.markdown("""
     .main {
         font-family: 'Courier New', Courier, monospace;
     }
-    .stSelectbox, .stSlider {
-        color: black !important;  /* Black text for the mood options */
+    .stSelectbox label, .stSlider label {
+        color: black !important;  /* Set font color to black for mood and intensity options */
     }
     </style>
 """, unsafe_allow_html=True)
@@ -142,7 +142,7 @@ def filter_songs(songs, mood, intensity):
     }
     
     mood_range = mood_ranges[mood]
-    filtered_songs = [song for song in songs if mood_range[0] <= song['valence'] <= mood_range[1] and song['energy'] >= (intensity / 10)]
+    filtered_songs = [song for song in songs if mood_range[0] <= song['valence'] <= mood_range[1] and song['energy'] >= (intensity / 5)]  # Adjusted for 1-5 range
     
     return filtered_songs
 
@@ -172,7 +172,7 @@ if is_authenticated():
         
         # Mood and Intensity filters
         mood = st.selectbox("Choose your mood:", ["Happy", "Calm", "Energetic", "Sad"])
-        intensity = st.slider("Choose intensity:", 1, 10, 5)
+        intensity = st.slider("Choose intensity:", 1, 5, 3)  # Adjusted intensity to 1-5
         
         # Tabs for liked songs and new discoveries
         tab1, tab2 = st.tabs(["Liked Songs", "New Discoveries"])
