@@ -27,7 +27,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS styling to apply black and green gradient to the entire app
+# Custom CSS styling to apply black and green gradient to the entire app and make Wvvy logo appealing
 st.markdown("""
     <style>
     /* Set background to black and green gradient */
@@ -40,28 +40,39 @@ st.markdown("""
         background: linear-gradient(to right, black, #1DB954) !important;
     }
 
-    /* Force text color to white for visibility */
-    .header-title, .login-button, .success, .error, h1, h2, h3, h4, h5, h6, p {
+    /* Customize the Wvvy header text */
+    .header-title {
+        font-size: 5em; /* Larger font size */
+        font-weight: bold;
         color: white !important;
+        text-align: center;
+        padding-top: 50px;
+        margin-bottom: 20px;
+        letter-spacing: 5px; /* Adds spacing between letters for style */
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7); /* Adds shadow for depth */
+    }
+
+    /* Style for the login button */
+    .login-button {
+        color: white;
+        background-color: #1DB954;  /* Spotify Green */
+        padding: 15px 30px;  /* Larger padding for a bigger button */
+        font-size: 1.5em;  /* Larger font size for the button */
+        border-radius: 12px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-weight: bold;
+        margin-top: 30px;
     }
 
     .main {
         font-family: 'Courier New', Courier, monospace;
     }
-
-    /* Style the login button */
-    .login-button {
-        color: white;
-        background-color: #1DB954;  /* Spotify Green */
-        padding: 10px 20px;
-        border-radius: 8px;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-    }
     </style>
 """, unsafe_allow_html=True)
 
+# Larger Wvvy logo and text
 st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
 
 # Authentication Functions
