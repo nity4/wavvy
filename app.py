@@ -27,7 +27,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS styling to apply black and green gradient to the entire app and make Wvvy logo appealing
+# Custom CSS styling to apply black and green gradient to the entire app and make all text white
 st.markdown("""
     <style>
     /* Set background to black and green gradient */
@@ -40,7 +40,12 @@ st.markdown("""
         background: linear-gradient(to right, black, #1DB954) !important;
     }
 
-    /* Customize the Wvvy header text without shadow */
+    /* Make all text white */
+    h1, h2, h3, h4, h5, h6, p, div, span, label, .stMarkdown, .success, .error, .warning {
+        color: white !important;  /* Force all text to be white */
+    }
+
+    /* Customize the Wvvy header text */
     .header-title {
         font-size: 5em; /* Larger font size */
         font-weight: bold;
@@ -49,7 +54,6 @@ st.markdown("""
         padding-top: 50px;
         margin-bottom: 20px;
         letter-spacing: 5px; /* Adds spacing between letters for style */
-        /* Removed text-shadow */
     }
 
     /* Style for the login button */
