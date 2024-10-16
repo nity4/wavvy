@@ -107,7 +107,10 @@ def authenticate_user():
     if "code" in query_params:
         code = query_params["code"][0]
         try:
-            token_info = sp_oauth.get_access_token(code)
+            # Using get_cached_token to avoid future deprecation
+            token_info = sp_oauth.get_cached_token()
+            if not token_info:
+                token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
             # Use query_params to reset query parameters
             st.query_params.clear()  # Clear query parameters to avoid repeated authentication
@@ -127,21 +130,23 @@ def authenticate_user():
 def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
     retries = 0
     wait_time = 1  # Start with 1 second wait time
+    suppressed_warning = False  # Flag to suppress multiple retry warnings
     while retries < max_retries:
         try:
             return sp_func(*args, **kwargs)
         except spotipy.SpotifyException as e:
             if e.http_status == 429:
                 retry_after = int(e.headers.get("Retry-After", wait_time)) if e.headers and "Retry-After" in e.headers else wait_time
-                st.warning(f"Rate limit reached. Retrying after {retry_after} seconds... (Attempt {retries + 1}/{max_retries})")
+                if not suppressed_warning:  # Suppress multiple warnings
+                    st.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
+                    suppressed_warning = True
                 time.sleep(retry_after)  # Sleep for 'Retry-After' seconds
                 retries += 1
                 wait_time *= 2  # Double the wait time after each retry (exponential backoff)
             else:
                 st.error(f"Error: {e}")
                 break
-    st.error(f"Max retries exceeded ({max_retries}). Please try again later.")
-    return None
+    return None  # Silent return, no more 'Max Retries' messages
 
 # Fetch audio features for a batch of tracks (with 429 handling)
 def fetch_audio_features(sp, track_ids):
@@ -158,7 +163,7 @@ def fetch_audio_features(sp, track_ids):
 def get_liked_songs(sp):
     results = handle_spotify_rate_limit(sp.current_user_saved_tracks, limit=50)
     if not results:
-        return []  # If max retries exceeded, return empty list to prevent crashes
+        return []  # Return empty list if retries exceeded
     liked_songs = []
     for item in results['items']:
         track = item['track']
