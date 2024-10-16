@@ -102,15 +102,15 @@ def refresh_token():
 
 def authenticate_user():
     # Correct handling of query params
-    query_params = st.experimental_get_query_params()  # Correct way to get query parameters
+    query_params = st.query_params  # Updated way to get query parameters
     
     if "code" in query_params:
         code = query_params["code"][0]
         try:
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
-            # Use experimental_set_query_params to reset query parameters
-            st.experimental_set_query_params()  # Clear query parameters to avoid repeated authentication
+            # Use query_params to reset query parameters
+            st.query_params.clear()  # Clear query parameters to avoid repeated authentication
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
                 st.experimental_rerun()  # Reload the app once authenticated
