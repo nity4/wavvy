@@ -1,12 +1,10 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import random
 import pandas as pd
-import datetime
-import time
 import matplotlib.pyplot as plt
 from collections import Counter
+import time
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -14,7 +12,7 @@ CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 
 # Define the required scope for Spotify access
-scope = "user-library-read user-top-read playlist-read-private user-read-recently-played"
+scope = "user-library-read user-top-read playlist-read-private user-read-recently-played user-read-playback-state"
 
 # Initialize Spotify OAuth object
 sp_oauth = SpotifyOAuth(
@@ -67,12 +65,6 @@ st.markdown("""
         color: white !important;
     }
     .stSelectbox label, .stSlider label {
-        color: white !important;
-    }
-    .stSelectbox .css-1wa3eu0-placeholder, .stSelectbox .css-2b097c-container {
-        color: white !important;
-    }
-    .stSlider .css-164nlkn .css-qrbaxs {
         color: white !important;
     }
     .stTabs [role="tab"] {
