@@ -102,17 +102,18 @@ def refresh_token():
 
 def authenticate_user():
     # Correct handling of query params
-    query_params = st.query_params  # No parentheses, accessing it as an attribute
+    query_params = st.experimental_get_query_params()  # Correct way to get query parameters
     
     if "code" in query_params:
         code = query_params["code"][0]
         try:
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
-            st.set_query_params()  # Setting query params if needed
+            # Use experimental_set_query_params to reset query parameters
+            st.experimental_set_query_params()  # Clear query parameters to avoid repeated authentication
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
-                st.experimental_rerun()
+                st.experimental_rerun()  # Reload the app once authenticated
         except Exception as e:
             st.error(f"Authentication error: {e}")
     else:
@@ -207,6 +208,43 @@ def get_new_discoveries(sp):
             "tempo": audio_features["tempo"]
         })
     return new_songs
+
+# Enhanced mood classification based on valence and tempo
+def filter_songs(songs, mood, intensity):
+    mood_ranges = {
+        "Happy": {"valence": (0.6, 1), "tempo": (100, 200)},
+        "Calm": {"valence": (0.3, 0.5), "tempo": (40, 100)},
+        "Energetic": {"valence": (0.5, 1), "tempo": (120, 200)},
+        "Sad": {"valence": (0, 0.3), "tempo": (40, 80)}
+    }
+    
+    mood_filter = mood_ranges[mood]
+    
+    # Apply mood and intensity filtering
+    filtered_songs = [
+        song for song in songs
+        if mood_filter["valence"][0] <= song["valence"] <= mood_filter["valence"][1]
+        and mood_filter["tempo"][0] <= song["tempo"] <= mood_filter["tempo"][1]
+        and song['energy'] >= (intensity / 5)
+    ]
+    
+    return filtered_songs
+
+# Function to display songs with their cover images
+def display_songs(song_list, title):
+    st.write(f"### {title}")
+    if song_list:
+        for song in song_list:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if song["cover"]:
+                    st.image(song["cover"], width=80)
+                else:
+                    st.write("No cover")
+            with col2:
+                st.write(f"**{song['name']}** by {song['artist']}")
+    else:
+        st.write("No songs found.")
 
 # Main app logic
 if is_authenticated():
