@@ -137,6 +137,74 @@ def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
                 break
     return None
 
+# Fetch audio features for a batch of tracks (with 429 handling)
+def fetch_audio_features(sp, track_ids):
+    audio_features = []
+    batch_size = 50  # Fetch in batches of 50 to avoid rate limits
+    for i in range(0, len(track_ids), batch_size):
+        batch_ids = track_ids[i:i + batch_size]
+        features = handle_spotify_rate_limit(sp.audio_features, batch_ids)
+        if features:
+            audio_features.extend(features)
+    return audio_features
+
+# Example function to get liked songs and audio features (with 429 error handling)
+def get_liked_songs(sp):
+    results = handle_spotify_rate_limit(sp.current_user_saved_tracks, limit=50)
+    if not results:
+        return []  # Return empty list if retries exceeded
+    liked_songs = []
+    for item in results['items']:
+        track = item['track']
+        track_id = track['id']
+        audio_features = fetch_audio_features(sp, [track_id])[0]
+        liked_songs.append({
+            "name": track['name'],
+            "artist": track['artists'][0]['name'],
+            "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
+            "energy": audio_features["energy"],
+            "valence": audio_features["valence"],
+            "tempo": audio_features["tempo"]
+        })
+    return liked_songs
+
+# Enhanced mood classification based on valence and tempo
+def filter_songs(songs, mood, intensity):
+    mood_ranges = {
+        "Happy": {"valence": (0.6, 1), "tempo": (100, 200)},
+        "Calm": {"valence": (0.3, 0.5), "tempo": (40, 100)},
+        "Energetic": {"valence": (0.5, 1), "tempo": (120, 200)},
+        "Sad": {"valence": (0, 0.3), "tempo": (40, 80)}
+    }
+    
+    mood_filter = mood_ranges[mood]
+    
+    # Apply mood and intensity filtering
+    filtered_songs = [
+        song for song in songs
+        if mood_filter["valence"][0] <= song["valence"] <= mood_filter["valence"][1]
+        and mood_filter["tempo"][0] <= song["tempo"] <= mood_filter["tempo"][1]
+        and song['energy'] >= (intensity / 5)
+    ]
+    
+    return filtered_songs
+
+# Function to display songs with their cover images
+def display_songs(song_list, title):
+    st.write(f"### {title}")
+    if song_list:
+        for song in song_list:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if song["cover"]:
+                    st.image(song["cover"], width=80)
+                else:
+                    st.write("No cover")
+            with col2:
+                st.write(f"**{song['name']}** by {song['artist']}")
+    else:
+        st.write("No songs found.")
+
 # Fetch top songs, artists, and genres over time
 def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
     if item_type == 'tracks':
@@ -151,28 +219,30 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
                 'name': item['name'],
                 'artist': item['artists'][0]['name'],
                 'popularity': item['popularity'],
-                'genres': [artist['genres'][0] for artist in item['artists']]
+                'genres': [artist.get('genres', ['Unknown Genre'])[0] for artist in item['artists']]  # Check for 'genres'
             })
         elif item_type == 'artists':
             items.append({
                 'name': item['name'],
-                'genres': item['genres'],
+                'genres': item.get('genres', ['Unknown Genre']),  # Safely access 'genres' with fallback
                 'popularity': item['popularity']
             })
     
     return items
 
-# Visualization for Music Taste Evolution
-def plot_music_taste_evolution(sp):
-    time_ranges = ['short_term', 'medium_term', 'long_term']
-    evolution_data = {}
+# Display insights based on top songs, artists, and genres
+def display_top_insights(sp, time_range='short_term'):
+    top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
+    top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
     
-    for time_range in time_ranges:
-        top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
-        top_genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
-        evolution_data[time_range] = top_genres
-    
-    st.line_chart(pd.DataFrame(evolution_data))  # Line chart for genre evolution
+    st.write(f"### Top Insights for {time_range.replace('_', ' ').title()}")
+
+    if top_tracks:
+        st.write(f"**Most Listened Song:** {top_tracks[0]['name']} by {top_tracks[0]['artist']}")
+        st.write(f"**Top Artist:** {top_artists[0]['name']}")
+        st.write(f"**Top Genres:** {', '.join(genre for artist in top_artists for genre in artist['genres'])}")
+    else:
+        st.write("No top tracks found for this period.")
 
 # Unique Songs Insights: Display unique songs based on popularity
 def find_unique_songs(sp):
@@ -206,26 +276,13 @@ def analyze_depth_vs_breadth(sp):
     df = pd.DataFrame({'Artist': artist_names, 'Song Count': song_counts})
     st.bar_chart(df.set_index('Artist'))
 
-# Display insights based on top songs, artists, and genres
-def display_top_insights(sp, time_range='short_term'):
-    top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
-    top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
-    
-    st.write(f"### Top Insights for {time_range.replace('_', ' ').title()}")
-
-    if top_tracks:
-        st.write(f"**Most Listened Song:** {top_tracks[0]['name']} by {top_tracks[0]['artist']}")
-        st.write(f"**Top Artist:** {top_artists[0]['name']}")
-        st.write(f"**Top Genres:** {', '.join(genre for artist in top_artists for genre in artist['genres'])}")
-    else:
-        st.write("No top tracks found for this period.")
-
 # Main app logic
 if is_authenticated():
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
     # Tabs for different features
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Liked Songs", 
         "Top Songs, Artists & Genres", 
         "Unique Songs", 
         "Listening Depth vs Breadth", 
@@ -233,17 +290,27 @@ if is_authenticated():
     ])
 
     with tab1:
+        mood = st.selectbox("Choose your mood:", ["Happy", "Calm", "Energetic", "Sad"])
+        intensity = st.slider("Choose intensity:", 1, 5, 3)
+        liked_songs = get_liked_songs(sp)
+        if liked_songs:
+            filtered_liked_songs = filter_songs(liked_songs, mood, intensity)
+            display_songs(filtered_liked_songs, "Your Liked Songs")
+        else:
+            st.warning("No liked songs available.")
+
+    with tab2:
         time_filter = st.selectbox("Select Time Period:", ["This Week", "This Month", "This Year"])
         time_mapping = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
         display_top_insights(sp, time_range=time_mapping[time_filter])
 
-    with tab2:
+    with tab3:
         find_unique_songs(sp)  # Display most unique songs
 
-    with tab3:
+    with tab4:
         analyze_depth_vs_breadth(sp)  # Analyze depth vs breadth in their listening
 
-    with tab4:
+    with tab5:
         plot_music_taste_evolution(sp)  # Display music taste evolution over time
 
 else:
