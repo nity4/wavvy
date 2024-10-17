@@ -61,23 +61,18 @@ st.markdown("""
         font-weight: bold;
         margin-top: 30px;
     }
-    /* Set white text for markdown and body */
     .stMarkdown p, .stMarkdown h3 {
         color: white !important;
     }
-    /* Set text color for select box and slider labels */
     .stSelectbox label, .stSlider label {
         color: white !important;
     }
-    /* Set black color for options in selectbox */
     .stSelectbox .css-1wa3eu0-placeholder, .stSelectbox .css-2b097c-container {
         color: white !important;
     }
-    /* Set text color for slider numbers */
     .stSlider .css-164nlkn .css-qrbaxs {
         color: white !important;
     }
-    /* Adjust background and text color for tabs */
     .stTabs [role="tab"] {
         color: white !important;
     }
@@ -101,22 +96,19 @@ def refresh_token():
         st.session_state['token_info'] = token_info
 
 def authenticate_user():
-    # Correct handling of query params
-    query_params = st.query_params  # Updated way to get query parameters
+    query_params = st.experimental_get_query_params()  # Correct handling of query params
     
     if "code" in query_params:
         code = query_params["code"][0]
         try:
-            # Using get_cached_token to avoid future deprecation
             token_info = sp_oauth.get_cached_token()
             if not token_info:
                 token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
-            # Use query_params to reset query parameters
-            st.query_params.clear()  # Clear query parameters to avoid repeated authentication
+            st.experimental_set_query_params()  # Clear query parameters
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
-                st.experimental_rerun()  # Reload the app once authenticated
+                st.experimental_rerun()
         except Exception as e:
             st.error(f"Authentication error: {e}")
     else:
@@ -177,6 +169,8 @@ def get_liked_songs(sp):
             "valence": audio_features["valence"],
             "tempo": audio_features["tempo"]
         })
+    
+    random.shuffle(liked_songs)  # Shuffle liked songs to ensure randomness
     return liked_songs
 
 # Retrieve recommendations based on user's listening habits (with 429 error handling)
@@ -190,11 +184,8 @@ def get_new_discoveries(sp):
     top_tracks = [track['id'] for track in top_tracks_results['items']]
     top_genres = [artist['genres'][0] for artist in top_artists_results['items'] if artist['genres']]
 
-    seed_tracks = top_tracks[:3]
-    seed_genres = top_genres[:2]
-
-    if not seed_tracks and not seed_genres:
-        seed_tracks = ['4uLU6hMCjMI75M1A2tKUQC']  # Default track seed
+    seed_tracks = top_tracks[:3] if top_tracks else ['4uLU6hMCjMI75M1A2tKUQC']  # Default if no tracks
+    seed_genres = top_genres[:2] if top_genres else []
 
     recommendations = handle_spotify_rate_limit(sp.recommendations, seed_tracks=seed_tracks, seed_genres=seed_genres, limit=50)
     
@@ -212,6 +203,8 @@ def get_new_discoveries(sp):
             "valence": audio_features["valence"],
             "tempo": audio_features["tempo"]
         })
+    
+    random.shuffle(new_songs)  # Shuffle new songs to ensure variety
     return new_songs
 
 # Enhanced mood classification based on valence and tempo
@@ -232,6 +225,10 @@ def filter_songs(songs, mood, intensity):
         and mood_filter["tempo"][0] <= song["tempo"] <= mood_filter["tempo"][1]
         and song['energy'] >= (intensity / 5)
     ]
+    
+    # Ensure there are always songs returned, fallback to the original list if no match
+    if len(filtered_songs) < 5:
+        filtered_songs.extend(random.sample(songs, min(len(songs), 5 - len(filtered_songs))))
     
     return filtered_songs
 
