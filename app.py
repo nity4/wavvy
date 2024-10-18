@@ -3,8 +3,8 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import random
 import pandas as pd
-import datetime
 import time
+import matplotlib.pyplot as plt
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -31,7 +31,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for white text and design elements
+# Custom CSS for styling
 st.markdown("""
     <style>
     body {
@@ -60,18 +60,8 @@ st.markdown("""
         font-weight: bold;
         margin-top: 30px;
     }
-    .stMarkdown p, .stMarkdown h3 {
-        color: white !important;
-    }
-    .stSelectbox label, .stSlider label {
-        color: white !important;
-    }
-    .stTabs [role="tab"] {
-        color: white !important;
-    }
-    .stTabs [role="tabpanel"] {
-        background-color: rgba(0, 0, 0, 0.5) !important;
-        color: white !important;
+    .song-cover, .artist-cover, .genre-icon {
+        margin-right: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -125,7 +115,7 @@ def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
                 break
     return None
 
-# Fetch audio features for liked songs
+# Fetch liked songs and audio features
 def get_liked_songs(sp):
     results = handle_spotify_rate_limit(sp.current_user_saved_tracks, limit=50)
     if not results:
@@ -208,7 +198,7 @@ def display_songs(song_list, title):
     else:
         st.write("No songs found.")
 
-# Fetch top songs, artists, and genres for insights
+# Fetch top items for insights
 def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
     if item_type == 'tracks':
         results = handle_spotify_rate_limit(sp.current_user_top_tracks, time_range=time_range, limit=limit)
@@ -238,20 +228,31 @@ def display_top_insights(sp, time_range='short_term'):
     st.write(f"### Top Insights for {time_range.replace('_', ' ').title()}")
 
     if top_tracks:
-        st.write(f"**Most Listened Song:** {top_tracks[0]['name']} by {top_tracks[0]['artist']}")
-        st.write(f"**Top Artist:** {top_artists[0]['name']}")
-        st.write(f"**Top Genres:** {', '.join(artist['genres'][0] for artist in top_artists if artist['genres'])}")
+        st.write("### Top Songs")
+        for track in top_tracks:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.image(track['cover'], width=80)
+            with col2:
+                st.write(f"**{track['name']}** by {track['artist']}")
     
-    st.write("### Artist Covers and Genre Icons")
-    for artist in top_artists:
+    if top_artists:
+        st.write("### Top Artists")
+        for artist in top_artists:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.image(artist['cover'], width=80)
+            with col2:
+                st.write(f"**{artist['name']}** - {', '.join(artist['genres'])}")
+
+    st.write("### Top Genres")
+    genres = set([artist['genres'][0] for artist in top_artists if artist['genres']])
+    for genre in genres:
         col1, col2 = st.columns([1, 4])
         with col1:
-            if artist["cover"]:
-                st.image(artist["cover"], width=80)
-            else:
-                st.write("No cover")
+            st.image("https://img.icons8.com/ios-filled/50/000000/musical-notes.png", width=50, use_column_width="auto")
         with col2:
-            st.write(f"**{artist['name']}** - {', '.join(artist['genres'])}")
+            st.write(f"**{genre}**")
 
 # Analyze listening depth vs. breadth
 def analyze_depth_vs_breadth(sp):
@@ -268,8 +269,13 @@ def analyze_depth_vs_breadth(sp):
     # Visualization: Weekly listening graph (screen time style)
     days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     song_count = [random.randint(20, 60) for _ in range(7)]
-    st.write("**Weekly Listening (Songs per Day)**")
-    st.bar_chart(pd.DataFrame({'Day': days, 'Songs Listened': song_count}).set_index('Day'))
+    
+    # Matplotlib visualization
+    plt.figure(figsize=(10, 5))
+    plt.bar(days, song_count, color='lightblue')
+    plt.title('Songs Listened per Day')
+    plt.ylabel('Number of Songs')
+    st.pyplot(plt)
     
     # Total number of songs and minutes
     total_minutes = total_songs * 3  # Assuming average song length is 3 minutes
@@ -310,22 +316,24 @@ if is_authenticated():
     ])
 
     with tab1:
+        option = st.radio("Choose Option:", ["Liked Songs", "Discover New Songs"])
         mood = st.selectbox("Choose your mood:", ["Happy", "Calm", "Energetic", "Sad"])
         intensity = st.slider("Choose intensity:", 1, 5, 3)
 
-        liked_songs = get_liked_songs(sp)
-        if liked_songs:
-            filtered_liked_songs = filter_songs(liked_songs, mood, intensity)
-            display_songs(filtered_liked_songs, "Your Liked Songs")
+        if option == "Liked Songs":
+            liked_songs = get_liked_songs(sp)
+            if liked_songs:
+                filtered_liked_songs = filter_songs(liked_songs, mood, intensity)
+                display_songs(filtered_liked_songs, "Your Liked Songs")
+            else:
+                st.warning("No liked songs available.")
         else:
-            st.warning("No liked songs available.")
-        
-        new_songs = get_new_discoveries(sp)
-        if new_songs:
-            filtered_new_songs = filter_songs(new_songs, mood, intensity)
-            display_songs(filtered_new_songs, "New Song Discoveries")
-        else:
-            st.warning("No new discoveries available.")
+            new_songs = get_new_discoveries(sp)
+            if new_songs:
+                filtered_new_songs = filter_songs(new_songs, mood, intensity)
+                display_songs(filtered_new_songs, "New Song Discoveries")
+            else:
+                st.warning("No new discoveries available.")
 
     with tab2:
         time_filter = st.selectbox("Select Time Period:", ["This Week", "This Month", "This Year"])
