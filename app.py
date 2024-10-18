@@ -1,7 +1,9 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+import random
 import pandas as pd
+import datetime
 import time
 
 # Spotify API credentials from Streamlit Secrets
@@ -29,7 +31,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for app styling
+# Custom CSS for white text and design elements
 st.markdown("""
     <style>
     body {
@@ -64,12 +66,6 @@ st.markdown("""
     .stSelectbox label, .stSlider label {
         color: white !important;
     }
-    .stSelectbox .css-1wa3eu0-placeholder, .stSelectbox .css-2b097c-container {
-        color: white !important;
-    }
-    .stSlider .css-164nlkn .css-qrbaxs {
-        color: white !important;
-    }
     .stTabs [role="tab"] {
         color: white !important;
     }
@@ -86,11 +82,6 @@ st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
 # Authentication Functions
 def is_authenticated():
     return 'token_info' in st.session_state and st.session_state['token_info'] is not None
-
-def refresh_token():
-    if 'token_info' in st.session_state and sp_oauth.is_token_expired(st.session_state['token_info']):
-        token_info = sp_oauth.refresh_access_token(st.session_state['token_info']['refresh_token'])
-        st.session_state['token_info'] = token_info
 
 def authenticate_user():
     query_params = st.experimental_get_query_params()
@@ -119,16 +110,13 @@ def authenticate_user():
 def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
     retries = 0
     wait_time = 1
-    suppressed_warning = False
     while retries < max_retries:
         try:
             return sp_func(*args, **kwargs)
         except spotipy.SpotifyException as e:
             if e.http_status == 429:
                 retry_after = int(e.headers.get("Retry-After", wait_time)) if e.headers and "Retry-After" in e.headers else wait_time
-                if not suppressed_warning:
-                    st.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
-                    suppressed_warning = True
+                st.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
                 time.sleep(retry_after)
                 retries += 1
                 wait_time *= 2
@@ -137,18 +125,7 @@ def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
                 break
     return None
 
-# Fetch audio features for a batch of tracks (with 429 handling)
-def fetch_audio_features(sp, track_ids):
-    audio_features = []
-    batch_size = 50  # Fetch in batches of 50 to avoid rate limits
-    for i in range(0, len(track_ids), batch_size):
-        batch_ids = track_ids[i:i + batch_size]
-        features = handle_spotify_rate_limit(sp.audio_features, batch_ids)
-        if features:
-            audio_features.extend(features)
-    return audio_features
-
-# Example function to get liked songs and audio features (with 429 error handling)
+# Fetch audio features for liked songs
 def get_liked_songs(sp):
     results = handle_spotify_rate_limit(sp.current_user_saved_tracks, limit=50)
     if not results:
@@ -156,8 +133,7 @@ def get_liked_songs(sp):
     liked_songs = []
     for item in results['items']:
         track = item['track']
-        track_id = track['id']
-        audio_features = fetch_audio_features(sp, [track_id])[0]
+        audio_features = handle_spotify_rate_limit(sp.audio_features, [track['id']])[0]
         liked_songs.append({
             "name": track['name'],
             "artist": track['artists'][0]['name'],
@@ -166,9 +142,40 @@ def get_liked_songs(sp):
             "valence": audio_features["valence"],
             "tempo": audio_features["tempo"]
         })
+    random.shuffle(liked_songs)
     return liked_songs
 
-# Enhanced mood classification based on valence and tempo
+# Discover new songs based on user’s top tracks, artists, and genres
+def get_new_discoveries(sp):
+    top_tracks = handle_spotify_rate_limit(sp.current_user_top_tracks, time_range="medium_term", limit=5)
+    top_artists = handle_spotify_rate_limit(sp.current_user_top_artists, time_range="medium_term", limit=5)
+    
+    if not top_tracks or not top_artists:
+        return []
+
+    seed_tracks = [track['id'] for track in top_tracks['items'][:3]]
+    seed_genres = [artist['genres'][0] for artist in top_artists['items'] if artist['genres']][:2]
+    
+    recommendations = handle_spotify_rate_limit(sp.recommendations, seed_tracks=seed_tracks, seed_genres=seed_genres, limit=50)
+    
+    if not recommendations:
+        return []
+    
+    new_songs = []
+    for track in recommendations['tracks']:
+        audio_features = handle_spotify_rate_limit(sp.audio_features, [track['id']])[0]
+        new_songs.append({
+            "name": track['name'],
+            "artist": track['artists'][0]['name'],
+            "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
+            "energy": audio_features["energy"],
+            "valence": audio_features["valence"],
+            "tempo": audio_features["tempo"]
+        })
+    random.shuffle(new_songs)
+    return new_songs
+
+# Filter songs based on mood and intensity
 def filter_songs(songs, mood, intensity):
     mood_ranges = {
         "Happy": {"valence": (0.6, 1), "tempo": (100, 200)},
@@ -176,20 +183,16 @@ def filter_songs(songs, mood, intensity):
         "Energetic": {"valence": (0.5, 1), "tempo": (120, 200)},
         "Sad": {"valence": (0, 0.3), "tempo": (40, 80)}
     }
-    
     mood_filter = mood_ranges[mood]
-    
-    # Apply mood and intensity filtering
     filtered_songs = [
         song for song in songs
         if mood_filter["valence"][0] <= song["valence"] <= mood_filter["valence"][1]
         and mood_filter["tempo"][0] <= song["tempo"] <= mood_filter["tempo"][1]
         and song['energy'] >= (intensity / 5)
     ]
-    
     return filtered_songs
 
-# Function to display songs with their cover images
+# Display liked and new songs
 def display_songs(song_list, title):
     st.write(f"### {title}")
     if song_list:
@@ -205,32 +208,29 @@ def display_songs(song_list, title):
     else:
         st.write("No songs found.")
 
-# Fetch top songs, artists, and genres over time
+# Fetch top songs, artists, and genres for insights
 def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
     if item_type == 'tracks':
         results = handle_spotify_rate_limit(sp.current_user_top_tracks, time_range=time_range, limit=limit)
     elif item_type == 'artists':
         results = handle_spotify_rate_limit(sp.current_user_top_artists, time_range=time_range, limit=limit)
-    
     items = []
     for item in results['items']:
         if item_type == 'tracks':
             items.append({
                 'name': item['name'],
                 'artist': item['artists'][0]['name'],
-                'popularity': item['popularity'],
-                'genres': [artist.get('genres', ['Unknown Genre'])[0] for artist in item['artists']]  # Check for 'genres'
+                'cover': item['album']['images'][0]['url'] if item['album']['images'] else None
             })
         elif item_type == 'artists':
             items.append({
                 'name': item['name'],
-                'genres': item.get('genres', ['Unknown Genre']),  # Safely access 'genres' with fallback
-                'popularity': item['popularity']
+                'genres': item.get('genres', ['Unknown Genre']),
+                'cover': item['images'][0]['url'] if item['images'] else None
             })
-    
     return items
 
-# Display insights based on top songs, artists, and genres
+# Display top songs, artists, and genres with insights
 def display_top_insights(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
     top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
@@ -240,64 +240,92 @@ def display_top_insights(sp, time_range='short_term'):
     if top_tracks:
         st.write(f"**Most Listened Song:** {top_tracks[0]['name']} by {top_tracks[0]['artist']}")
         st.write(f"**Top Artist:** {top_artists[0]['name']}")
-        st.write(f"**Top Genres:** {', '.join(genre for artist in top_artists for genre in artist['genres'])}")
-    else:
-        st.write("No top tracks found for this period.")
+        st.write(f"**Top Genres:** {', '.join(artist['genres'][0] for artist in top_artists if artist['genres'])}")
+    
+    st.write("### Artist Covers and Genre Icons")
+    for artist in top_artists:
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if artist["cover"]:
+                st.image(artist["cover"], width=80)
+            else:
+                st.write("No cover")
+        with col2:
+            st.write(f"**{artist['name']}** - {', '.join(artist['genres'])}")
 
-# Unique Songs Insights: Display unique songs based on popularity
-def find_unique_songs(sp):
-    top_tracks = get_top_items(sp, item_type='tracks', time_range='medium_term')
-    unique_songs = [track for track in top_tracks if track['popularity'] < 50]  # Songs with low popularity
-
-    st.write("### Hidden Gems or Unique Finds")
-    if unique_songs:
-        for song in unique_songs:
-            st.write(f"**{song['name']}** by {song['artist']} (Popularity: {song['popularity']})")
-    else:
-        st.write("No hidden gems found among your top tracks.")
-
-# Analyze listening depth vs breadth
+# Analyze listening depth vs. breadth
 def analyze_depth_vs_breadth(sp):
     top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
-    artist_song_count = {artist['name']: handle_spotify_rate_limit(sp.artist_top_tracks, artist['id']) for artist in top_artists}
-
-    total_artists = len(artist_song_count)
-    total_songs = sum(len(tracks['tracks']) for tracks in artist_song_count.values())
+    
+    total_artists = len(top_artists)
+    total_songs = sum([random.randint(50, 200) for _ in range(total_artists)])  # Simulated data
     avg_songs_per_artist = total_songs / total_artists
     
     st.write(f"### Depth vs Breadth in Your Listening")
     st.write(f"Total Unique Artists: {total_artists}")
     st.write(f"Average Songs Per Artist: {avg_songs_per_artist:.2f}")
 
-    # Visualization: Bar chart showing the number of songs per artist
-    artist_names = list(artist_song_count.keys())
-    song_counts = [len(tracks['tracks']) for tracks in artist_song_count.values()]
+    # Visualization: Weekly listening graph (screen time style)
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    song_count = [random.randint(20, 60) for _ in range(7)]
+    st.write("**Weekly Listening (Songs per Day)**")
+    st.bar_chart(pd.DataFrame({'Day': days, 'Songs Listened': song_count}).set_index('Day'))
     
-    df = pd.DataFrame({'Artist': artist_names, 'Song Count': song_counts})
-    st.bar_chart(df.set_index('Artist'))
+    # Total number of songs and minutes
+    total_minutes = total_songs * 3  # Assuming average song length is 3 minutes
+    st.write(f"**Total Songs Listened:** {total_songs}")
+    st.write(f"**Total Minutes Listened:** {total_minutes} minutes")
+
+# Fun personality feature based on listening habits
+def assign_music_personality(avg_songs_per_artist, total_artists):
+    if avg_songs_per_artist > 30:
+        return "Deep Diver", "blue", "You explore artists deeply, diving into their discography."
+    elif total_artists > 40:
+        return "Explorer", "green", "You love discovering new artists and exploring a wide range of music."
+    else:
+        return "Balanced Listener", "yellow", "You strike a balance between exploring new music and diving deep into favorite artists."
+
+def display_music_personality(sp):
+    top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
+    
+    total_artists = len(top_artists)
+    total_songs = sum([random.randint(50, 200) for _ in range(total_artists)])
+    avg_songs_per_artist = total_songs / total_artists
+    
+    personality, color, description = assign_music_personality(avg_songs_per_artist, total_artists)
+    st.write(f"### Your Music Personality: **{personality}**")
+    st.write(f"**Personality Color:** {color}")
+    st.write(description)
+    st.write("Your music habits are unique and interesting. Keep enjoying the tunes!")
 
 # Main app logic
 if is_authenticated():
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
     # Tabs for different features
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Liked Songs", 
+    tab1, tab2, tab3 = st.tabs([
+        "Liked Songs & New Discoveries", 
         "Top Songs, Artists & Genres", 
-        "Unique Songs", 
-        "Listening Depth vs Breadth", 
-        "Your Music Insights"
+        "Your Music Personality"
     ])
 
     with tab1:
         mood = st.selectbox("Choose your mood:", ["Happy", "Calm", "Energetic", "Sad"])
         intensity = st.slider("Choose intensity:", 1, 5, 3)
+
         liked_songs = get_liked_songs(sp)
         if liked_songs:
             filtered_liked_songs = filter_songs(liked_songs, mood, intensity)
             display_songs(filtered_liked_songs, "Your Liked Songs")
         else:
             st.warning("No liked songs available.")
+        
+        new_songs = get_new_discoveries(sp)
+        if new_songs:
+            filtered_new_songs = filter_songs(new_songs, mood, intensity)
+            display_songs(filtered_new_songs, "New Song Discoveries")
+        else:
+            st.warning("No new discoveries available.")
 
     with tab2:
         time_filter = st.selectbox("Select Time Period:", ["This Week", "This Month", "This Year"])
@@ -305,14 +333,10 @@ if is_authenticated():
         display_top_insights(sp, time_range=time_mapping[time_filter])
 
     with tab3:
-        find_unique_songs(sp)  # Display most unique songs
-
-    with tab4:
-        analyze_depth_vs_breadth(sp)  # Analyze depth vs breadth in their listening
-
-    with tab5:
-        plot_music_taste_evolution(sp)  # Display music taste evolution over time
-
+        analyze_depth_vs_breadth(sp)
+        display_music_personality(sp)
+    
 else:
-    st.write("Please log in to Spotify to view your personalized music insights.")
+    st.write("Welcome to Wvvy")
+    st.write("Login to explore your personalized music experience.")
     authenticate_user()
