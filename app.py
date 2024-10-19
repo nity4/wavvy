@@ -153,6 +153,27 @@ def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
                 break
     return None
 
+# Fetch liked songs and audio features
+def get_liked_songs(sp):
+    results = handle_spotify_rate_limit(sp.current_user_saved_tracks, limit=50)
+    if not results:
+        return []  # Return empty list if retries exceeded
+    liked_songs = []
+    for item in results['items']:
+        track = item['track']
+        audio_features = handle_spotify_rate_limit(sp.audio_features, [track['id']])[0]
+        liked_songs.append({
+            "name": track['name'],
+            "artist": track['artists'][0]['name'],
+            "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
+            "energy": audio_features["energy"],
+            "valence": audio_features["valence"],
+            "tempo": audio_features["tempo"],
+            "popularity": track['popularity']
+        })
+    random.shuffle(liked_songs)
+    return liked_songs
+
 # Fetch top items for insights
 def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
     if item_type == 'tracks':
