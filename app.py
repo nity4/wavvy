@@ -73,11 +73,6 @@ st.markdown("""
     .insight-box:hover {
         transform: scale(1.02);
     }
-    .insight-quote {
-        font-style: italic;
-        color: #1DB954;
-        font-size: 1.5em;
-    }
     .stMarkdown, .stMarkdown p, .stMarkdown h3, .stSelectbox label, .stSlider label {
         color: white !important;
     }
@@ -88,12 +83,23 @@ st.markdown("""
         background-color: rgba(0, 0, 0, 0.5) !important;
         color: white !important;
     }
+    .personality-card {
+        background-color: #1e1e1e;
+        color: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+    }
     .personality-color-box {
         width: 50px;
         height: 50px;
         display: inline-block;
         margin-right: 10px;
         border-radius: 50%;
+    }
+    .graph-container {
+        margin-top: 20px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -147,27 +153,6 @@ def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
                 break
     return None
 
-# Fetch liked songs and audio features
-def get_liked_songs(sp):
-    results = handle_spotify_rate_limit(sp.current_user_saved_tracks, limit=50)
-    if not results:
-        return []  # Return empty list if retries exceeded
-    liked_songs = []
-    for item in results['items']:
-        track = item['track']
-        audio_features = handle_spotify_rate_limit(sp.audio_features, [track['id']])[0]
-        liked_songs.append({
-            "name": track['name'],
-            "artist": track['artists'][0]['name'],
-            "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
-            "energy": audio_features["energy"],
-            "valence": audio_features["valence"],
-            "tempo": audio_features["tempo"],
-            "popularity": track['popularity']
-        })
-    random.shuffle(liked_songs)
-    return liked_songs
-
 # Fetch top items for insights
 def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
     if item_type == 'tracks':
@@ -191,107 +176,6 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
                 'cover': item['images'][0]['url'] if item['images'] else None
             })
     return items
-
-# Display liked and new songs
-def display_songs(song_list, title):
-    st.write(f"### {title}")
-    if song_list:
-        for song in song_list:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                if song["cover"]:
-                    st.image(song["cover"], width=80)
-                else:
-                    st.write("No cover")
-            with col2:
-                st.write(f"**{song['name']}** by **{song['artist']}**")
-    else:
-        st.write("No songs found.")
-
-# Display top songs, artists, genres, and hidden gems with insights
-def display_top_insights(sp, time_range='short_term'):
-    top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
-    top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
-    
-    st.write(f"### Top Insights for {time_range.replace('_', ' ').title()}")
-
-    # Display top songs with cover images
-    if top_tracks:
-        st.write("### Top Songs")
-        for track in top_tracks:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.image(track['cover'], width=80)
-            with col2:
-                st.markdown(f"**{track['name']}** by **{track['artist']}**", unsafe_allow_html=True)
-    
-    # Display top artists with their cover images
-    if top_artists:
-        st.write("### Top Artists")
-        for artist in top_artists:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.image(artist['cover'], width=80)
-            with col2:
-                st.markdown(f"**{artist['name']}** - {', '.join(artist['genres'])}", unsafe_allow_html=True)
-
-    # Display top genres
-    st.write("### Top Genres")
-    genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
-    unique_genres = set(genres)
-    for genre in unique_genres:
-        st.markdown(f"**{genre}**", unsafe_allow_html=True)
-
-    # Display hidden gems (tracks with popularity < 50)
-    hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
-    if hidden_gems:
-        st.write("### Hidden Gems")
-        for gem in hidden_gems:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.image(gem['cover'], width=80)
-            with col2:
-                st.markdown(f"**{gem['name']}** by **{gem['artist']}**", unsafe_allow_html=True)
-
-    # Insights based on user data only
-    st.write("### Fascinating Insights about Your Music:")
-    insights = []
-
-    # Top Tracks Popularity
-    avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
-    insights.append(f"Your top tracks have an average popularity of **{avg_popularity}**. You're balancing popular hits and deep cuts.")
-    
-    # Top Track Energy Levels
-    avg_energy = round(sum(track.get('energy', 0.5) for track in top_tracks) / len(top_tracks), 2)
-    insights.append(f"The energy levels of your top tracks are at **{avg_energy}**. You love a good balance of upbeat and mellow songs.")
-    
-    # Unique Genres
-    genre_count = len(unique_genres)
-    insights.append(f"You explored **{genre_count}** different genres this period. You're musically diverse!")
-
-    # Tempo analysis
-    avg_tempo = sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks) if top_tracks else 120
-    insights.append(f"Your favorite songs have an average tempo of **{round(avg_tempo)} BPM**. You're all about that perfect rhythm.")
-
-    # Hidden Gems based on popularity (insight)
-    hidden_gems_count = len(hidden_gems)
-    insights.append(f"You've found **{hidden_gems_count} hidden gems** this time. Keep discovering underrated tracks!")
-
-    # Display insights in a side-by-side layout
-    display_insights_side_by_side(insights)
-
-# Function to create a side-by-side display for insights
-def display_insights_side_by_side(insights):
-    cols = st.columns(2)  # Create two columns for side-by-side display
-    for i, insight in enumerate(insights):
-        with cols[i % 2]:
-            st.markdown(f"""
-            <div class="insight-box">
-                <div class="insight-quote">“</div>
-                <div class="insight-content">{insight}</div>
-                <div class="insight-quote">”</div>
-            </div>
-            """, unsafe_allow_html=True)
 
 # Function to determine listening personality type (depth vs breadth)
 def analyze_listening_behavior(sp):
@@ -326,34 +210,48 @@ def display_music_personality(sp):
     personality, color, description = analyze_listening_behavior(sp)
     listening_pattern, pattern_description = analyze_behavioral_insights(sp)
     
+    # Personality Card Layout
     st.write(f"### Your Music Personality Profile")
-
-    # Personality Name and Color
-    st.write(f"**Personality Name**: {personality}")
-    st.markdown(f'<div class="personality-color-box" style="background-color: {color};"></div> **Color**: {color.capitalize()}', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="personality-card">
+        <h2>Personality Summary</h2>
+        <p><strong>Personality Name</strong>: {}</p>
+        <div class="personality-color-box" style="background-color: {}; display: inline-block;"></div>
+        <strong>Personality Color</strong>: {}
+        <p>{}</p>
+    </div>
+    """.format(personality, color, color.capitalize(), description), unsafe_allow_html=True)
     
-    # Description in Gen Z Language
-    st.write(description)
+    # Behavioral Insights Card
+    st.markdown(f"""
+    <div class="personality-card">
+        <h2>Listening Behavior</h2>
+        <p><strong>Listening Pattern</strong>: {listening_pattern}</p>
+        <p>{pattern_description}</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Additional behavioral insights
-    st.write(f"**Listening Pattern**: {listening_pattern}")
-    st.write(pattern_description)
-    
-    # Total songs and total minutes this week (Simulated data)
+    # Total songs and minutes this week (Simulated Data)
     total_songs_this_week = random.randint(80, 200)
-    total_minutes_this_week = total_songs_this_week * 3  # Assuming an average song length of 3 minutes
-    
-    st.write(f"**Total Tracks This Week:** {total_songs_this_week}")
-    st.write(f"**Total Minutes Listened This Week:** {total_minutes_this_week} minutes")
+    total_minutes_this_week = total_songs_this_week * 3  # Assuming average song length of 3 minutes
 
-    # Visualization: Weekly song listening graph (Monday to Sunday)
+    st.markdown(f"""
+    <div class="personality-card">
+        <h2>Weekly Listening Stats</h2>
+        <p><strong>Total Tracks This Week:</strong> {total_songs_this_week}</p>
+        <p><strong>Total Minutes Listened This Week:</strong> {total_minutes_this_week} minutes</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Weekly song listening graph (Monday to Sunday)
     days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     songs_per_day = [random.randint(10, 40) for _ in range(7)]  # Simulated data
 
     # Apple Screen Time-like Visualization using Matplotlib
-    fig, ax = plt.subplots(figsize=(8, 4))
+    st.markdown('<div class="graph-container">', unsafe_allow_html=True)
+    fig, ax = plt.subplots(figsize=(6, 3))
     ax.bar(days_of_week, songs_per_day, color='#1DB954')
-    ax.set_title('Songs Listened Per Day (This Week)', fontsize=16)
+    ax.set_title('Songs Listened Per Day (This Week)', fontsize=14)
     ax.set_ylabel('Number of Songs')
     ax.set_xlabel('Day of the Week')
     ax.spines['top'].set_visible(False)
@@ -365,6 +263,7 @@ def display_music_personality(sp):
     ax.yaxis.label.set_color('white')
     ax.xaxis.label.set_color('white')
     st.pyplot(fig)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # Main app logic
 if is_authenticated():
