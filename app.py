@@ -297,9 +297,6 @@ def display_top_insights(sp, time_range='short_term'):
     unique_artists = len(top_artists)
     insights.append(f"**You listened to {unique_artists} unique artists.** You enjoy exploring a variety of music!")
     
-    avg_song_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
-    insights.append(f"**The average popularity of your top songs is {avg_song_popularity}!** You have a mix of mainstream and hidden gems.")
-    
     # Total listening time calculation (assuming each song is 3 minutes long)
     total_minutes_listened = len(top_tracks) * 3
     insights.append(f"**You spent approximately {total_minutes_listened} minutes listening to your top tracks!** That's dedication.")
