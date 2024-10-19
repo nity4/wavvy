@@ -1,9 +1,8 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import random
-import time
 import os
+import time
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -18,6 +17,7 @@ cache_path = ".cache"
 
 # Function to clear cache
 def clear_cache():
+    """Clears the OAuth cache to prevent reusing old tokens or authorization codes."""
     if os.path.exists(cache_path):
         os.remove(cache_path)
 
@@ -38,40 +38,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for styling, including flip cards for insights
-st.markdown("""
-    <style>
-    body {
-        background: linear-gradient(to right, black, #1DB954) !important;
-    }
-    .stApp {
-        background: linear-gradient(to right, black, #1DB954) !important;
-    }
-    .header-title {
-        font-size: 5em;
-        font-weight: bold;
-        color: white !important;
-        text-align: center;
-        padding-top: 50px;
-        margin-bottom: 20px;
-        letter-spacing: 5px;
-    }
-    .login-button {
-        color: white;
-        background-color: #1DB954;
-        padding: 15px 30px;
-        font-size: 1.5em;
-        border-radius: 12px;
-        text-align: center;
-        display: inline-block;
-        font-weight: bold;
-        margin-top: 30px;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 # Function to refresh the token if expired
 def refresh_token():
+    """Refreshes the token if it has expired."""
     token_info = st.session_state.get('token_info', None)
     if token_info and sp_oauth.is_token_expired(token_info):
         token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
@@ -79,14 +48,16 @@ def refresh_token():
 
 # Function to check if the user is authenticated
 def is_authenticated():
+    """Checks if the user is authenticated and has a valid token."""
     if 'token_info' in st.session_state and st.session_state['token_info']:
-        refresh_token()  # Ensure token is refreshed before using it
+        refresh_token()  # Ensure the token is refreshed before using it
         return True
     return False
 
 # Authentication flow
 def authenticate_user():
-    query_params = st.query_params  # Using st.query_params to get query parameters
+    """Handles Spotify OAuth authentication flow."""
+    query_params = st.experimental_get_query_params()  # Use query parameters to get the 'code'
 
     if "code" in query_params:
         code = query_params["code"][0]
@@ -94,9 +65,12 @@ def authenticate_user():
             # Clear cache before attempting to use the code
             clear_cache()
 
+            # Immediately exchange the authorization code for an access token
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
-            st.set_query_params()  # Clear query parameters
+
+            # Clear query parameters and rerun the app
+            st.experimental_set_query_params()  # Clear query parameters
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
                 st.experimental_rerun()  # Rerun after successful authentication
@@ -109,7 +83,7 @@ def authenticate_user():
             unsafe_allow_html=True
         )
 
-# Helper Function for Handling Spotify API Rate Limit (429 Error)
+# Helper function to handle Spotify API Rate Limit (HTTP 429 Error)
 def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
     retries = 0
     wait_time = 1
@@ -130,6 +104,7 @@ def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
 
 # Fetch liked songs and audio features
 def get_liked_songs(sp):
+    """Fetches liked songs and their audio features."""
     results = handle_spotify_rate_limit(sp.current_user_saved_tracks, limit=50)
     if not results:
         return []  # Return empty list if retries exceeded
@@ -189,7 +164,7 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
-# Function to display top insights (Top Songs, Artists, Genres, Insights)
+# Display top insights (Top Songs, Artists, Genres, Insights)
 def display_top_insights(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
     top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
@@ -270,72 +245,6 @@ def display_top_insights(sp, time_range='short_term'):
 
     display_flip_insights(insights)
 
-# Function to determine listening personality type (depth vs breadth)
-def analyze_listening_behavior(sp):
-    top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
-    total_artists = len(top_artists)
-    total_songs = sum([random.randint(50, 200) for _ in range(total_artists)])  # Simulated data
-    avg_songs_per_artist = total_songs / total_artists
-
-    if avg_songs_per_artist > 30:
-        return "Deep Diver", "blue", "You're all about depth—diving deep into a few artists and their entire discographies."
-    elif total_artists > 40:
-        return "Explorer", "green", "You're a breadth explorer, constantly seeking new artists and sounds."
-    else:
-        return "Balanced Listener", "yellow", "You strike the perfect balance between exploring new music and sticking to your favorites."
-
-# Behavior insights function to analyze listening patterns
-def analyze_behavioral_insights(sp):
-    # Mock behavior insights based on time of listening
-    hour = random.randint(0, 23)  # Simulating time of listening
-    if 6 <= hour <= 11:
-        return "Morning Listener", "You start your day with music. It's like your daily dose of energy!"
-    elif 12 <= hour <= 17:
-        return "Daytime Groover", "You keep the music going throughout your day, staying productive and energized."
-    elif 18 <= hour <= 23:
-        return "Night Owl", "Late-night jams are your vibe. Music hits different after dark!"
-    else:
-        return "Late-Night Crawler", "You're listening past midnight, discovering the best hidden tracks!"
-
-# Display music personality profile
-def display_music_personality(sp):
-    # Analyze listening behavior and determine personality type
-    personality, color, description = analyze_listening_behavior(sp)
-    listening_pattern, pattern_description = analyze_behavioral_insights(sp)
-    
-    # Personality Card Layout
-    st.write(f"### Your Music Personality Profile")
-    st.markdown("""
-    <div class="personality-card">
-        <h2>Personality Summary</h2>
-        <p><strong>Personality Name</strong>: {}</p>
-        <div class="personality-color-box" style="background-color: {}; display: inline-block;"></div>
-        <strong>Personality Color</strong>: {}
-        <p>{}</p>
-    </div>
-    """.format(personality, color, color.capitalize(), description), unsafe_allow_html=True)
-    
-    # Behavioral Insights Card
-    st.markdown(f"""
-    <div class="personality-card">
-        <h2>Listening Behavior</h2>
-        <p><strong>Listening Pattern</strong>: {listening_pattern}</p>
-        <p>{pattern_description}</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Total songs and minutes this week (Simulated Data)
-    total_songs_this_week = random.randint(80, 200)
-    total_minutes_this_week = total_songs_this_week * 3  # Assuming average song length of 3 minutes
-
-    st.markdown(f"""
-    <div class="personality-card">
-        <h2>Weekly Listening Stats</h2>
-        <p><strong>Total Tracks This Week:</strong> {total_songs_this_week}</p>
-        <p><strong>Total Minutes Listened This Week:</strong> {total_minutes_this_week} minutes</p>
-    </div>
-    """, unsafe_allow_html=True)
-
 # Main app logic
 if is_authenticated():
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
@@ -367,9 +276,6 @@ if is_authenticated():
         time_mapping = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
         display_top_insights(sp, time_range=time_mapping[time_filter])
 
-    with tab3:
-        display_music_personality(sp)
-    
 else:
     st.write("Welcome to Wvvy")
     st.write("Login to explore your personalized music experience.")
