@@ -310,8 +310,8 @@ def display_top_insights(sp, time_range='short_term'):
     # Unique Listening Times
     insights.append("You're in the **1%** of people who listen to music at 3 AM. Sleep is overrated, right?")
     
-    # Tempo & Heartbeat
-    avg_tempo = sum(track['tempo'] for track in top_tracks) / len(top_tracks) if top_tracks else 120
+    # Tempo & Heartbeat: Handling missing tempo values
+    avg_tempo = sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks) if top_tracks else 120
     insights.append(f"Your favorite songs are **faster than your heartbeat**—you're all about that high tempo.")
 
     # Throwback Listener
@@ -321,6 +321,7 @@ def display_top_insights(sp, time_range='short_term'):
 
     # Display insights in a carousel-style box
     display_insights_carousel(insights)
+
 
 # Function to create a carousel-style swipe for insights
 def display_insights_carousel(insights):
