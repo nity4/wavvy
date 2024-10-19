@@ -174,6 +174,22 @@ def get_liked_songs(sp):
     random.shuffle(liked_songs)
     return liked_songs
 
+# Function to display songs with their cover images
+def display_songs(song_list, title):
+    st.write(f"### {title}")
+    if song_list:
+        for song in song_list:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if song["cover"]:
+                    st.image(song["cover"], width=80)
+                else:
+                    st.write("No cover")
+            with col2:
+                st.write(f"**{song['name']}** by {song['artist']}")
+    else:
+        st.write("No songs found.")
+
 # Fetch top items for insights
 def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
     if item_type == 'tracks':
