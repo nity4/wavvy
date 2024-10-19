@@ -5,7 +5,7 @@ import random
 import pandas as pd
 import time
 import matplotlib.pyplot as plt
-import streamlit.components.v1 as components
+import streamlit.components.v1 as components  # For custom components
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -32,7 +32,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for a floating notification-style insight and proper markdown handling
+# Custom CSS for styling: white text and swipeable carousel
 st.markdown("""
     <style>
     body {
@@ -64,33 +64,31 @@ st.markdown("""
     .song-cover, .artist-cover {
         margin-right: 10px;
     }
-    .insight-box {
+    .stMarkdown, .stMarkdown p, .stMarkdown h3, .stSelectbox label, .stSlider label {
+        color: white !important;
+    }
+    .insight-card {
         background-color: #333;
         color: white;
-        padding: 15px;
+        padding: 20px;
         margin-bottom: 20px;
         border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         transition: transform 0.2s ease-in-out;
         font-family: 'Arial', sans-serif;
-        font-size: 1.1em;
-        width: 250px;
-        position: fixed;
-        right: 30px;
-        top: 80px;
+        font-size: 1.2em;
     }
-    .insight-box:hover {
-        transform: scale(1.03);
+    .insight-card:hover {
+        transform: scale(1.02);
     }
     .insight-quote {
         font-style: italic;
         color: #1DB954;
-        font-size: 1.3em;
-        margin-bottom: 10px;
+        font-size: 1.5em;
     }
     .insight-content {
         margin-top: 10px;
-        font-size: 1.1em;
+        font-size: 1.2em;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -283,7 +281,7 @@ def display_top_insights(sp, time_range='short_term'):
     for genre in unique_genres:
         st.write(f"**{genre}**")
 
-    # Fascinating Insights in Notification Boxes
+    # Fascinating Insights in Styled Cards
     st.write("### Fascinating Insights about Your Music:")
 
     # Generate insights based on user data
@@ -313,14 +311,14 @@ def display_top_insights(sp, time_range='short_term'):
     avg_tempo = sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks) if top_tracks else 120
     insights.append(f"Your favorite songs are **faster than your heartbeat**—you're all about that high tempo.")
 
-    # Display insights in a floating notification-style box
-    display_insights_notification(insights)
+    # Display insights in a card-style box
+    display_insights_cards(insights)
 
-# Function to create a notification-style display for insights
-def display_insights_notification(insights):
+# Function to create a card-style display for insights
+def display_insights_cards(insights):
     for insight in insights:
         st.markdown(f"""
-        <div class="insight-box">
+        <div class="insight-card">
             <div class="insight-quote">“</div>
             <div class="insight-content">{insight}</div>
             <div class="insight-quote">”</div>
