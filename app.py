@@ -214,6 +214,40 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
+# Function to display top insights (Top Songs, Artists, Genres)
+def display_top_insights(sp, time_range='short_term'):
+    top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
+    top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
+    
+    st.write(f"### Top Insights for {time_range.replace('_', ' ').title()}")
+
+    # Display top songs with cover images
+    if top_tracks:
+        st.write("### Top Songs")
+        for track in top_tracks:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.image(track['cover'], width=80)
+            with col2:
+                st.write(f"**{track['name']}** by {track['artist']}")
+    
+    # Display top artists with their cover images
+    if top_artists:
+        st.write("### Top Artists")
+        for artist in top_artists:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.image(artist['cover'], width=80)
+            with col2:
+                st.write(f"**{artist['name']}** - {', '.join(artist['genres'])}")
+
+    # Display top genres
+    st.write("### Top Genres")
+    genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
+    unique_genres = set(genres)
+    for genre in unique_genres:
+        st.write(f"**{genre}**")
+
 # Function to determine listening personality type (depth vs breadth)
 def analyze_listening_behavior(sp):
     top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
