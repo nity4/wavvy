@@ -208,91 +208,6 @@ def display_songs(song_list, title):
     else:
         st.write("No songs found.")
 
-# Display top songs, artists, genres, and hidden gems with insights
-def display_top_insights(sp, time_range='short_term'):
-    top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
-    top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
-    
-    st.write(f"### Top Insights for {time_range.replace('_', ' ').title()}")
-
-    # Display top songs with cover images
-    if top_tracks:
-        st.write("### Top Songs")
-        for track in top_tracks:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.image(track['cover'], width=80)
-            with col2:
-                st.markdown(f"<strong>{track['name']}</strong> by <strong>{track['artist']}</strong>", unsafe_allow_html=True)
-    
-    # Display top artists with their cover images
-    if top_artists:
-        st.write("### Top Artists")
-        for artist in top_artists:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.image(artist['cover'], width=80)
-            with col2:
-                st.markdown(f"<strong>{artist['name']}</strong> - {', '.join(artist['genres'])}", unsafe_allow_html=True)
-
-    # Display top genres
-    st.write("### Top Genres")
-    genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
-    unique_genres = set(genres)
-    for genre in unique_genres:
-        st.markdown(f"<strong>{genre}</strong>", unsafe_allow_html=True)
-
-    # Display hidden gems (tracks with popularity < 50)
-    hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
-    if hidden_gems:
-        st.write("### Hidden Gems")
-        for gem in hidden_gems:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.image(gem['cover'], width=80)
-            with col2:
-                st.markdown(f"<strong>{gem['name']}</strong> by <strong>{gem['artist']}</strong>", unsafe_allow_html=True)
-
-    # Insights based on user data only
-    st.write("### Fascinating Insights about Your Music:")
-    insights = []
-
-    # Top Tracks Popularity
-    avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
-    insights.append(f"Your top tracks have an average popularity of <strong>{avg_popularity}</strong>. You're balancing popular hits and deep cuts.")
-    
-    # Top Track Energy Levels
-    avg_energy = round(sum(track.get('energy', 0.5) for track in top_tracks) / len(top_tracks), 2)
-    insights.append(f"The energy levels of your top tracks are at <strong>{avg_energy}</strong>. You love a good balance of upbeat and mellow songs.")
-    
-    # Unique Genres
-    genre_count = len(unique_genres)
-    insights.append(f"You explored <strong>{genre_count}</strong> different genres this period. You're musically diverse!")
-
-    # Tempo analysis
-    avg_tempo = sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks) if top_tracks else 120
-    insights.append(f"Your favorite songs have an average tempo of <strong>{round(avg_tempo)} BPM</strong>. You're all about that perfect rhythm.")
-
-    # Hidden Gems based on popularity (insight)
-    hidden_gems_count = len(hidden_gems)
-    insights.append(f"You've found <strong>{hidden_gems_count} hidden gems</strong> this time. Keep discovering underrated tracks!")
-
-    # Display insights in a side-by-side layout
-    display_insights_side_by_side(insights)
-
-# Function to create a side-by-side display for insights
-def display_insights_side_by_side(insights):
-    cols = st.columns(2)  # Create two columns for side-by-side display
-    for i, insight in enumerate(insights):
-        with cols[i % 2]:
-            st.markdown(f"""
-            <div class="insight-box">
-                <div class="insight-quote">“</div>
-                <div class="insight-content">{insight}</div>
-                <div class="insight-quote">”</div>
-            </div>
-            """, unsafe_allow_html=True)
-
 # Function to determine listening personality type (depth vs breadth)
 def analyze_listening_behavior(sp):
     top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
@@ -307,10 +222,24 @@ def analyze_listening_behavior(sp):
     else:
         return "Balanced Listener", "yellow", "You strike the perfect balance between exploring new music and sticking to your favorites."
 
+# Behavior insights function to analyze listening patterns
+def analyze_behavioral_insights(sp):
+    # Mock behavior insights based on time of listening
+    hour = random.randint(0, 23)  # Simulating time of listening
+    if 6 <= hour <= 11:
+        return "Morning Listener", "You start your day with music. It's like your daily dose of energy!"
+    elif 12 <= hour <= 17:
+        return "Daytime Groover", "You keep the music going throughout your day, staying productive and energized."
+    elif 18 <= hour <= 23:
+        return "Night Owl", "Late-night jams are your vibe. Music hits different after dark!"
+    else:
+        return "Late-Night Crawler", "You're listening past midnight, discovering the best hidden tracks!"
+
 # Display music personality profile
 def display_music_personality(sp):
     # Analyze listening behavior and determine personality type
     personality, color, description = analyze_listening_behavior(sp)
+    listening_pattern, pattern_description = analyze_behavioral_insights(sp)
     
     st.write(f"### Your Music Personality Profile")
 
@@ -320,6 +249,10 @@ def display_music_personality(sp):
     
     # Description in Gen Z Language
     st.write(description)
+    
+    # Additional behavioral insights
+    st.write(f"**Listening Pattern**: {listening_pattern}")
+    st.write(pattern_description)
     
     # Total songs and total minutes this week (Simulated data)
     total_songs_this_week = random.randint(80, 200)
@@ -333,11 +266,19 @@ def display_music_personality(sp):
     songs_per_day = [random.randint(10, 40) for _ in range(7)]  # Simulated data
 
     # Apple Screen Time-like Visualization using Matplotlib
-    fig, ax = plt.subplots(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(8, 4))
     ax.bar(days_of_week, songs_per_day, color='#1DB954')
-    ax.set_title('Songs Listened Per Day (This Week)')
+    ax.set_title('Songs Listened Per Day (This Week)', fontsize=16)
     ax.set_ylabel('Number of Songs')
     ax.set_xlabel('Day of the Week')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('white')
+    ax.spines['bottom'].set_color('white')
+    ax.tick_params(colors='white')
+    ax.set_facecolor('#333')
+    ax.yaxis.label.set_color('white')
+    ax.xaxis.label.set_color('white')
     st.pyplot(fig)
 
 # Main app logic
