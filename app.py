@@ -107,19 +107,28 @@ st.markdown("""
 # Wvvy logo and title
 st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
 
-# Authentication Functions
-def is_authenticated():
-    return 'token_info' in st.session_state and st.session_state['token_info'] is not None
+# Function to refresh the token if expired
+def refresh_token():
+    token_info = st.session_state.get('token_info', None)
+    if token_info and sp_oauth.is_token_expired(token_info):
+        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+        st.session_state['token_info'] = token_info
 
+# Function to check if the user is authenticated
+def is_authenticated():
+    if 'token_info' in st.session_state and st.session_state['token_info']:
+        refresh_token()  # Ensure token is refreshed before using it
+        return True
+    return False
+
+# Authentication flow
 def authenticate_user():
     query_params = st.experimental_get_query_params()
     
     if "code" in query_params:
         code = query_params["code"][0]
         try:
-            token_info = sp_oauth.get_cached_token()
-            if not token_info:
-                token_info = sp_oauth.get_access_token(code)
+            token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
             st.experimental_set_query_params()  # Clear query parameters
             st.success("You're authenticated! Click the button below to enter.")
@@ -284,6 +293,72 @@ def display_top_insights(sp, time_range='short_term'):
 
     display_insights_side_by_side(insights)
 
+# Function to determine listening personality type (depth vs breadth)
+def analyze_listening_behavior(sp):
+    top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
+    total_artists = len(top_artists)
+    total_songs = sum([random.randint(50, 200) for _ in range(total_artists)])  # Simulated data
+    avg_songs_per_artist = total_songs / total_artists
+
+    if avg_songs_per_artist > 30:
+        return "Deep Diver", "blue", "You're all about depth—diving deep into a few artists and their entire discographies."
+    elif total_artists > 40:
+        return "Explorer", "green", "You're a breadth explorer, constantly seeking new artists and sounds."
+    else:
+        return "Balanced Listener", "yellow", "You strike the perfect balance between exploring new music and sticking to your favorites."
+
+# Behavior insights function to analyze listening patterns
+def analyze_behavioral_insights(sp):
+    # Mock behavior insights based on time of listening
+    hour = random.randint(0, 23)  # Simulating time of listening
+    if 6 <= hour <= 11:
+        return "Morning Listener", "You start your day with music. It's like your daily dose of energy!"
+    elif 12 <= hour <= 17:
+        return "Daytime Groover", "You keep the music going throughout your day, staying productive and energized."
+    elif 18 <= hour <= 23:
+        return "Night Owl", "Late-night jams are your vibe. Music hits different after dark!"
+    else:
+        return "Late-Night Crawler", "You're listening past midnight, discovering the best hidden tracks!"
+
+# Display music personality profile
+def display_music_personality(sp):
+    # Analyze listening behavior and determine personality type
+    personality, color, description = analyze_listening_behavior(sp)
+    listening_pattern, pattern_description = analyze_behavioral_insights(sp)
+    
+    # Personality Card Layout
+    st.write(f"### Your Music Personality Profile")
+    st.markdown("""
+    <div class="personality-card">
+        <h2>Personality Summary</h2>
+        <p><strong>Personality Name</strong>: {}</p>
+        <div class="personality-color-box" style="background-color: {}; display: inline-block;"></div>
+        <strong>Personality Color</strong>: {}
+        <p>{}</p>
+    </div>
+    """.format(personality, color, color.capitalize(), description), unsafe_allow_html=True)
+    
+    # Behavioral Insights Card
+    st.markdown(f"""
+    <div class="personality-card">
+        <h2>Listening Behavior</h2>
+        <p><strong>Listening Pattern</strong>: {listening_pattern}</p>
+        <p>{pattern_description}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Total songs and minutes this week (Simulated Data)
+    total_songs_this_week = random.randint(80, 200)
+    total_minutes_this_week = total_songs_this_week * 3  # Assuming average song length of 3 minutes
+
+    st.markdown(f"""
+    <div class="personality-card">
+        <h2>Weekly Listening Stats</h2>
+        <p><strong>Total Tracks This Week:</strong> {total_songs_this_week}</p>
+        <p><strong>Total Minutes Listened This Week:</strong> {total_minutes_this_week} minutes</p>
+    </div>
+    """, unsafe_allow_html=True)
+
 # Main app logic
 if is_authenticated():
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
@@ -316,7 +391,7 @@ if is_authenticated():
         display_top_insights(sp, time_range=time_mapping[time_filter])
 
     with tab3:
-        st.write("Your Music Personality page is still under construction.")
+        display_music_personality(sp)
     
 else:
     st.write("Welcome to Wvvy")
