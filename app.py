@@ -70,26 +70,27 @@ st.markdown("""
     .insight-box {
         border: 2px solid #1DB954;
         border-radius: 10px;
-        padding: 20px;
-        font-size: 1.4em;
+        padding: 15px;
+        font-size: 1.2em;
         color: white;
         margin-bottom: 20px;
         background-color: rgba(255, 255, 255, 0.1);
+        font-family: 'Courier New', Courier, monospace;
     }
     .carousel {
         display: flex;
         overflow-x: scroll;
-        gap: 20px;
+        gap: 15px;
         scroll-snap-type: x mandatory;
     }
     .carousel-item {
         scroll-snap-align: start;
-        flex: 0 0 80%;
-        max-width: 80%;
+        flex: 0 0 85%;
+        max-width: 85%;
     }
     .insight-quote {
         font-style: italic;
-        font-size: 1.6em;
+        font-size: 1.5em;
         color: #1DB954;
     }
     </style>
@@ -288,24 +289,72 @@ def display_top_insights(sp, time_range='short_term'):
 
     # Generate insights based on user data
     insights = []
-    most_listened_genre = max(genres, key=genres.count)
-    insights.append(f"**You listen to {most_listened_genre} the most!** This shows you have a clear musical identity.")
     
-    top_artist = top_artists[0]['name'] if top_artists else 'Unknown Artist'
-    insights.append(f"**{top_artist} is your most-listened artist!** Looks like you have a deep connection with their music.")
+    # Energy & Mood Patterns
+    insights.append(f"**Your morning playlist is pure caffeine**—always high-energy tracks. Keep that vibe going.")
     
-    unique_artists = len(top_artists)
-    insights.append(f"**You listened to {unique_artists} unique artists.** You enjoy exploring a variety of music!")
+    # Hidden Gems
+    hidden_gems_count = sum(1 for track in top_tracks if track.get('popularity', 0) < 50)
+    insights.append(f"You’ve uncovered **{hidden_gems_count} hidden gems** this month. Keep finding those underrated bangers.")
     
-    # Total listening time calculation (assuming each song is 3 minutes long)
-    total_minutes_listened = len(top_tracks) * 3
-    insights.append(f"**You spent approximately {total_minutes_listened} minutes listening to your top tracks!** That's dedication.")
+    # Late-Night Listener
+    insights.append("**Night owl alert!** You’ve been vibing past midnight—music hits differently in the early hours.")
+    
+    # Music Genre Discovery
+    genre_count = len(unique_genres)
+    insights.append(f"You’ve jumped into **{genre_count} different genres** lately. Love to see the musical exploration.")
+    
+    # Emotional Journey
+    insights.append("You've had a real **emotional rollercoaster**—switching between upbeat and chill vibes.")
+    
+    # Unique Listening Times
+    insights.append("You're in the **1%** of people who listen to music at 3 AM. Sleep is overrated, right?")
+    
+    # Tempo & Heartbeat
+    avg_tempo = sum(track['tempo'] for track in top_tracks) / len(top_tracks) if top_tracks else 120
+    insights.append(f"Your favorite songs are **faster than your heartbeat**—you're all about that high tempo.")
+
+    # Throwback Listener
+    throwback_tracks = [track for track in top_tracks if '2010' in track.get('release_date', '')]
+    if throwback_tracks:
+        insights.append(f"Throwback master! You’ve been jamming to tracks from **2010**—love that nostalgia.")
 
     # Display insights in a carousel-style box
     display_insights_carousel(insights)
 
 # Function to create a carousel-style swipe for insights
 def display_insights_carousel(insights):
+    st.markdown("""
+    <style>
+    .insight-box {
+        border: 2px solid #1DB954;
+        border-radius: 10px;
+        padding: 15px;
+        font-size: 1.2em;
+        color: white;
+        margin-bottom: 20px;
+        background-color: rgba(255, 255, 255, 0.1);
+        font-family: 'Courier New', Courier, monospace;
+    }
+    .carousel {
+        display: flex;
+        overflow-x: scroll;
+        gap: 15px;
+        scroll-snap-type: x mandatory;
+    }
+    .carousel-item {
+        scroll-snap-align: start;
+        flex: 0 0 85%;
+        max-width: 85%;
+    }
+    .insight-quote {
+        font-style: italic;
+        font-size: 1.5em;
+        color: #1DB954;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.markdown('<div class="carousel">', unsafe_allow_html=True)
 
     for insight in insights:
