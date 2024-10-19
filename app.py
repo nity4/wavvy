@@ -147,23 +147,23 @@ def is_authenticated():
 
 # Authentication flow
 def authenticate_user():
-    query_params = st.query_params  # Replaced experimental_get_query_params with query_params
-    
+    query_params = st.experimental_get_query_params()  # Fetch query parameters
+
     if "code" in query_params:
         code = query_params["code"][0]
         try:
-            token_info = sp_oauth.get_cached_token()  # Using cached token to avoid the deprecation warning
+            token_info = sp_oauth.get_cached_token()  # Get the cached token if available
             if not token_info:
-                token_info = sp_oauth.get_access_token(code)
+                token_info = sp_oauth.get_access_token(code)  # Request a new token using the code
             st.session_state['token_info'] = token_info
-            st.experimental_set_query_params()  # Clear query parameters for now
+            st.experimental_set_query_params()  # Clear query parameters after the code is processed
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
                 st.experimental_rerun()
         except Exception as e:
             st.error(f"Authentication error: {e}")
     else:
-        auth_url = sp_oauth.get_authorize_url()
+        auth_url = sp_oauth.get_authorize_url()  # Generate authorization URL
         st.markdown(
             f'<a href="{auth_url}" class="login-button">Login with Spotify</a>',
             unsafe_allow_html=True
