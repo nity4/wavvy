@@ -5,6 +5,7 @@ import random
 import pandas as pd
 import time
 import matplotlib.pyplot as plt
+import streamlit.components.v1 as components  # For carousel-style insights
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -31,7 +32,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for styling: white text and smaller music icon
+# Custom CSS for styling: white text and swipeable carousel
 st.markdown("""
     <style>
     body {
@@ -60,14 +61,36 @@ st.markdown("""
         font-weight: bold;
         margin-top: 30px;
     }
-    .song-cover, .artist-cover, .genre-icon {
+    .song-cover, .artist-cover {
         margin-right: 10px;
     }
     .stMarkdown, .stMarkdown p, .stMarkdown h3, .stSelectbox label, .stSlider label {
         color: white !important;
     }
-    img.genre-icon {
-        width: 30px !important;
+    .insight-box {
+        border: 2px solid #1DB954;
+        border-radius: 10px;
+        padding: 20px;
+        font-size: 1.4em;
+        color: white;
+        margin-bottom: 20px;
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+    .carousel {
+        display: flex;
+        overflow-x: scroll;
+        gap: 20px;
+        scroll-snap-type: x mandatory;
+    }
+    .carousel-item {
+        scroll-snap-align: start;
+        flex: 0 0 80%;
+        max-width: 80%;
+    }
+    .insight-quote {
+        font-style: italic;
+        font-size: 1.6em;
+        color: #1DB954;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -255,19 +278,52 @@ def display_top_insights(sp, time_range='short_term'):
 
     # Display top genres
     st.write("### Top Genres")
-    # Convert genres to a list (instead of a set)
     genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
     unique_genres = set(genres)
     for genre in unique_genres:
         st.write(f"**{genre}**")
 
-    # Personalized Insights at the End
+    # Fascinating Insights in Carousel-Style Boxes
     st.write("### Fascinating Insights about Your Music:")
-    # Count the most listened genre by using list and count
+
+    # Generate insights based on user data
+    insights = []
     most_listened_genre = max(genres, key=genres.count)
-    st.write(f"**You listen to {most_listened_genre} the most!** This shows you really enjoy a specific kind of vibe.")
-    st.write("**Your top artist** is deeply connected to your mood — seems like you listen to them no matter how you're feeling!")
+    insights.append(f"**You listen to {most_listened_genre} the most!** This shows you have a clear musical identity.")
     
+    top_artist = top_artists[0]['name'] if top_artists else 'Unknown Artist'
+    insights.append(f"**{top_artist} is your most-listened artist!** Looks like you have a deep connection with their music.")
+    
+    unique_artists = len(top_artists)
+    insights.append(f"**You listened to {unique_artists} unique artists.** You enjoy exploring a variety of music!")
+    
+    avg_song_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
+    insights.append(f"**The average popularity of your top songs is {avg_song_popularity}!** You have a mix of mainstream and hidden gems.")
+    
+    # Total listening time calculation (assuming each song is 3 minutes long)
+    total_minutes_listened = len(top_tracks) * 3
+    insights.append(f"**You spent approximately {total_minutes_listened} minutes listening to your top tracks!** That's dedication.")
+
+    # Display insights in a carousel-style box
+    display_insights_carousel(insights)
+
+# Function to create a carousel-style swipe for insights
+def display_insights_carousel(insights):
+    st.markdown('<div class="carousel">', unsafe_allow_html=True)
+
+    for insight in insights:
+        st.markdown(f"""
+        <div class="carousel-item">
+            <div class="insight-box">
+                <div class="insight-quote">“</div>
+                {insight}
+                <div class="insight-quote">”</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
 # Analyze listening depth vs. breadth
 def analyze_depth_vs_breadth(sp):
     top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
