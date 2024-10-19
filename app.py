@@ -256,7 +256,7 @@ def display_top_insights(sp, time_range='short_term'):
     for genre in genres:
         col1, col2 = st.columns([1, 4])
         with col1:
-            st.image("https://img.icons8.com/ios-filled/50/000000/musical-notes.png", width=30, use_column_width="auto", class_="genre-icon")
+            st.image("https://img.icons8.com/ios-filled/50/000000/musical-notes.png", width=30)  # Removed the class attribute
         with col2:
             st.write(f"**{genre}**")
 
