@@ -29,7 +29,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for styling white text, and other elements
+# Custom CSS for styling, including flip cards for insights
 st.markdown("""
     <style>
     body {
@@ -58,6 +58,49 @@ st.markdown("""
         font-weight: bold;
         margin-top: 30px;
     }
+    .flip-card {
+        background-color: transparent;
+        width: 300px;
+        height: 200px;
+        perspective: 1000px;
+        display: inline-block;
+        margin: 10px;
+    }
+    .flip-card-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        text-align: center;
+        transition: transform 0.8s;
+        transform-style: preserve-3d;
+    }
+    .flip-card:hover .flip-card-inner {
+        transform: rotateY(180deg);
+    }
+    .flip-card-front, .flip-card-back {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        backface-visibility: hidden;
+        border-radius: 10px;
+    }
+    .flip-card-front {
+        background-color: #1DB954;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+    }
+    .flip-card-back {
+        background-color: #333;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transform: rotateY(180deg);
+    }
     .insight-box {
         background-color: #333;
         color: white;
@@ -66,20 +109,6 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         font-size: 1em;
-        transition: transform 0.2s ease-in-out;
-    }
-    .insight-box:hover {
-        transform: scale(1.02);
-    }
-    .stMarkdown, .stMarkdown p, .stMarkdown h3, .stSelectbox label, .stSlider label {
-        color: white !important;
-    }
-    .stTabs [role="tab"] {
-        color: white !important;
-    }
-    .stTabs [role="tabpanel"] {
-        background-color: rgba(0, 0, 0, 0.5) !important;
-        color: white !important;
     }
     .personality-card {
         background-color: #1e1e1e;
@@ -95,11 +124,6 @@ st.markdown("""
         display: inline-block;
         margin-right: 10px;
         border-radius: 50%;
-    }
-    .insight-row {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -282,16 +306,27 @@ def display_top_insights(sp, time_range='short_term'):
     hidden_gems_count = len(hidden_gems)
     insights.append(f"You've found <strong>{hidden_gems_count} hidden gems</strong> this time. Keep discovering underrated tracks!")
 
-    # Display insights in a side-by-side layout
-    def display_insights_side_by_side(insights):
+    # Display insights in a flip-card style
+    def display_flip_insights(insights):
         for i in range(0, len(insights), 2):
             cols = st.columns(2)
             for j in range(2):
                 if i + j < len(insights):
                     with cols[j]:
-                        st.markdown(f"<div class='insight-box'>{insights[i + j]}</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="flip-card">
+                            <div class="flip-card-inner">
+                                <div class="flip-card-front">
+                                    🔥 Hot Insight
+                                </div>
+                                <div class="flip-card-back">
+                                    {insights[i + j]}
+                                </div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-    display_insights_side_by_side(insights)
+    display_flip_insights(insights)
 
 # Function to determine listening personality type (depth vs breadth)
 def analyze_listening_behavior(sp):
