@@ -31,7 +31,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for styling
+# Custom CSS for styling: white text and smaller music icon
 st.markdown("""
     <style>
     body {
@@ -62,6 +62,12 @@ st.markdown("""
     }
     .song-cover, .artist-cover, .genre-icon {
         margin-right: 10px;
+    }
+    .stMarkdown, .stMarkdown p, .stMarkdown h3, .stSelectbox label, .stSlider label {
+        color: white !important;
+    }
+    img.genre-icon {
+        width: 30px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -250,9 +256,15 @@ def display_top_insights(sp, time_range='short_term'):
     for genre in genres:
         col1, col2 = st.columns([1, 4])
         with col1:
-            st.image("https://img.icons8.com/ios-filled/50/000000/musical-notes.png", width=50, use_column_width="auto")
+            st.image("https://img.icons8.com/ios-filled/50/000000/musical-notes.png", width=30, use_column_width="auto", class_="genre-icon")
         with col2:
             st.write(f"**{genre}**")
+
+    # Personalized Insights at the End
+    st.write("### Fascinating Insights about Your Music:")
+    most_listened_genre = max(genres, key=lambda g: genres.count(g))
+    st.write(f"**You listen to {most_listened_genre} the most!** This shows you really enjoy a specific kind of vibe.")
+    st.write("**Your top artist** is deeply connected to your mood — seems like you listen to them no matter how you're feeling!")
 
 # Analyze listening depth vs. breadth
 def analyze_depth_vs_breadth(sp):
@@ -270,17 +282,18 @@ def analyze_depth_vs_breadth(sp):
     days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     song_count = [random.randint(20, 60) for _ in range(7)]
     
-    # Matplotlib visualization
-    plt.figure(figsize=(10, 5))
-    plt.bar(days, song_count, color='lightblue')
-    plt.title('Songs Listened per Day')
-    plt.ylabel('Number of Songs')
-    st.pyplot(plt)
+    # Matplotlib visualization for appealing chart
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.bar(days, song_count, color='lightblue')
+    ax.set_title('Songs Listened per Day (This Week)')
+    ax.set_ylabel('Number of Songs')
+    ax.set_xlabel('Day of the Week')
+    st.pyplot(fig)
     
     # Total number of songs and minutes
     total_minutes = total_songs * 3  # Assuming average song length is 3 minutes
-    st.write(f"**Total Songs Listened:** {total_songs}")
-    st.write(f"**Total Minutes Listened:** {total_minutes} minutes")
+    st.write(f"**Total Songs This Week:** {total_songs}")
+    st.write(f"**Total Minutes This Week:** {total_minutes} minutes")
 
 # Fun personality feature based on listening habits
 def assign_music_personality(avg_songs_per_artist, total_artists):
