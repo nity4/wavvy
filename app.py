@@ -147,8 +147,8 @@ def is_authenticated():
 
 # Authentication flow
 def authenticate_user():
-    query_params = st.query_params  # Replaced experimental_get_query_params with query_params
-    
+    query_params = st.query_params  # Using st.query_params to get query parameters
+
     if "code" in query_params:
         code = query_params["code"][0]
         try:
@@ -156,10 +156,10 @@ def authenticate_user():
             if not token_info:
                 token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
-            st.experimental_set_query_params()  # Clear query parameters for now
+            st.set_query_params()  # Clear query parameters
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
-                st.experimental_rerun()
+                st.experimental_rerun()  # Rerun after successful authentication
         except Exception as e:
             st.error(f"Authentication error: {e}")
     else:
