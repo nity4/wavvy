@@ -78,6 +78,9 @@ st.markdown("""
         color: #1DB954;
         font-size: 1.5em;
     }
+    .stMarkdown, .stMarkdown p, .stMarkdown h3, .stSelectbox label, .stSlider label {
+        color: white !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -191,7 +194,7 @@ def display_songs(song_list, title):
     else:
         st.write("No songs found.")
 
-# Display top songs, artists, and genres with insights (side-by-side layout)
+# Display top songs, artists, genres, and hidden gems with insights
 def display_top_insights(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
     top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
@@ -225,6 +228,17 @@ def display_top_insights(sp, time_range='short_term'):
     for genre in unique_genres:
         st.markdown(f"<strong>{genre}</strong>", unsafe_allow_html=True)
 
+    # Display hidden gems (tracks with popularity < 50)
+    hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
+    if hidden_gems:
+        st.write("### Hidden Gems")
+        for gem in hidden_gems:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.image(gem['cover'], width=80)
+            with col2:
+                st.markdown(f"<strong>{gem['name']}</strong> by <strong>{gem['artist']}</strong>", unsafe_allow_html=True)
+
     # Insights based on user data only
     st.write("### Fascinating Insights about Your Music:")
     insights = []
@@ -245,9 +259,9 @@ def display_top_insights(sp, time_range='short_term'):
     avg_tempo = sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks) if top_tracks else 120
     insights.append(f"Your favorite songs have an average tempo of <strong>{round(avg_tempo)} BPM</strong>. You're all about that perfect rhythm.")
 
-    # Hidden Gems based on popularity
-    hidden_gems = len([track for track in top_tracks if track['popularity'] < 50])
-    insights.append(f"You've found <strong>{hidden_gems} hidden gems</strong> this time. Keep discovering underrated tracks!")
+    # Hidden Gems based on popularity (insight)
+    hidden_gems_count = len(hidden_gems)
+    insights.append(f"You've found <strong>{hidden_gems_count} hidden gems</strong> this time. Keep discovering underrated tracks!")
 
     # Display insights in a side-by-side layout
     display_insights_side_by_side(insights)
