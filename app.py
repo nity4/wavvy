@@ -233,6 +233,7 @@ def display_top_insights(sp, time_range='short_term'):
     
     st.write(f"### Top Insights for {time_range.replace('_', ' ').title()}")
 
+    # Display top songs with cover images
     if top_tracks:
         st.write("### Top Songs")
         for track in top_tracks:
@@ -242,6 +243,7 @@ def display_top_insights(sp, time_range='short_term'):
             with col2:
                 st.write(f"**{track['name']}** by {track['artist']}")
     
+    # Display top artists with their cover images
     if top_artists:
         st.write("### Top Artists")
         for artist in top_artists:
@@ -251,21 +253,21 @@ def display_top_insights(sp, time_range='short_term'):
             with col2:
                 st.write(f"**{artist['name']}** - {', '.join(artist['genres'])}")
 
+    # Display top genres
     st.write("### Top Genres")
-    genres = set([artist['genres'][0] for artist in top_artists if artist['genres']])
-    for genre in genres:
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            st.image("https://img.icons8.com/ios-filled/50/000000/musical-notes.png", width=30)  # Removed the class attribute
-        with col2:
-            st.write(f"**{genre}**")
+    # Convert genres to a list (instead of a set)
+    genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
+    unique_genres = set(genres)
+    for genre in unique_genres:
+        st.write(f"**{genre}**")
 
     # Personalized Insights at the End
     st.write("### Fascinating Insights about Your Music:")
-    most_listened_genre = max(genres, key=lambda g: genres.count(g))
+    # Count the most listened genre by using list and count
+    most_listened_genre = max(genres, key=genres.count)
     st.write(f"**You listen to {most_listened_genre} the most!** This shows you really enjoy a specific kind of vibe.")
     st.write("**Your top artist** is deeply connected to your mood — seems like you listen to them no matter how you're feeling!")
-
+    
 # Analyze listening depth vs. breadth
 def analyze_depth_vs_breadth(sp):
     top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
