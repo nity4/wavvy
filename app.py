@@ -147,14 +147,16 @@ def is_authenticated():
 
 # Authentication flow
 def authenticate_user():
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params  # Replaced experimental_get_query_params with query_params
     
     if "code" in query_params:
         code = query_params["code"][0]
         try:
-            token_info = sp_oauth.get_access_token(code)
+            token_info = sp_oauth.get_cached_token()  # Using cached token to avoid the deprecation warning
+            if not token_info:
+                token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
-            st.experimental_set_query_params()  # Clear query parameters (for now, until deprecated)
+            st.experimental_set_query_params()  # Clear query parameters for now
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
                 st.experimental_rerun()
