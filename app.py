@@ -3,6 +3,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import random
 import time
+import os
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -12,13 +13,21 @@ REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 # Define the required scope for Spotify access
 scope = "user-library-read user-top-read playlist-read-private"
 
+# Set cache path
+cache_path = ".cache"
+
+# Function to clear cache
+def clear_cache():
+    if os.path.exists(cache_path):
+        os.remove(cache_path)
+
 # Initialize Spotify OAuth object
 sp_oauth = SpotifyOAuth(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     redirect_uri=REDIRECT_URI,
     scope=scope,
-    cache_path=".cache"
+    cache_path=cache_path
 )
 
 # Set Streamlit page configuration
@@ -58,78 +67,8 @@ st.markdown("""
         font-weight: bold;
         margin-top: 30px;
     }
-    .flip-card {
-        background-color: transparent;
-        width: 300px;
-        height: 200px;
-        perspective: 1000px;
-        display: inline-block;
-        margin: 10px;
-    }
-    .flip-card-inner {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        text-align: center;
-        transition: transform 0.8s;
-        transform-style: preserve-3d;
-    }
-    .flip-card:hover .flip-card-inner {
-        transform: rotateY(180deg);
-    }
-    .flip-card-front, .flip-card-back {
-        position: absolute;
-        width: 100%;
-        height: 100%;
-        backface-visibility: hidden;
-        border-radius: 10px;
-    }
-    .flip-card-front {
-        background-color: #1DB954;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-    }
-    .flip-card-back {
-        background-color: #333;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 16px;
-        transform: rotateY(180deg);
-    }
-    .insight-box {
-        background-color: #333;
-        color: white;
-        padding: 20px;
-        margin-bottom: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        font-size: 1em;
-    }
-    .personality-card {
-        background-color: #1e1e1e;
-        color: white;
-        padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        margin-bottom: 20px;
-    }
-    .personality-color-box {
-        width: 50px;
-        height: 50px;
-        display: inline-block;
-        margin-right: 10px;
-        border-radius: 50%;
-    }
     </style>
 """, unsafe_allow_html=True)
-
-# Wvvy logo and title
-st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
 
 # Function to refresh the token if expired
 def refresh_token():
@@ -152,9 +91,10 @@ def authenticate_user():
     if "code" in query_params:
         code = query_params["code"][0]
         try:
-            token_info = sp_oauth.get_cached_token()  # Using cached token to avoid the deprecation warning
-            if not token_info:
-                token_info = sp_oauth.get_access_token(code)
+            # Clear cache before attempting to use the code
+            clear_cache()
+
+            token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
             st.set_query_params()  # Clear query parameters
             st.success("You're authenticated! Click the button below to enter.")
