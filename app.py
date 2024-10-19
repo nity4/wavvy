@@ -208,6 +208,91 @@ def display_songs(song_list, title):
     else:
         st.write("No songs found.")
 
+# Display top songs, artists, genres, and hidden gems with insights
+def display_top_insights(sp, time_range='short_term'):
+    top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
+    top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
+    
+    st.write(f"### Top Insights for {time_range.replace('_', ' ').title()}")
+
+    # Display top songs with cover images
+    if top_tracks:
+        st.write("### Top Songs")
+        for track in top_tracks:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.image(track['cover'], width=80)
+            with col2:
+                st.markdown(f"**{track['name']}** by **{track['artist']}**", unsafe_allow_html=True)
+    
+    # Display top artists with their cover images
+    if top_artists:
+        st.write("### Top Artists")
+        for artist in top_artists:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.image(artist['cover'], width=80)
+            with col2:
+                st.markdown(f"**{artist['name']}** - {', '.join(artist['genres'])}", unsafe_allow_html=True)
+
+    # Display top genres
+    st.write("### Top Genres")
+    genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
+    unique_genres = set(genres)
+    for genre in unique_genres:
+        st.markdown(f"**{genre}**", unsafe_allow_html=True)
+
+    # Display hidden gems (tracks with popularity < 50)
+    hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
+    if hidden_gems:
+        st.write("### Hidden Gems")
+        for gem in hidden_gems:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.image(gem['cover'], width=80)
+            with col2:
+                st.markdown(f"**{gem['name']}** by **{gem['artist']}**", unsafe_allow_html=True)
+
+    # Insights based on user data only
+    st.write("### Fascinating Insights about Your Music:")
+    insights = []
+
+    # Top Tracks Popularity
+    avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
+    insights.append(f"Your top tracks have an average popularity of **{avg_popularity}**. You're balancing popular hits and deep cuts.")
+    
+    # Top Track Energy Levels
+    avg_energy = round(sum(track.get('energy', 0.5) for track in top_tracks) / len(top_tracks), 2)
+    insights.append(f"The energy levels of your top tracks are at **{avg_energy}**. You love a good balance of upbeat and mellow songs.")
+    
+    # Unique Genres
+    genre_count = len(unique_genres)
+    insights.append(f"You explored **{genre_count}** different genres this period. You're musically diverse!")
+
+    # Tempo analysis
+    avg_tempo = sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks) if top_tracks else 120
+    insights.append(f"Your favorite songs have an average tempo of **{round(avg_tempo)} BPM**. You're all about that perfect rhythm.")
+
+    # Hidden Gems based on popularity (insight)
+    hidden_gems_count = len(hidden_gems)
+    insights.append(f"You've found **{hidden_gems_count} hidden gems** this time. Keep discovering underrated tracks!")
+
+    # Display insights in a side-by-side layout
+    display_insights_side_by_side(insights)
+
+# Function to create a side-by-side display for insights
+def display_insights_side_by_side(insights):
+    cols = st.columns(2)  # Create two columns for side-by-side display
+    for i, insight in enumerate(insights):
+        with cols[i % 2]:
+            st.markdown(f"""
+            <div class="insight-box">
+                <div class="insight-quote">“</div>
+                <div class="insight-content">{insight}</div>
+                <div class="insight-quote">”</div>
+            </div>
+            """, unsafe_allow_html=True)
+
 # Function to determine listening personality type (depth vs breadth)
 def analyze_listening_behavior(sp):
     top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
