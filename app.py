@@ -3,7 +3,6 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import random
 import time
-import matplotlib.pyplot as plt
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -97,8 +96,10 @@ st.markdown("""
         margin-right: 10px;
         border-radius: 50%;
     }
-    .graph-container {
-        margin-top: 20px;
+    .insight-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -247,108 +248,41 @@ def display_top_insights(sp, time_range='short_term'):
     for genre in unique_genres:
         st.write(f"**{genre}**")
 
-    # Fascinating insights
-    st.write("### Fascinating Insights About Your Music:")
-    insights = [
-        "**Your morning playlist is pure caffeine**—always high-energy tracks. Keep that vibe going.",
-        "You’ve uncovered **10 hidden gems** this month. Keep finding those underrated bangers.",
-        "**Night owl alert!** You’ve been vibing past midnight—music hits differently in the early hours.",
-        "You’ve jumped into **9 different genres** lately. Love to see the musical exploration.",
-        "You've had a real **emotional rollercoaster**—switching between upbeat and chill vibes.",
-        "Your favorite songs are **faster than your heartbeat**—you're all about that high tempo."
-    ]
+    # Insights based on user data only
+    st.write("### Fascinating Insights about Your Music:")
+    insights = []
+
+    # Top Tracks Popularity
+    avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
+    insights.append(f"Your top tracks have an average popularity of <strong>{avg_popularity}</strong>. You're balancing popular hits and deep cuts.")
     
-    # Display insights as cards
-    for insight in insights:
-        st.markdown(f"<div class='insight-box'>{insight}</div>", unsafe_allow_html=True)
-
-# Function to determine listening personality type (depth vs breadth)
-def analyze_listening_behavior(sp):
-    top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
-    total_artists = len(top_artists)
-    total_songs = sum([random.randint(50, 200) for _ in range(total_artists)])  # Simulated data
-    avg_songs_per_artist = total_songs / total_artists
-
-    if avg_songs_per_artist > 30:
-        return "Deep Diver", "blue", "You're all about depth—diving deep into a few artists and their entire discographies."
-    elif total_artists > 40:
-        return "Explorer", "green", "You're a breadth explorer, constantly seeking new artists and sounds."
-    else:
-        return "Balanced Listener", "yellow", "You strike the perfect balance between exploring new music and sticking to your favorites."
-
-# Behavior insights function to analyze listening patterns
-def analyze_behavioral_insights(sp):
-    # Mock behavior insights based on time of listening
-    hour = random.randint(0, 23)  # Simulating time of listening
-    if 6 <= hour <= 11:
-        return "Morning Listener", "You start your day with music. It's like your daily dose of energy!"
-    elif 12 <= hour <= 17:
-        return "Daytime Groover", "You keep the music going throughout your day, staying productive and energized."
-    elif 18 <= hour <= 23:
-        return "Night Owl", "Late-night jams are your vibe. Music hits different after dark!"
-    else:
-        return "Late-Night Crawler", "You're listening past midnight, discovering the best hidden tracks!"
-
-# Display music personality profile
-def display_music_personality(sp):
-    # Analyze listening behavior and determine personality type
-    personality, color, description = analyze_listening_behavior(sp)
-    listening_pattern, pattern_description = analyze_behavioral_insights(sp)
+    # Top Track Energy Levels
+    avg_energy = round(sum(track.get('energy', 0.5) for track in top_tracks) / len(top_tracks), 2)
+    insights.append(f"The energy levels of your top tracks are at <strong>{avg_energy}</strong>. You love a good balance of upbeat and mellow songs.")
     
-    # Personality Card Layout
-    st.write(f"### Your Music Personality Profile")
-    st.markdown("""
-    <div class="personality-card">
-        <h2>Personality Summary</h2>
-        <p><strong>Personality Name</strong>: {}</p>
-        <div class="personality-color-box" style="background-color: {}; display: inline-block;"></div>
-        <strong>Personality Color</strong>: {}
-        <p>{}</p>
-    </div>
-    """.format(personality, color, color.capitalize(), description), unsafe_allow_html=True)
-    
-    # Behavioral Insights Card
-    st.markdown(f"""
-    <div class="personality-card">
-        <h2>Listening Behavior</h2>
-        <p><strong>Listening Pattern</strong>: {listening_pattern}</p>
-        <p>{pattern_description}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Total songs and minutes this week (Simulated Data)
-    total_songs_this_week = random.randint(80, 200)
-    total_minutes_this_week = total_songs_this_week * 3  # Assuming average song length of 3 minutes
+    # Unique Genres
+    genre_count = len(unique_genres)
+    insights.append(f"You explored <strong>{genre_count}</strong> different genres this period. You're musically diverse!")
 
-    st.markdown(f"""
-    <div class="personality-card">
-        <h2>Weekly Listening Stats</h2>
-        <p><strong>Total Tracks This Week:</strong> {total_songs_this_week}</p>
-        <p><strong>Total Minutes Listened This Week:</strong> {total_minutes_this_week} minutes</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Tempo analysis
+    avg_tempo = sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks) if top_tracks else 120
+    insights.append(f"Your favorite songs have an average tempo of <strong>{round(avg_tempo)} BPM</strong>. You're all about that perfect rhythm.")
 
-    # Weekly song listening graph (Monday to Sunday)
-    days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    songs_per_day = [random.randint(10, 40) for _ in range(7)]  # Simulated data
+    # Hidden Gems based on popularity (insight)
+    hidden_gems = [track for track in top_tracks if track['popularity'] < 50]  # Example threshold for hidden gems
+    hidden_gems_count = len(hidden_gems)
+    insights.append(f"You've found <strong>{hidden_gems_count} hidden gems</strong> this time. Keep discovering underrated tracks!")
 
-    # Improved Graph (smaller, cleaner)
-    st.markdown('<div class="graph-container">', unsafe_allow_html=True)
-    fig, ax = plt.subplots(figsize=(5, 3))  # Reduced size
-    ax.bar(days_of_week, songs_per_day, color='#1DB954')
-    ax.set_title('Songs Listened Per Day (This Week)', fontsize=12)
-    ax.set_ylabel('Number of Songs')
-    ax.set_xlabel('Day of the Week')
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_color('white')
-    ax.spines['bottom'].set_color('white')
-    ax.tick_params(colors='white')
-    ax.set_facecolor('#333')
-    ax.yaxis.label.set_color('white')
-    ax.xaxis.label.set_color('white')
-    st.pyplot(fig)
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Display insights in a side-by-side layout
+    def display_insights_side_by_side(insights):
+        for i in range(0, len(insights), 2):
+            cols = st.columns(2)
+            for j in range(2):
+                if i + j < len(insights):
+                    with cols[j]:
+                        st.markdown(f"<div class='insight-box'>{insights[i + j]}</div>", unsafe_allow_html=True)
+
+    display_insights_side_by_side(insights)
 
 # Main app logic
 if is_authenticated():
@@ -382,7 +316,7 @@ if is_authenticated():
         display_top_insights(sp, time_range=time_mapping[time_filter])
 
     with tab3:
-        display_music_personality(sp)
+        st.write("Your Music Personality page is still under construction.")
     
 else:
     st.write("Welcome to Wvvy")
