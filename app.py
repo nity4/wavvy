@@ -48,16 +48,15 @@ st.markdown("""
         margin-bottom: 20px;
         letter-spacing: 5px;
     }
-    .login-button {
-        color: white;
+    .personality-box {
         background-color: #1DB954;
-        padding: 15px 30px;
-        font-size: 1.5em;
-        border-radius: 12px;
-        text-align: center;
-        display: inline-block;
-        font-weight: bold;
-        margin-top: 30px;
+        color: white;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        font-size: 1.2em;
+        font-family: 'Arial', sans-serif;
     }
     .insight-box {
         background-color: #333;
@@ -66,12 +65,8 @@ st.markdown("""
         margin-bottom: 20px;
         border-radius: 10px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        transition: transform 0.2s ease-in-out;
-        font-family: 'Arial', sans-serif;
         font-size: 1.2em;
-    }
-    .insight-box:hover {
-        transform: scale(1.02);
+        font-family: 'Arial', sans-serif;
     }
     .insight-quote {
         font-style: italic;
@@ -81,235 +76,30 @@ st.markdown("""
     .stMarkdown, .stMarkdown p, .stMarkdown h3, .stSelectbox label, .stSlider label {
         color: white !important;
     }
-    .stTabs [role="tab"] {
-        color: white !important;
-    }
-    .stTabs [role="tabpanel"] {
-        background-color: rgba(0, 0, 0, 0.5) !important;
-        color: white !important;
-    }
     .personality-color-box {
-        width: 50px;
-        height: 50px;
+        width: 60px;
+        height: 60px;
         display: inline-block;
-        margin-right: 10px;
         border-radius: 50%;
+        margin-right: 20px;
+        border: 2px solid white;
+    }
+    .song-stats-box {
+        background-color: #333;
+        padding: 15px;
+        border-radius: 10px;
+        margin-top: 20px;
+        color: white;
     }
     </style>
 """, unsafe_allow_html=True)
-
-# Wvvy logo and title
-st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
 
 # Authentication Functions
 def is_authenticated():
     return 'token_info' in st.session_state and st.session_state['token_info'] is not None
 
-def authenticate_user():
-    query_params = st.experimental_get_query_params()
-    
-    if "code" in query_params:
-        code = query_params["code"][0]
-        try:
-            token_info = sp_oauth.get_cached_token()
-            if not token_info:
-                token_info = sp_oauth.get_access_token(code)
-            st.session_state['token_info'] = token_info
-            st.experimental_set_query_params()  # Clear query parameters
-            st.success("You're authenticated! Click the button below to enter.")
-            if st.button("Enter Wvvy"):
-                st.experimental_rerun()
-        except Exception as e:
-            st.error(f"Authentication error: {e}")
-    else:
-        auth_url = sp_oauth.get_authorize_url()
-        st.markdown(
-            f'<a href="{auth_url}" class="login-button">Login with Spotify</a>',
-            unsafe_allow_html=True
-        )
-
-# Helper Function for Handling Spotify API Rate Limit (429 Error)
-def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
-    retries = 0
-    wait_time = 1
-    while retries < max_retries:
-        try:
-            return sp_func(*args, **kwargs)
-        except spotipy.SpotifyException as e:
-            if e.http_status == 429:
-                retry_after = int(e.headers.get("Retry-After", wait_time)) if e.headers and "Retry-After" in e.headers else wait_time
-                st.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
-                time.sleep(retry_after)
-                retries += 1
-                wait_time *= 2
-            else:
-                st.error(f"Error: {e}")
-                break
-    return None
-
-# Fetch liked songs and audio features
-def get_liked_songs(sp):
-    results = handle_spotify_rate_limit(sp.current_user_saved_tracks, limit=50)
-    if not results:
-        return []  # Return empty list if retries exceeded
-    liked_songs = []
-    for item in results['items']:
-        track = item['track']
-        audio_features = handle_spotify_rate_limit(sp.audio_features, [track['id']])[0]
-        liked_songs.append({
-            "name": track['name'],
-            "artist": track['artists'][0]['name'],
-            "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
-            "energy": audio_features["energy"],
-            "valence": audio_features["valence"],
-            "tempo": audio_features["tempo"],
-            "popularity": track['popularity']
-        })
-    random.shuffle(liked_songs)
-    return liked_songs
-
-# Fetch top items for insights
-def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
-    if item_type == 'tracks':
-        results = handle_spotify_rate_limit(sp.current_user_top_tracks, time_range=time_range, limit=limit)
-    elif item_type == 'artists':
-        results = handle_spotify_rate_limit(sp.current_user_top_artists, time_range=time_range, limit=limit)
-    items = []
-    for item in results['items']:
-        if item_type == 'tracks':
-            items.append({
-                'name': item['name'],
-                'artist': item['artists'][0]['name'],
-                'popularity': item.get('popularity', 0),
-                'cover': item['album']['images'][0]['url'] if item['album']['images'] else None,
-                'tempo': item.get('tempo', 120)
-            })
-        elif item_type == 'artists':
-            items.append({
-                'name': item['name'],
-                'genres': item.get('genres', ['Unknown Genre']),
-                'cover': item['images'][0]['url'] if item['images'] else None
-            })
-    return items
-
-# Display liked and new songs
-def display_songs(song_list, title):
-    st.write(f"### {title}")
-    if song_list:
-        for song in song_list:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                if song["cover"]:
-                    st.image(song["cover"], width=80)
-                else:
-                    st.write("No cover")
-            with col2:
-                st.write(f"**{song['name']}** by **{song['artist']}**")
-    else:
-        st.write("No songs found.")
-
-# Display top songs, artists, genres, and hidden gems with insights
-def display_top_insights(sp, time_range='short_term'):
-    top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
-    top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
-    
-    st.write(f"### Top Insights for {time_range.replace('_', ' ').title()}")
-
-    # Display top songs with cover images
-    if top_tracks:
-        st.write("### Top Songs")
-        for track in top_tracks:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.image(track['cover'], width=80)
-            with col2:
-                st.markdown(f"**{track['name']}** by **{track['artist']}**", unsafe_allow_html=True)
-    
-    # Display top artists with their cover images
-    if top_artists:
-        st.write("### Top Artists")
-        for artist in top_artists:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.image(artist['cover'], width=80)
-            with col2:
-                st.markdown(f"**{artist['name']}** - {', '.join(artist['genres'])}", unsafe_allow_html=True)
-
-    # Display top genres
-    st.write("### Top Genres")
-    genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
-    unique_genres = set(genres)
-    for genre in unique_genres:
-        st.markdown(f"**{genre}**", unsafe_allow_html=True)
-
-    # Display hidden gems (tracks with popularity < 50)
-    hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
-    if hidden_gems:
-        st.write("### Hidden Gems")
-        for gem in hidden_gems:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.image(gem['cover'], width=80)
-            with col2:
-                st.markdown(f"**{gem['name']}** by **{gem['artist']}**", unsafe_allow_html=True)
-
-    # Insights based on user data only
-    st.write("### Fascinating Insights about Your Music:")
-    insights = []
-
-    # Top Tracks Popularity
-    avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
-    insights.append(f"Your top tracks have an average popularity of **{avg_popularity}**. You're balancing popular hits and deep cuts.")
-    
-    # Top Track Energy Levels
-    avg_energy = round(sum(track.get('energy', 0.5) for track in top_tracks) / len(top_tracks), 2)
-    insights.append(f"The energy levels of your top tracks are at **{avg_energy}**. You love a good balance of upbeat and mellow songs.")
-    
-    # Unique Genres
-    genre_count = len(unique_genres)
-    insights.append(f"You explored **{genre_count}** different genres this period. You're musically diverse!")
-
-    # Tempo analysis
-    avg_tempo = sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks) if top_tracks else 120
-    insights.append(f"Your favorite songs have an average tempo of **{round(avg_tempo)} BPM**. You're all about that perfect rhythm.")
-
-    # Hidden Gems based on popularity (insight)
-    hidden_gems_count = len(hidden_gems)
-    insights.append(f"You've found **{hidden_gems_count} hidden gems** this time. Keep discovering underrated tracks!")
-
-    # Display insights in a side-by-side layout
-    display_insights_side_by_side(insights)
-
-# Function to create a side-by-side display for insights
-def display_insights_side_by_side(insights):
-    cols = st.columns(2)  # Create two columns for side-by-side display
-    for i, insight in enumerate(insights):
-        with cols[i % 2]:
-            st.markdown(f"""
-            <div class="insight-box">
-                <div class="insight-quote">“</div>
-                <div class="insight-content">{insight}</div>
-                <div class="insight-quote">”</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-# Function to determine listening personality type (depth vs breadth)
-def analyze_listening_behavior(sp):
-    top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
-    total_artists = len(top_artists)
-    total_songs = sum([random.randint(50, 200) for _ in range(total_artists)])  # Simulated data
-    avg_songs_per_artist = total_songs / total_artists
-
-    if avg_songs_per_artist > 30:
-        return "Deep Diver", "blue", "You're all about depth—diving deep into a few artists and their entire discographies."
-    elif total_artists > 40:
-        return "Explorer", "green", "You're a breadth explorer, constantly seeking new artists and sounds."
-    else:
-        return "Balanced Listener", "yellow", "You strike the perfect balance between exploring new music and sticking to your favorites."
-
 # Behavior insights function to analyze listening patterns
-def analyze_behavioral_insights(sp):
-    # Mock behavior insights based on time of listening
+def analyze_behavioral_insights():
     hour = random.randint(0, 23)  # Simulating time of listening
     if 6 <= hour <= 11:
         return "Morning Listener", "You start your day with music. It's like your daily dose of energy!"
@@ -320,40 +110,54 @@ def analyze_behavioral_insights(sp):
     else:
         return "Late-Night Crawler", "You're listening past midnight, discovering the best hidden tracks!"
 
+# Function to determine listening personality type (depth vs breadth)
+def analyze_listening_behavior():
+    avg_songs_per_artist = random.randint(20, 50)  # Simulated behavior analysis
+    total_artists = random.randint(40, 100)  # Simulated total artist count
+
+    if avg_songs_per_artist > 30:
+        return "Deep Diver", "blue", "You're all about depth—diving deep into a few artists and their entire discographies."
+    elif total_artists > 40:
+        return "Explorer", "green", "You're a breadth explorer, constantly seeking new artists and sounds."
+    else:
+        return "Balanced Listener", "yellow", "You strike the perfect balance between exploring new music and sticking to your favorites."
+
 # Display music personality profile
-def display_music_personality(sp):
+def display_music_personality():
     # Analyze listening behavior and determine personality type
-    personality, color, description = analyze_listening_behavior(sp)
-    listening_pattern, pattern_description = analyze_behavioral_insights(sp)
+    personality, color, description = analyze_listening_behavior()
+    listening_pattern, pattern_description = analyze_behavioral_insights()
+
+    st.markdown(f"<div class='personality-box'><h2>Your Music Personality Profile</h2></div>", unsafe_allow_html=True)
     
-    st.write(f"### Your Music Personality Profile")
+    # Split into two columns
+    col1, col2 = st.columns([1, 3])
 
     # Personality Name and Color
-    st.write(f"**Personality Name**: {personality}")
-    st.markdown(f'<div class="personality-color-box" style="background-color: {color};"></div> **Color**: {color.capitalize()}', unsafe_allow_html=True)
+    with col1:
+        st.markdown(f'<div class="personality-color-box" style="background-color: {color};"></div>', unsafe_allow_html=True)
+
+    with col2:
+        st.write(f"**Personality Name**: {personality}")
+        st.write(description)
     
-    # Description in Gen Z Language
-    st.write(description)
+    st.markdown("---")
     
-    # Additional behavioral insights
-    st.write(f"**Listening Pattern**: {listening_pattern}")
-    st.write(pattern_description)
-    
-    # Total songs and total minutes this week (Simulated data)
+    # Listening Pattern
+    st.markdown(f"<div class='insight-box'><h3>Listening Pattern</h3><p><strong>{listening_pattern}</strong></p><p>{pattern_description}</p></div>", unsafe_allow_html=True)
+
+    # Weekly Song Listening Stats (Simulated Data)
     total_songs_this_week = random.randint(80, 200)
     total_minutes_this_week = total_songs_this_week * 3  # Assuming an average song length of 3 minutes
-    
-    st.write(f"**Total Tracks This Week:** {total_songs_this_week}")
-    st.write(f"**Total Minutes Listened This Week:** {total_minutes_this_week} minutes")
 
     # Visualization: Weekly song listening graph (Monday to Sunday)
     days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     songs_per_day = [random.randint(10, 40) for _ in range(7)]  # Simulated data
 
     # Apple Screen Time-like Visualization using Matplotlib
-    fig, ax = plt.subplots(figsize=(8, 4))
+    fig, ax = plt.subplots(figsize=(7, 3))
     ax.bar(days_of_week, songs_per_day, color='#1DB954')
-    ax.set_title('Songs Listened Per Day (This Week)', fontsize=16)
+    ax.set_title('Songs Listened Per Day (This Week)', fontsize=14)
     ax.set_ylabel('Number of Songs')
     ax.set_xlabel('Day of the Week')
     ax.spines['top'].set_visible(False)
@@ -364,41 +168,24 @@ def display_music_personality(sp):
     ax.set_facecolor('#333')
     ax.yaxis.label.set_color('white')
     ax.xaxis.label.set_color('white')
+    
+    # Display the stats and chart
+    st.write(f"<div class='song-stats-box'><p><strong>Total Tracks This Week:</strong> {total_songs_this_week}</p>", unsafe_allow_html=True)
+    st.write(f"<p><strong>Total Minutes Listened:</strong> {total_minutes_this_week} minutes</p></div>", unsafe_allow_html=True)
     st.pyplot(fig)
 
 # Main app logic
 if is_authenticated():
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
-    # Tabs for different features
     tab1, tab2, tab3 = st.tabs([
         "Liked Songs & New Discoveries", 
         "Top Songs, Artists & Genres", 
         "Your Music Personality"
     ])
 
-    with tab1:
-        option = st.radio("Choose Option:", ["Liked Songs", "Discover New Songs"])
-        mood = st.selectbox("Choose your mood:", ["Happy", "Calm", "Energetic", "Sad"])
-        intensity = st.slider("Choose intensity:", 1, 5, 3)
-
-        if option == "Liked Songs":
-            liked_songs = get_liked_songs(sp)
-            if liked_songs:
-                filtered_liked_songs = [song for song in liked_songs if song['energy'] > 0.5]  # example filter
-                display_songs(filtered_liked_songs, "Your Liked Songs")
-            else:
-                st.warning("No liked songs available.")
-        else:
-            st.warning("Discover New Songs feature not implemented.")
-
-    with tab2:
-        time_filter = st.selectbox("Select Time Period:", ["This Week", "This Month", "This Year"])
-        time_mapping = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
-        display_top_insights(sp, time_range=time_mapping[time_filter])
-
     with tab3:
-        display_music_personality(sp)
+        display_music_personality()
     
 else:
     st.write("Welcome to Wvvy")
