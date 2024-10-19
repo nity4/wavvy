@@ -175,6 +175,22 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
+# Display liked and new songs
+def display_songs(song_list, title):
+    st.write(f"### {title}")
+    if song_list:
+        for song in song_list:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if song["cover"]:
+                    st.image(song["cover"], width=80)
+                else:
+                    st.write("No cover")
+            with col2:
+                st.write(f"**{song['name']}** by **{song['artist']}**")
+    else:
+        st.write("No songs found.")
+
 # Display top songs, artists, and genres with insights (side-by-side layout)
 def display_top_insights(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
