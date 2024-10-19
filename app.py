@@ -30,7 +30,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for styling
+# Custom CSS for styling white text, and other elements
 st.markdown("""
     <style>
     body {
@@ -80,6 +80,20 @@ st.markdown("""
     }
     .stMarkdown, .stMarkdown p, .stMarkdown h3, .stSelectbox label, .stSlider label {
         color: white !important;
+    }
+    .stTabs [role="tab"] {
+        color: white !important;
+    }
+    .stTabs [role="tabpanel"] {
+        background-color: rgba(0, 0, 0, 0.5) !important;
+        color: white !important;
+    }
+    .personality-color-box {
+        width: 50px;
+        height: 50px;
+        display: inline-block;
+        margin-right: 10px;
+        border-radius: 50%;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -279,6 +293,53 @@ def display_insights_side_by_side(insights):
             </div>
             """, unsafe_allow_html=True)
 
+# Function to determine listening personality type (depth vs breadth)
+def analyze_listening_behavior(sp):
+    top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
+    total_artists = len(top_artists)
+    total_songs = sum([random.randint(50, 200) for _ in range(total_artists)])  # Simulated data
+    avg_songs_per_artist = total_songs / total_artists
+
+    if avg_songs_per_artist > 30:
+        return "Deep Diver", "blue", "You're all about depth—diving deep into a few artists and their entire discographies."
+    elif total_artists > 40:
+        return "Explorer", "green", "You're a breadth explorer, constantly seeking new artists and sounds."
+    else:
+        return "Balanced Listener", "yellow", "You strike the perfect balance between exploring new music and sticking to your favorites."
+
+# Display music personality profile
+def display_music_personality(sp):
+    # Analyze listening behavior and determine personality type
+    personality, color, description = analyze_listening_behavior(sp)
+    
+    st.write(f"### Your Music Personality Profile")
+
+    # Personality Name and Color
+    st.write(f"**Personality Name**: {personality}")
+    st.markdown(f'<div class="personality-color-box" style="background-color: {color};"></div> **Color**: {color.capitalize()}', unsafe_allow_html=True)
+    
+    # Description in Gen Z Language
+    st.write(description)
+    
+    # Total songs and total minutes this week (Simulated data)
+    total_songs_this_week = random.randint(80, 200)
+    total_minutes_this_week = total_songs_this_week * 3  # Assuming an average song length of 3 minutes
+    
+    st.write(f"**Total Tracks This Week:** {total_songs_this_week}")
+    st.write(f"**Total Minutes Listened This Week:** {total_minutes_this_week} minutes")
+
+    # Visualization: Weekly song listening graph (Monday to Sunday)
+    days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    songs_per_day = [random.randint(10, 40) for _ in range(7)]  # Simulated data
+
+    # Apple Screen Time-like Visualization using Matplotlib
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.bar(days_of_week, songs_per_day, color='#1DB954')
+    ax.set_title('Songs Listened Per Day (This Week)')
+    ax.set_ylabel('Number of Songs')
+    ax.set_xlabel('Day of the Week')
+    st.pyplot(fig)
+
 # Main app logic
 if is_authenticated():
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
@@ -309,9 +370,11 @@ if is_authenticated():
         time_filter = st.selectbox("Select Time Period:", ["This Week", "This Month", "This Year"])
         time_mapping = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
         display_top_insights(sp, time_range=time_mapping[time_filter])
+
+    with tab3:
+        display_music_personality(sp)
     
 else:
     st.write("Welcome to Wvvy")
     st.write("Login to explore your personalized music experience.")
     authenticate_user()
-
