@@ -154,7 +154,7 @@ def authenticate_user():
         try:
             token_info = sp_oauth.get_access_token(code)
             st.session_state['token_info'] = token_info
-            st.experimental_set_query_params()  # Clear query parameters
+            st.set_query_params()  # Clear query parameters
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
                 st.experimental_rerun()
