@@ -32,7 +32,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for styling: white text and swipeable carousel
+# Custom CSS for styling: white text and card-like appearance for insights
 st.markdown("""
     <style>
     body {
@@ -67,7 +67,7 @@ st.markdown("""
     .stMarkdown, .stMarkdown p, .stMarkdown h3, .stSelectbox label, .stSlider label {
         color: white !important;
     }
-    .insight-card {
+    .insight-box {
         background-color: #333;
         color: white;
         padding: 20px;
@@ -78,17 +78,13 @@ st.markdown("""
         font-family: 'Arial', sans-serif;
         font-size: 1.2em;
     }
-    .insight-card:hover {
+    .insight-box:hover {
         transform: scale(1.02);
     }
     .insight-quote {
         font-style: italic;
         color: #1DB954;
         font-size: 1.5em;
-    }
-    .insight-content {
-        margin-top: 10px;
-        font-size: 1.2em;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -247,7 +243,7 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
-# Display top songs, artists, and genres with insights
+# Display top songs, artists, and genres with insights (side-by-side layout)
 def display_top_insights(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
     top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
@@ -281,7 +277,7 @@ def display_top_insights(sp, time_range='short_term'):
     for genre in unique_genres:
         st.write(f"**{genre}**")
 
-    # Fascinating Insights in Styled Cards
+    # Fascinating Insights in Side-by-Side Layout
     st.write("### Fascinating Insights about Your Music:")
 
     # Generate insights based on user data
@@ -311,19 +307,21 @@ def display_top_insights(sp, time_range='short_term'):
     avg_tempo = sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks) if top_tracks else 120
     insights.append(f"Your favorite songs are **faster than your heartbeat**—you're all about that high tempo.")
 
-    # Display insights in a card-style box
-    display_insights_cards(insights)
+    # Display insights in a side-by-side layout
+    display_insights_side_by_side(insights)
 
-# Function to create a card-style display for insights
-def display_insights_cards(insights):
-    for insight in insights:
-        st.markdown(f"""
-        <div class="insight-card">
-            <div class="insight-quote">“</div>
-            <div class="insight-content">{insight}</div>
-            <div class="insight-quote">”</div>
-        </div>
-        """, unsafe_allow_html=True)
+# Function to create a side-by-side display for insights
+def display_insights_side_by_side(insights):
+    cols = st.columns(2)  # Create two columns for side-by-side display
+    for i, insight in enumerate(insights):
+        with cols[i % 2]:
+            st.markdown(f"""
+            <div class="insight-box">
+                <div class="insight-quote">“</div>
+                <div class="insight-content">{insight}</div>
+                <div class="insight-quote">”</div>
+            </div>
+            """, unsafe_allow_html=True)
 
 # Analyze listening depth vs. breadth
 def analyze_depth_vs_breadth(sp):
