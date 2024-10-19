@@ -5,7 +5,7 @@ import random
 import pandas as pd
 import time
 import matplotlib.pyplot as plt
-import streamlit.components.v1 as components  # For carousel-style insights
+import streamlit.components.v1 as components  # For custom components
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -67,31 +67,28 @@ st.markdown("""
     .stMarkdown, .stMarkdown p, .stMarkdown h3, .stSelectbox label, .stSlider label {
         color: white !important;
     }
-    .insight-box {
-        border: 2px solid #1DB954;
-        border-radius: 10px;
-        padding: 15px;
-        font-size: 1.2em;
+    .insight-card {
+        background-color: #333;
         color: white;
+        padding: 20px;
         margin-bottom: 20px;
-        background-color: rgba(255, 255, 255, 0.1);
-        font-family: 'Courier New', Courier, monospace;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s ease-in-out;
+        font-family: 'Arial', sans-serif;
+        font-size: 1.2em;
     }
-    .carousel {
-        display: flex;
-        overflow-x: scroll;
-        gap: 15px;
-        scroll-snap-type: x mandatory;
-    }
-    .carousel-item {
-        scroll-snap-align: start;
-        flex: 0 0 85%;
-        max-width: 85%;
+    .insight-card:hover {
+        transform: scale(1.02);
     }
     .insight-quote {
         font-style: italic;
-        font-size: 1.5em;
         color: #1DB954;
+        font-size: 1.5em;
+    }
+    .insight-content {
+        margin-top: 10px;
+        font-size: 1.2em;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -284,7 +281,7 @@ def display_top_insights(sp, time_range='short_term'):
     for genre in unique_genres:
         st.write(f"**{genre}**")
 
-    # Fascinating Insights in Carousel-Style Boxes
+    # Fascinating Insights in Styled Cards
     st.write("### Fascinating Insights about Your Music:")
 
     # Generate insights based on user data
@@ -314,62 +311,19 @@ def display_top_insights(sp, time_range='short_term'):
     avg_tempo = sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks) if top_tracks else 120
     insights.append(f"Your favorite songs are **faster than your heartbeat**—you're all about that high tempo.")
 
-    # Throwback Listener
-    throwback_tracks = [track for track in top_tracks if '2010' in track.get('release_date', '')]
-    if throwback_tracks:
-        insights.append(f"Throwback master! You’ve been jamming to tracks from **2010**—love that nostalgia.")
+    # Display insights in a card-style box
+    display_insights_cards(insights)
 
-    # Display insights in a carousel-style box
-    display_insights_carousel(insights)
-
-
-# Function to create a carousel-style swipe for insights
-def display_insights_carousel(insights):
-    st.markdown("""
-    <style>
-    .insight-box {
-        border: 2px solid #1DB954;
-        border-radius: 10px;
-        padding: 15px;
-        font-size: 1.2em;
-        color: white;
-        margin-bottom: 20px;
-        background-color: rgba(255, 255, 255, 0.1);
-        font-family: 'Courier New', Courier, monospace;
-    }
-    .carousel {
-        display: flex;
-        overflow-x: scroll;
-        gap: 15px;
-        scroll-snap-type: x mandatory;
-    }
-    .carousel-item {
-        scroll-snap-align: start;
-        flex: 0 0 85%;
-        max-width: 85%;
-    }
-    .insight-quote {
-        font-style: italic;
-        font-size: 1.5em;
-        color: #1DB954;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="carousel">', unsafe_allow_html=True)
-
+# Function to create a card-style display for insights
+def display_insights_cards(insights):
     for insight in insights:
         st.markdown(f"""
-        <div class="carousel-item">
-            <div class="insight-box">
-                <div class="insight-quote">“</div>
-                {insight}
-                <div class="insight-quote">”</div>
-            </div>
+        <div class="insight-card">
+            <div class="insight-quote">“</div>
+            <div class="insight-content">{insight}</div>
+            <div class="insight-quote">”</div>
         </div>
         """, unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # Analyze listening depth vs. breadth
 def analyze_depth_vs_breadth(sp):
