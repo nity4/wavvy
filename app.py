@@ -1,7 +1,6 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import random
 import time
 
 # Spotify API credentials from Streamlit Secrets
@@ -10,7 +9,7 @@ CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 
 # Define the required scope for Spotify access
-scope = "user-library-read user-top-read playlist-read-private"
+scope = "user-library-read user-top-read playlist-read-private user-read-recently-played"
 
 # Initialize Spotify OAuth object
 sp_oauth = SpotifyOAuth(
@@ -29,7 +28,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for styling, including flip cards for insights
+# Custom CSS for styling
 st.markdown("""
     <style>
     body {
@@ -57,58 +56,6 @@ st.markdown("""
         display: inline-block;
         font-weight: bold;
         margin-top: 30px;
-    }
-    .flip-card {
-        background-color: transparent;
-        width: 300px;
-        height: 200px;
-        perspective: 1000px;
-        display: inline-block;
-        margin: 10px;
-    }
-    .flip-card-inner {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        text-align: center;
-        transition: transform 0.8s;
-        transform-style: preserve-3d;
-    }
-    .flip-card:hover .flip-card-inner {
-        transform: rotateY(180deg);
-    }
-    .flip-card-front, .flip-card-back {
-        position: absolute;
-        width: 100%;
-        height: 100%;
-        backface-visibility: hidden;
-        border-radius: 10px;
-    }
-    .flip-card-front {
-        background-color: #1DB954;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-    }
-    .flip-card-back {
-        background-color: #333;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 16px;
-        transform: rotateY(180deg);
-    }
-    .insight-box {
-        background-color: #333;
-        color: white;
-        padding: 20px;
-        margin-bottom: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        font-size: 1em;
     }
     .personality-card {
         background-color: #1e1e1e;
@@ -147,7 +94,7 @@ def is_authenticated():
 
 # Authentication flow
 def authenticate_user():
-    query_params = st.experimental_get_query_params()  # Fetch query parameters
+    query_params = st.experimental_get_query_params()
 
     if "code" in query_params:
         code = query_params["code"][0]
@@ -206,7 +153,6 @@ def get_liked_songs(sp):
             "tempo": audio_features["tempo"],
             "popularity": track['popularity']
         })
-    random.shuffle(liked_songs)
     return liked_songs
 
 # Function to display songs with their cover images
@@ -249,7 +195,7 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
-# Function to display top insights (Top Songs, Artists, Genres, Insights)
+# Display top songs and artists insights
 def display_top_insights(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
     top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
@@ -283,59 +229,30 @@ def display_top_insights(sp, time_range='short_term'):
     for genre in unique_genres:
         st.write(f"**{genre}**")
 
-    # Insights based on user data only
-    st.write("### Fascinating Insights about Your Music:")
-    insights = []
+    # Fascinating insights based on the user's top songs
+    if top_tracks:
+        avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
+        avg_energy = round(sum(track.get('energy', 0.5) for track in top_tracks) / len(top_tracks), 2)
+        avg_tempo = round(sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks), 1)
+        hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
 
-    # Top Tracks Popularity
-    avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
-    insights.append(f"Your top tracks have an average popularity of <strong>{avg_popularity}</strong>. You're balancing popular hits and deep cuts.")
-    
-    # Top Track Energy Levels
-    avg_energy = round(sum(track.get('energy', 0.5) for track in top_tracks) / len(top_tracks), 2)
-    insights.append(f"The energy levels of your top tracks are at <strong>{avg_energy}</strong>. You love a good balance of upbeat and mellow songs.")
-    
-    # Unique Genres
-    genre_count = len(unique_genres)
-    insights.append(f"You explored <strong>{genre_count}</strong> different genres this period. You're musically diverse!")
+        # Display insights
+        st.write("### Fascinating Insights")
+        st.markdown(f"- **Average Popularity of Top Songs:** {avg_popularity}")
+        st.markdown(f"- **Average Energy of Top Songs:** {avg_energy}")
+        st.markdown(f"- **Average Tempo of Top Songs:** {avg_tempo} BPM")
+        st.markdown(f"- **Hidden Gems (Less Popular Tracks):** {len(hidden_gems)} discovered")
 
-    # Tempo analysis
-    avg_tempo = sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks) if top_tracks else 120
-    insights.append(f"Your favorite songs have an average tempo of <strong>{round(avg_tempo)} BPM</strong>. You're all about that perfect rhythm.")
-
-    # Hidden Gems based on popularity (insight)
-    hidden_gems = [track for track in top_tracks if track['popularity'] < 50]  # Example threshold for hidden gems
-    hidden_gems_count = len(hidden_gems)
-    insights.append(f"You've found <strong>{hidden_gems_count} hidden gems</strong> this time. Keep discovering underrated tracks!")
-
-    # Display insights in a flip-card style
-    def display_flip_insights(insights):
-        for i in range(0, len(insights), 2):
-            cols = st.columns(2)
-            for j in range(2):
-                if i + j < len(insights):
-                    with cols[j]:
-                        st.markdown(f"""
-                        <div class="flip-card">
-                            <div class="flip-card-inner">
-                                <div class="flip-card-front">
-                                    🔥 Hot Insight
-                                </div>
-                                <div class="flip-card-back">
-                                    {insights[i + j]}
-                                </div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-    display_flip_insights(insights)
-
-# Function to determine listening personality type (depth vs breadth)
+# Function to analyze listening behavior
 def analyze_listening_behavior(sp):
     top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
     total_artists = len(top_artists)
-    total_songs = sum([random.randint(50, 200) for _ in range(total_artists)])  # Simulated data
-    avg_songs_per_artist = total_songs / total_artists
+    
+    # Estimate total songs based on top artist data
+    top_tracks = get_top_items(sp, item_type='tracks', time_range='long_term', limit=50)
+    total_songs = len(top_tracks)
+
+    avg_songs_per_artist = total_songs / total_artists if total_artists else 0
 
     if avg_songs_per_artist > 30:
         return "Deep Diver", "blue", "You're all about depth—diving deep into a few artists and their entire discographies."
@@ -344,50 +261,34 @@ def analyze_listening_behavior(sp):
     else:
         return "Balanced Listener", "yellow", "You strike the perfect balance between exploring new music and sticking to your favorites."
 
-# Behavior insights function to analyze listening patterns
-def analyze_behavioral_insights(sp):
-    # Mock behavior insights based on time of listening
-    hour = random.randint(0, 23)  # Simulating time of listening
-    if 6 <= hour <= 11:
-        return "Morning Listener", "You start your day with music. It's like your daily dose of energy!"
-    elif 12 <= hour <= 17:
-        return "Daytime Groover", "You keep the music going throughout your day, staying productive and energized."
-    elif 18 <= hour <= 23:
-        return "Night Owl", "Late-night jams are your vibe. Music hits different after dark!"
-    else:
-        return "Late-Night Crawler", "You're listening past midnight, discovering the best hidden tracks!"
+# Fetch recent listening data and calculate behavioral insights
+def fetch_recently_played(sp):
+    results = handle_spotify_rate_limit(sp.current_user_recently_played, limit=50)
+    if not results:
+        return 0, 0
+    total_songs = len(results['items'])
+    total_minutes = sum([item['track']['duration_ms'] for item in results['items']]) / (1000 * 60)  # Convert ms to minutes
+    return total_songs, total_minutes
 
 # Display music personality profile
 def display_music_personality(sp):
     # Analyze listening behavior and determine personality type
     personality, color, description = analyze_listening_behavior(sp)
-    listening_pattern, pattern_description = analyze_behavioral_insights(sp)
     
-    # Personality Card Layout
+    # Fetch recent listening data
+    total_songs_this_week, total_minutes_this_week = fetch_recently_played(sp)
+    
     st.write(f"### Your Music Personality Profile")
-    st.markdown("""
-    <div class="personality-card">
-        <h2>Personality Summary</h2>
-        <p><strong>Personality Name</strong>: {}</p>
-        <div class="personality-color-box" style="background-color: {}; display: inline-block;"></div>
-        <strong>Personality Color</strong>: {}
-        <p>{}</p>
-    </div>
-    """.format(personality, color, color.capitalize(), description), unsafe_allow_html=True)
-    
-    # Behavioral Insights Card
     st.markdown(f"""
     <div class="personality-card">
-        <h2>Listening Behavior</h2>
-        <p><strong>Listening Pattern</strong>: {listening_pattern}</p>
-        <p>{pattern_description}</p>
+        <h2>Personality Summary</h2>
+        <p><strong>Personality Name</strong>: {personality}</p>
+        <div class="personality-color-box" style="background-color: {color}; display: inline-block;"></div>
+        <strong>Personality Color</strong>: {color.capitalize()}</p>
+        <p>{description}</p>
     </div>
     """, unsafe_allow_html=True)
-
-    # Total songs and minutes this week (Simulated Data)
-    total_songs_this_week = random.randint(80, 200)
-    total_minutes_this_week = total_songs_this_week * 3  # Assuming average song length of 3 minutes
-
+    
     st.markdown(f"""
     <div class="personality-card">
         <h2>Weekly Listening Stats</h2>
