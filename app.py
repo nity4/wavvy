@@ -170,74 +170,7 @@ def get_liked_songs(sp):
         })
     return liked_songs
 
-# Function to display songs with their cover images
-def display_songs(song_list, title):
-    st.write(f"### {title}")
-    if song_list:
-        for song in song_list:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                if song["cover"]:
-                    st.image(song["cover"], width=80)
-                else:
-                    st.write("No cover")
-            with col2:
-                st.write(f"**{song['name']}** by {song['artist']}")
-    else:
-        st.write("No songs found.")
-
-# Fetch top items for insights
-def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
-    if item_type == 'tracks':
-        results = handle_spotify_rate_limit(sp.current_user_top_tracks, time_range=time_range, limit=limit)
-    elif item_type == 'artists':
-        results = handle_spotify_rate_limit(sp.current_user_top_artists, time_range=time_range, limit=limit)
-    items = []
-    for item in results['items']:
-        if item_type == 'tracks':
-            items.append({
-                'name': item['name'],
-                'artist': item['artists'][0]['name'],
-                'popularity': item.get('popularity', 0),
-                'cover': item['album']['images'][0]['url'] if item['album']['images'] else None,
-                'tempo': item.get('tempo', 120)
-            })
-        elif item_type == 'artists':
-            items.append({
-                'name': item['name'],
-                'genres': item.get('genres', ['Unknown Genre']),
-                'cover': item['images'][0]['url'] if item['images'] else None
-            })
-    return items
-
-# Create a pie chart for genres explored
-def display_genres_pie_chart(genre_list):
-    genre_df = pd.DataFrame(genre_list, columns=["Genre"])
-    genre_counts = genre_df["Genre"].value_counts()
-
-    fig, ax = plt.subplots(figsize=(5, 5), facecolor='#000')  # Larger pie chart for readability
-    wedges, texts, autotexts = ax.pie(
-        genre_counts, 
-        labels=genre_counts.index, 
-        autopct=lambda p: '{:.0f}'.format(p * sum(genre_counts) / 100),  # Exact count instead of percentage
-        colors=plt.cm.viridis(np.linspace(0, 1, len(genre_counts))),
-        textprops=dict(color="white"),
-        wedgeprops=dict(edgecolor='black'),
-    )
-
-    # Set the background color of the plot to match the app's style
-    fig.patch.set_facecolor('black')
-    ax.set_facecolor('black')
-
-    # Improve readability
-    for text in autotexts:
-        text.set_fontsize(10)  # Larger percentage text
-        text.set_color("white")
-
-    st.write("### Genres Explored (Pie Chart)")
-    st.pyplot(fig)
-
-# Display top songs and artists insights
+# Display top insights
 def display_top_insights(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
     top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
@@ -253,142 +186,40 @@ def display_top_insights(sp, time_range='short_term'):
                 st.image(track['cover'], width=80)
             with col2:
                 st.write(f"**{track['name']}** by {track['artist']}")
-    
-    # Display top artists with their cover images
-    if top_artists:
-        st.write("### Top Artists")
-        for artist in top_artists:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.image(artist['cover'], width=80)
-            with col2:
-                st.write(f"**{artist['name']}** - {', '.join(artist['genres'])}")
 
-    # Display genres explored in a pie chart
-    genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
+    # Display genres explored in a pie chart (Removed artist genres)
+    genres = [artist['name'] for artist in top_artists]
     display_genres_pie_chart(genres)
 
-    # Fascinating insights based on the user's top songs
-    if top_tracks:
-        avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
-        avg_energy = round(sum(track.get('energy', 0.5) for track in top_tracks) / len(top_tracks), 2)
-        avg_tempo = round(sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks), 1)
-        hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
+# Pie Chart for Genres (Reduced Size)
+def display_genres_pie_chart(genre_list):
+    genre_df = pd.DataFrame(genre_list, columns=["Genre"])
+    genre_counts = genre_df["Genre"].value_counts()
 
-        # Display insights in well-formatted boxes
-        st.write("### Fascinating Insights")
-        st.markdown(f"<div class='insight-box'><strong>Average Popularity of Top Songs:</strong> {avg_popularity}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='insight-box'><strong>Average Energy of Top Songs:</strong> {avg_energy}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='insight-box'><strong>Average Tempo of Top Songs:</strong> {avg_tempo} BPM</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='insight-box'><strong>Hidden Gems (Less Popular Tracks):</strong> {len(hidden_gems)} discovered</div>", unsafe_allow_html=True)
+    fig, ax = plt.subplots(figsize=(3, 3), facecolor='#000')  # Reduced pie chart size
+    wedges, texts, autotexts = ax.pie(
+        genre_counts, 
+        labels=None,  # No labels for artists
+        autopct=lambda p: '{:.0f}%'.format(p),
+        colors=plt.cm.viridis(np.linspace(0, 1, len(genre_counts))),
+        textprops=dict(color="white"),
+        wedgeprops=dict(edgecolor='black'),
+    )
 
-# Analyze listening behavior for the personality profile
-def analyze_listening_behavior(sp):
-    top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
-    total_artists = len(top_artists)
-    
-    # Estimate total songs based on top artist data
-    top_tracks = get_top_items(sp, item_type='tracks', time_range='long_term', limit=50)
-    total_songs = len(top_tracks)
+    fig.patch.set_facecolor('black')
+    ax.set_facecolor('black')
 
-    avg_songs_per_artist = total_songs / total_artists if total_artists else 0
+    for text in autotexts:
+        text.set_fontsize(8)  # Smaller percentage text
+        text.set_color("white")
 
-    if avg_songs_per_artist > 30:
-        return "Deep Diver", "blue", "You're all about depth—diving deep into a few artists and their entire discographies."
-    elif total_artists > 40:
-        return "Explorer", "green", "You're a breadth explorer, constantly seeking new artists and sounds."
-    else:
-        return "Balanced Listener", "yellow", "You strike the perfect balance between exploring new music and sticking to your favorites."
+    st.write("### Artists You Explore (Pie Chart)")
+    st.pyplot(fig)
 
-# Fetch recent listening data and calculate behavioral insights
-def fetch_recently_played(sp):
-    results = handle_spotify_rate_limit(sp.current_user_recently_played, limit=50)
-    if not results:
-        return 0, 0
-    total_songs = len(results['items'])
-    total_minutes = sum([item['track']['duration_ms'] for item in results['items']]) / (1000 * 60)  # Convert ms to minutes
-    return total_songs, total_minutes
-
-# Analyze time of day listening patterns
+# Analyze Time of Day Listening Pattern (Dot and Line Graph)
 def analyze_time_of_day(sp):
     results = handle_spotify_rate_limit(sp.current_user_recently_played, limit=50)
     if not results:
         return None
     
-    hours = [pd.to_datetime(item['played_at']).hour for item in results['items']]
-    hour_df = pd.DataFrame(hours, columns=["Hour"])
-    
-    st.write("### Listening Patterns by Time of Day")
-    fig, ax = plt.subplots()
-    hour_df["Hour"].value_counts().sort_index().plot(kind='bar', ax=ax, color='#1DB954')
-    ax.set_title("Listening Distribution by Hour")
-    st.pyplot(fig)
-
-# Display music personality profile
-def display_music_personality(sp):
-    # Analyze listening behavior and determine personality type
-    personality, color, description = analyze_listening_behavior(sp)
-    
-    # Fetch recent listening data
-    total_songs_this_week, total_minutes_this_week = fetch_recently_played(sp)
-    
-    st.write(f"### Your Music Personality Profile")
-    st.markdown(f"""
-    <div class="personality-card">
-        <h2>Personality Summary</h2>
-        <p><strong>Personality Name</strong>: {personality}</p>
-        <div class="personality-color-box" style="background-color: {color}; display: inline-block;"></div>
-        <strong>Personality Color</strong>: {color.capitalize()}</p>
-        <p>{description}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown(f"""
-    <div class="personality-card">
-        <h2>Weekly Listening Stats</h2>
-        <p><strong>Total Tracks This Week:</strong> {total_songs_this_week}</p>
-        <p><strong>Total Minutes Listened This Week:</strong> {total_minutes_this_week} minutes</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Add time of day analysis for listening patterns
-    analyze_time_of_day(sp)
-
-# Main app logic
-if is_authenticated():
-    sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])  # Correct Spotify initialization
-
-    # Tabs for different features
-    tab1, tab2, tab3 = st.tabs([
-        "Liked Songs & New Discoveries", 
-        "Top Songs, Artists & Genres", 
-        "Your Music Personality"
-    ])
-
-    with tab1:
-        option = st.radio("Choose Option:", ["Liked Songs", "Discover New Songs"])
-        mood = st.selectbox("Choose your mood:", ["Happy", "Calm", "Energetic", "Sad"])
-        intensity = st.slider("Choose intensity:", 1, 5, 3)
-
-        if option == "Liked Songs":
-            liked_songs = get_liked_songs(sp)
-            if liked_songs:
-                filtered_liked_songs = [song for song in liked_songs if song['energy'] > 0.5]  # example filter
-                display_songs(filtered_liked_songs, "Your Liked Songs")
-            else:
-                st.warning("No liked songs available.")
-        else:
-            st.warning("Discover New Songs feature not implemented.")
-
-    with tab2:
-        time_filter = st.selectbox("Select Time Period:", ["This Week", "This Month", "This Year"])
-        time_mapping = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
-        display_top_insights(sp, time_range=time_mapping[time_filter])
-
-    with tab3:
-        display_music_personality(sp)
-    
-else:
-    st.write("Welcome to Wvvy")
-    st.write("Login to explore your personalized music experience.")
-    authenticate_user()
+    hours = [pd.to_datetime(item['played_at']).
