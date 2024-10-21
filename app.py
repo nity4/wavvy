@@ -2,6 +2,8 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import time
+import pandas as pd
+import matplotlib.pyplot as plt
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -31,6 +33,9 @@ st.set_page_config(
 # Custom CSS for styling
 st.markdown("""
     <style>
+    * {
+        color: white !important;
+    }
     body {
         background: linear-gradient(to right, black, #1DB954) !important;
     }
@@ -40,7 +45,6 @@ st.markdown("""
     .header-title {
         font-size: 5em;
         font-weight: bold;
-        color: white !important;
         text-align: center;
         padding-top: 50px;
         margin-bottom: 20px;
@@ -59,7 +63,6 @@ st.markdown("""
     }
     .personality-card {
         background-color: #1e1e1e;
-        color: white;
         padding: 20px;
         border-radius: 15px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
@@ -74,7 +77,6 @@ st.markdown("""
     }
     .insight-box {
         background-color: #333;
-        color: white;
         padding: 15px;
         margin-bottom: 20px;
         border-radius: 10px;
@@ -203,6 +205,17 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
+# Create a bar chart for genres explored
+def display_genres_chart(genre_list):
+    genre_df = pd.DataFrame(genre_list, columns=["Genre"])
+    genre_counts = genre_df["Genre"].value_counts()
+
+    st.write("### Genres Explored")
+    fig, ax = plt.subplots()
+    genre_counts.plot(kind='barh', ax=ax, color='#1DB954')
+    ax.set_title("Top Genres Explored")
+    st.pyplot(fig)
+
 # Display top songs and artists insights
 def display_top_insights(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
@@ -230,12 +243,9 @@ def display_top_insights(sp, time_range='short_term'):
             with col2:
                 st.write(f"**{artist['name']}** - {', '.join(artist['genres'])}")
 
-    # Display top genres
-    st.write("### Top Genres")
+    # Display genres explored in a chart
     genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
-    unique_genres = set(genres)
-    genre_list = ', '.join(unique_genres)
-    st.markdown(f"<div class='insight-box'><strong>Genres Explored:</strong> {genre_list}</div>", unsafe_allow_html=True)
+    display_genres_chart(genres)
 
     # Fascinating insights based on the user's top songs
     if top_tracks:
@@ -251,7 +261,7 @@ def display_top_insights(sp, time_range='short_term'):
         st.markdown(f"<div class='insight-box'><strong>Average Tempo of Top Songs:</strong> {avg_tempo} BPM</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='insight-box'><strong>Hidden Gems (Less Popular Tracks):</strong> {len(hidden_gems)} discovered</div>", unsafe_allow_html=True)
 
-# Function to analyze listening behavior
+# Analyze listening behavior for the personality profile
 def analyze_listening_behavior(sp):
     top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
     total_artists = len(top_artists)
@@ -277,6 +287,21 @@ def fetch_recently_played(sp):
     total_songs = len(results['items'])
     total_minutes = sum([item['track']['duration_ms'] for item in results['items']]) / (1000 * 60)  # Convert ms to minutes
     return total_songs, total_minutes
+
+# Analyze time of day listening patterns
+def analyze_time_of_day(sp):
+    results = handle_spotify_rate_limit(sp.current_user_recently_played, limit=50)
+    if not results:
+        return None
+    
+    hours = [pd.to_datetime(item['played_at']).hour for item in results['items']]
+    hour_df = pd.DataFrame(hours, columns=["Hour"])
+    
+    st.write("### Listening Patterns by Time of Day")
+    fig, ax = plt.subplots()
+    hour_df["Hour"].value_counts().sort_index().plot(kind='bar', ax=ax, color='#1DB954')
+    ax.set_title("Listening Distribution by Hour")
+    st.pyplot(fig)
 
 # Display music personality profile
 def display_music_personality(sp):
@@ -304,6 +329,9 @@ def display_music_personality(sp):
         <p><strong>Total Minutes Listened This Week:</strong> {total_minutes_this_week} minutes</p>
     </div>
     """, unsafe_allow_html=True)
+
+    # Add time of day analysis for listening patterns
+    analyze_time_of_day(sp)
 
 # Main app logic
 if is_authenticated():
