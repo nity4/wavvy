@@ -3,7 +3,6 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import time
 import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
 
 # Spotify API credentials from Streamlit Secrets
@@ -206,17 +205,29 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
-# Create a heatmap for genres explored
-def display_genres_heatmap(genre_list):
+# Create a pie chart for genres explored
+def display_genres_pie_chart(genre_list):
     genre_df = pd.DataFrame(genre_list, columns=["Genre"])
     genre_counts = genre_df["Genre"].value_counts()
 
-    # Prepare heatmap data
-    genre_matrix = pd.DataFrame(genre_counts).T
-    fig, ax = plt.subplots(figsize=(8, 4))
-    sns.heatmap(genre_matrix, cmap="YlGnBu", annot=True, fmt="d", cbar=False, linewidths=1, ax=ax)
+    fig, ax = plt.subplots(figsize=(3, 3), facecolor='#000')  # Smaller size, dark background
+    wedges, texts, autotexts = ax.pie(
+        genre_counts, 
+        labels=genre_counts.index, 
+        autopct='%1.1f%%',
+        colors=plt.cm.viridis(np.linspace(0, 1, len(genre_counts))),
+        textprops=dict(color="white"),
+        wedgeprops=dict(edgecolor='black'),
+    )
 
-    st.write("### Genres Explored (Heatmap)")
+    # Set the background color of the plot to match the app's style
+    fig.patch.set_facecolor('black')
+    ax.set_facecolor('black')
+
+    for text in autotexts:
+        text.set_fontsize(8)  # Make percentage text smaller
+
+    st.write("### Genres Explored (Pie Chart)")
     st.pyplot(fig)
 
 # Display top songs and artists insights
@@ -246,9 +257,9 @@ def display_top_insights(sp, time_range='short_term'):
             with col2:
                 st.write(f"**{artist['name']}** - {', '.join(artist['genres'])}")
 
-    # Display genres explored in a heatmap
+    # Display genres explored in a pie chart
     genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
-    display_genres_heatmap(genres)
+    display_genres_pie_chart(genres)
 
     # Fascinating insights based on the user's top songs
     if top_tracks:
@@ -338,7 +349,7 @@ def display_music_personality(sp):
 
 # Main app logic
 if is_authenticated():
-    sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
+    sp = spotipy.Spotipy(auth=st.session_state['token_info']['access_token'])
 
     # Tabs for different features
     tab1, tab2, tab3 = st.tabs([
