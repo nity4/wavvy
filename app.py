@@ -72,6 +72,14 @@ st.markdown("""
         margin-right: 10px;
         border-radius: 50%;
     }
+    .insight-box {
+        background-color: #333;
+        color: white;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -226,8 +234,8 @@ def display_top_insights(sp, time_range='short_term'):
     st.write("### Top Genres")
     genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
     unique_genres = set(genres)
-    for genre in unique_genres:
-        st.write(f"**{genre}**")
+    genre_list = ', '.join(unique_genres)
+    st.markdown(f"<div class='insight-box'><strong>Genres Explored:</strong> {genre_list}</div>", unsafe_allow_html=True)
 
     # Fascinating insights based on the user's top songs
     if top_tracks:
@@ -236,12 +244,12 @@ def display_top_insights(sp, time_range='short_term'):
         avg_tempo = round(sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks), 1)
         hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
 
-        # Display insights
+        # Display insights in well-formatted boxes
         st.write("### Fascinating Insights")
-        st.markdown(f"- **Average Popularity of Top Songs:** {avg_popularity}")
-        st.markdown(f"- **Average Energy of Top Songs:** {avg_energy}")
-        st.markdown(f"- **Average Tempo of Top Songs:** {avg_tempo} BPM")
-        st.markdown(f"- **Hidden Gems (Less Popular Tracks):** {len(hidden_gems)} discovered")
+        st.markdown(f"<div class='insight-box'><strong>Average Popularity of Top Songs:</strong> {avg_popularity}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='insight-box'><strong>Average Energy of Top Songs:</strong> {avg_energy}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='insight-box'><strong>Average Tempo of Top Songs:</strong> {avg_tempo} BPM</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='insight-box'><strong>Hidden Gems (Less Popular Tracks):</strong> {len(hidden_gems)} discovered</div>", unsafe_allow_html=True)
 
 # Function to analyze listening behavior
 def analyze_listening_behavior(sp):
