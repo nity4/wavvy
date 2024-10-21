@@ -186,7 +186,7 @@ def display_genres_pie_chart(genre_list):
     genre_colors = plt.cm.Paired(np.linspace(0, 1, len(genre_counts)))
 
     # Create the layout with a list of genres with colors and a smaller pie chart
-    col1, col2 = st.columns([1, 2])  # Layout: genres on the left, pie chart on the right
+    col1, col2 = st.columns([1, 1])  # Layout: genres on the left, pie chart on the right
 
     # List genres with their respective colors
     with col1:
@@ -196,7 +196,7 @@ def display_genres_pie_chart(genre_list):
 
     # Minimalistic pie chart without labels or percentages
     with col2:
-        fig, ax = plt.subplots(figsize=(3, 3))  # Small pie chart
+        fig, ax = plt.subplots(figsize=(2, 2))  # Smaller pie chart
         ax.pie(
             genre_counts, 
             colors=genre_colors,
@@ -216,7 +216,7 @@ def analyze_time_of_day(sp):
     hours = [pd.to_datetime(item['played_at']).hour for item in results['items']]
     hour_df = pd.DataFrame(hours, columns=["Hour"])
 
-    fig, ax = plt.subplots(figsize=(3, 1.5))  # Much smaller graph size
+    fig, ax = plt.subplots(figsize=(2, 1.5))  # Smaller graph size
     hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF5733', linewidth=1.5, markersize=4)
 
     ax.set_title("Time of Day Listening Patterns", color="white", fontsize=10)
