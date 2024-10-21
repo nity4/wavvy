@@ -3,6 +3,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import time
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 
 # Spotify API credentials from Streamlit Secrets
@@ -205,15 +206,17 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
-# Create a bar chart for genres explored
-def display_genres_chart(genre_list):
+# Create a heatmap for genres explored
+def display_genres_heatmap(genre_list):
     genre_df = pd.DataFrame(genre_list, columns=["Genre"])
     genre_counts = genre_df["Genre"].value_counts()
 
-    st.write("### Genres Explored")
-    fig, ax = plt.subplots()
-    genre_counts.plot(kind='barh', ax=ax, color='#1DB954')
-    ax.set_title("Top Genres Explored")
+    # Prepare heatmap data
+    genre_matrix = pd.DataFrame(genre_counts).T
+    fig, ax = plt.subplots(figsize=(8, 4))
+    sns.heatmap(genre_matrix, cmap="YlGnBu", annot=True, fmt="d", cbar=False, linewidths=1, ax=ax)
+
+    st.write("### Genres Explored (Heatmap)")
     st.pyplot(fig)
 
 # Display top songs and artists insights
@@ -243,9 +246,9 @@ def display_top_insights(sp, time_range='short_term'):
             with col2:
                 st.write(f"**{artist['name']}** - {', '.join(artist['genres'])}")
 
-    # Display genres explored in a chart
+    # Display genres explored in a heatmap
     genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
-    display_genres_chart(genres)
+    display_genres_heatmap(genres)
 
     # Fascinating insights based on the user's top songs
     if top_tracks:
