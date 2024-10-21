@@ -78,7 +78,7 @@ st.markdown("""
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
     select, .stSlider label, .stRadio label, .stButton button {
-        color: black !important;
+        color: black !important;  /* Black filters */
     }
     </style>
 """, unsafe_allow_html=True)
@@ -184,22 +184,23 @@ def display_genres_pie_chart(genre_list):
     genre_df = pd.DataFrame(genre_list, columns=["Genre"])
     genre_counts = genre_df["Genre"].value_counts()
 
-    fig, ax = plt.subplots(figsize=(2, 2), facecolor='#000')  # Even smaller pie chart size
+    # Create pie chart like the attached image
+    fig, ax = plt.subplots(figsize=(4, 4), facecolor='#fff')  # Larger, clean white background
     wedges, texts, autotexts = ax.pie(
         genre_counts, 
         labels=genre_counts.index, 
         autopct='%1.1f%%',  # Show percentages
-        colors=plt.cm.cool(np.linspace(0, 1, len(genre_counts))),  # Vibrant color scheme
-        textprops=dict(color="white"),
+        colors=plt.cm.Paired(np.linspace(0, 1, len(genre_counts))),  # Pastel-like color scheme
+        textprops=dict(color="black"),  # Black text on white background
         wedgeprops=dict(edgecolor='black'),
     )
 
-    fig.patch.set_facecolor('black')
-    ax.set_facecolor('black')
+    fig.patch.set_facecolor('white')
+    ax.set_facecolor('white')
 
     for text in autotexts:
-        text.set_fontsize(8)  # Smaller percentage text
-        text.set_color("white")
+        text.set_fontsize(10)  # Adjust percentage text size
+        text.set_color("black")
 
     st.write("### Genres Explored (Pie Chart)")
     st.pyplot(fig)
@@ -213,20 +214,20 @@ def analyze_time_of_day(sp):
     hours = [pd.to_datetime(item['played_at']).hour for item in results['items']]
     hour_df = pd.DataFrame(hours, columns=["Hour"])
 
-    fig, ax = plt.subplots(figsize=(3, 2))  # Smaller line graph size
-    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF6347', linewidth=2, markersize=5)
+    fig, ax = plt.subplots(figsize=(4, 3))  # Smaller and cooler graph
+    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF5733', linewidth=2, markersize=7)
 
-    ax.set_title("Listening Patterns by Time of Day", color="white", fontsize=12)
-    ax.set_xlabel("Hour of Day", color="white")
-    ax.set_ylabel("Number of Tracks", color="white")
-    ax.spines['bottom'].set_color('white')
-    ax.spines['top'].set_color('white') 
-    ax.spines['right'].set_color('white')
-    ax.spines['left'].set_color('white')
-    ax.tick_params(axis='x', colors='white')
-    ax.tick_params(axis='y', colors='white')
-    ax.set_facecolor("#1e1e1e")  # Dark background
-    fig.patch.set_facecolor("#1e1e1e")
+    ax.set_title("Listening Patterns by Time of Day", color="black", fontsize=12)
+    ax.set_xlabel("Hour of Day", color="black")
+    ax.set_ylabel("Number of Tracks", color="black")
+    ax.spines['bottom'].set_color('black')
+    ax.spines['top'].set_color('black') 
+    ax.spines['right'].set_color('black')
+    ax.spines['left'].set_color('black')
+    ax.tick_params(axis='x', colors='black')
+    ax.tick_params(axis='y', colors='black')
+    ax.set_facecolor("white")  # White background for cleaner look
+    fig.patch.set_facecolor("white")
 
     st.write("### Listening Patterns by Time of Day")
     st.pyplot(fig)
@@ -331,7 +332,7 @@ def display_music_personality(sp):
     <div class="personality-card">
         <h2>Personality Summary</h2>
         <p><strong>Personality Name</strong>: {personality}</p>
-        <div class="personality-color-box" style="background-color: {color}; width: 20px; height: 20px; display: inline-block; margin-right: 10px;"></div>
+        <div class="personality-color-box" style="background-color: {color}; width: 40px; height: 40px; border-radius: 50%; display: inline-block; margin-right: 10px;"></div>
         <strong>Personality Color</strong>: {color.capitalize()}</p>
         <p>{description}</p>
     </div>
