@@ -227,6 +227,92 @@ def analyze_time_of_day(sp):
     peak_hour = hour_df["Hour"].mode()[0]
     st.markdown(f"<div class='insight-box'>Your peak listening hour this week is {peak_hour}:00.</div>", unsafe_allow_html=True)
 
+# Fetch top items for insights
+def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
+    if item_type == 'tracks':
+        results = handle_spotify_rate_limit(sp.current_user_top_tracks, time_range=time_range, limit=limit)
+    elif item_type == 'artists':
+        results = handle_spotify_rate_limit(sp.current_user_top_artists, time_range=time_range, limit=limit)
+    items = []
+    for item in results['items']:
+        if item_type == 'tracks':
+            items.append({
+                'name': item['name'],
+                'artist': item['artists'][0]['name'],
+                'popularity': item.get('popularity', 0),
+                'cover': item['album']['images'][0]['url'] if item['album']['images'] else None,
+                'tempo': item.get('tempo', 120)
+            })
+        elif item_type == 'artists':
+            items.append({
+                'name': item['name'],
+                'genres': item.get('genres', ['Unknown Genre']),
+                'cover': item['images'][0]['url'] if item['images'] else None
+            })
+    return items
+
+# Display top songs and artists insights
+def display_top_insights(sp, time_range='short_term'):
+    top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
+    top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
+    
+    st.write(f"### Top Insights for {time_range.replace('_', ' ').title()}")
+
+    # Display top songs with cover images
+    if top_tracks:
+        st.write("### Top Songs")
+        for track in top_tracks:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.image(track['cover'], width=80)
+            with col2:
+                st.write(f"**{track['name']}** by {track['artist']}")
+    
+    # Display top artists with their cover images
+    if top_artists:
+        st.write("### Top Artists")
+        for artist in top_artists:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.image(artist['cover'], width=80)
+            with col2:
+                st.write(f"**{artist['name']}**")
+
+    # Display genres explored in a pie chart
+    genres = [artist['genres'][0] for artist in top_artists if artist['genres']]
+    display_genres_pie_chart(genres)
+
+    # Fascinating insights based on the user's top songs
+    if top_tracks:
+        avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
+        avg_tempo = round(sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks), 1)
+        hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
+
+        # Display insights in well-formatted boxes
+        st.write("### Fascinating Insights")
+        st.markdown(f"<div class='insight-box'><strong>Average Popularity of Top Songs:</strong> {avg_popularity}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='insight-box'><strong>Average Tempo of Top Songs:</strong> {avg_tempo} BPM</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='insight-box'><strong>Hidden Gems (Less Popular Tracks):</strong> {len(hidden_gems)} discovered</div>", unsafe_allow_html=True)
+
+# Display music personality profile
+def display_music_personality(sp):
+    # Fetch recent listening data
+    results = handle_spotify_rate_limit(sp.current_user_recently_played, limit=50)
+    total_songs = len(results['items']) if results else 0
+    total_minutes = sum([item['track']['duration_ms'] for item in results['items']]) / (1000 * 60) if results else 0
+    
+    st.write(f"### Your Music Personality Profile")
+    st.markdown(f"""
+    <div class="personality-card">
+        <h2>Weekly Listening Stats</h2>
+        <p><strong>Total Tracks This Week:</strong> {total_songs}</p>
+        <p><strong>Total Minutes Listened This Week:</strong> {total_minutes:.1f} minutes</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Add time of day analysis for listening patterns
+    analyze_time_of_day(sp)
+
 # Main app logic
 if is_authenticated():
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
