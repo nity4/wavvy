@@ -50,7 +50,7 @@ st.markdown("""
         padding-top: 50px;
         margin-bottom: 20px;
         letter-spacing: 5px;
-        color: black !important;
+        color: white !important;
     }
     .login-button {
         color: white;
@@ -184,7 +184,7 @@ def display_genres_pie_chart(genre_list):
     genre_df = pd.DataFrame(genre_list, columns=["Genre"])
     genre_counts = genre_df["Genre"].value_counts()
 
-    fig, ax = plt.subplots(figsize=(3, 3), facecolor='#000')  # Smaller pie chart size
+    fig, ax = plt.subplots(figsize=(2, 2), facecolor='#000')  # Even smaller pie chart size
     wedges, texts, autotexts = ax.pie(
         genre_counts, 
         labels=genre_counts.index, 
@@ -198,7 +198,7 @@ def display_genres_pie_chart(genre_list):
     ax.set_facecolor('black')
 
     for text in autotexts:
-        text.set_fontsize(9)  # Smaller percentage text
+        text.set_fontsize(8)  # Smaller percentage text
         text.set_color("white")
 
     st.write("### Genres Explored (Pie Chart)")
@@ -213,10 +213,10 @@ def analyze_time_of_day(sp):
     hours = [pd.to_datetime(item['played_at']).hour for item in results['items']]
     hour_df = pd.DataFrame(hours, columns=["Hour"])
 
-    fig, ax = plt.subplots(figsize=(5, 3))  # Small graph size
-    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF6347', linewidth=2, markersize=8)
+    fig, ax = plt.subplots(figsize=(3, 2))  # Smaller line graph size
+    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF6347', linewidth=2, markersize=5)
 
-    ax.set_title("Listening Patterns by Time of Day", color="white", fontsize=14)
+    ax.set_title("Listening Patterns by Time of Day", color="white", fontsize=12)
     ax.set_xlabel("Hour of Day", color="white")
     ax.set_ylabel("Number of Tracks", color="white")
     ax.spines['bottom'].set_color('white')
@@ -331,7 +331,7 @@ def display_music_personality(sp):
     <div class="personality-card">
         <h2>Personality Summary</h2>
         <p><strong>Personality Name</strong>: {personality}</p>
-        <div class="personality-color-box" style="background-color: {color}; display: inline-block;"></div>
+        <div class="personality-color-box" style="background-color: {color}; width: 20px; height: 20px; display: inline-block; margin-right: 10px;"></div>
         <strong>Personality Color</strong>: {color.capitalize()}</p>
         <p>{description}</p>
     </div>
