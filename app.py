@@ -50,7 +50,6 @@ st.markdown("""
         padding-top: 50px;
         margin-bottom: 20px;
         letter-spacing: 5px;
-        color: black !important; /* Changed title color to black */
     }
     .login-button {
         color: white;
@@ -84,8 +83,12 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
+    /* Black text for filters and white-background elements */
     select, .stSlider label, .stRadio label, .stButton button {
-        color: black !important; /* Set filter labels to black */
+        color: black !important;
+    }
+    .stMarkdown h2, .stMarkdown h3, .stMarkdown p, .stMarkdown label {
+        color: black !important; /* Fix for black text on white backgrounds */
     }
     </style>
 """, unsafe_allow_html=True)
@@ -210,7 +213,7 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
-# Create a pie chart for genres explored
+# Create a pie chart for genres explored with exact counts
 def display_genres_pie_chart(genre_list):
     genre_df = pd.DataFrame(genre_list, columns=["Genre"])
     genre_counts = genre_df["Genre"].value_counts()
