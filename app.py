@@ -179,33 +179,35 @@ def display_songs(song_list, title):
     else:
         st.write("No songs found.")
 
-# Create a pie chart for genres explored
+# Create a pie chart with a list of genres and colors
 def display_genres_pie_chart(genre_list):
     genre_df = pd.DataFrame(genre_list, columns=["Genre"])
     genre_counts = genre_df["Genre"].value_counts()
+    genre_colors = plt.cm.Paired(np.linspace(0, 1, len(genre_counts)))
 
-    # Create pie chart like the attached image
-    fig, ax = plt.subplots(figsize=(4, 4), facecolor='#fff')  # Larger, clean white background
-    wedges, texts, autotexts = ax.pie(
-        genre_counts, 
-        labels=genre_counts.index, 
-        autopct='%1.1f%%',  # Show percentages
-        colors=plt.cm.Paired(np.linspace(0, 1, len(genre_counts))),  # Pastel-like color scheme
-        textprops=dict(color="black"),  # Black text on white background
-        wedgeprops=dict(edgecolor='black'),
-    )
+    # Create the layout with a list of genres with colors and a smaller pie chart
+    col1, col2 = st.columns([1, 2])  # Layout: genres on the left, pie chart on the right
 
-    fig.patch.set_facecolor('white')
-    ax.set_facecolor('white')
+    # List genres with their respective colors
+    with col1:
+        st.write("### Genre Breakdown")
+        for i, genre in enumerate(genre_counts.index):
+            st.markdown(f"<span style='color:{genre_colors[i]};'>⬤</span> {genre}", unsafe_allow_html=True)
 
-    for text in autotexts:
-        text.set_fontsize(10)  # Adjust percentage text size
-        text.set_color("black")
+    # Minimalistic pie chart without labels or percentages
+    with col2:
+        fig, ax = plt.subplots(figsize=(3, 3))  # Small pie chart
+        ax.pie(
+            genre_counts, 
+            colors=genre_colors,
+            wedgeprops=dict(edgecolor='black')
+        )
+        # Set pie chart background to transparent
+        fig.patch.set_alpha(0)
+        ax.set_facecolor("none")
+        st.pyplot(fig)
 
-    st.write("### Genres Explored (Pie Chart)")
-    st.pyplot(fig)
-
-# Analyze time of day listening patterns
+# Analyze time of day listening patterns with a much smaller graph
 def analyze_time_of_day(sp):
     results = handle_spotify_rate_limit(sp.current_user_recently_played, limit=50)
     if not results:
@@ -214,22 +216,21 @@ def analyze_time_of_day(sp):
     hours = [pd.to_datetime(item['played_at']).hour for item in results['items']]
     hour_df = pd.DataFrame(hours, columns=["Hour"])
 
-    fig, ax = plt.subplots(figsize=(4, 3))  # Smaller and cooler graph
-    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF5733', linewidth=2, markersize=7)
+    fig, ax = plt.subplots(figsize=(3, 1.5))  # Much smaller graph size
+    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF5733', linewidth=1.5, markersize=4)
 
-    ax.set_title("Listening Patterns by Time of Day", color="black", fontsize=12)
-    ax.set_xlabel("Hour of Day", color="black")
-    ax.set_ylabel("Number of Tracks", color="black")
-    ax.spines['bottom'].set_color('black')
-    ax.spines['top'].set_color('black') 
-    ax.spines['right'].set_color('black')
-    ax.spines['left'].set_color('black')
-    ax.tick_params(axis='x', colors='black')
-    ax.tick_params(axis='y', colors='black')
-    ax.set_facecolor("white")  # White background for cleaner look
-    fig.patch.set_facecolor("white")
+    ax.set_title("Time of Day Listening Patterns", color="white", fontsize=10)
+    ax.set_xlabel("Hour", color="white")
+    ax.set_ylabel("Tracks", color="white")
+    ax.spines['bottom'].set_color('white')
+    ax.spines['top'].set_color('white') 
+    ax.spines['right'].set_color('white')
+    ax.spines['left'].set_color('white')
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+    ax.set_facecolor("none")  # Transparent background for graph
+    fig.patch.set_alpha(0)
 
-    st.write("### Listening Patterns by Time of Day")
     st.pyplot(fig)
 
     peak_hour = hour_df["Hour"].mode()[0]
