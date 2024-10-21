@@ -1,6 +1,6 @@
 import streamlit as st
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+import spotify
+from spotify.oauth2 import SpotifyOAuth
 import time
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -133,7 +133,7 @@ def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
     while retries < max_retries:
         try:
             return sp_func(*args, **kwargs)
-        except spotipy.SpotifyException as e:
+        except spotify.SpotifyException as e:
             if e.http_status == 429:
                 retry_after = int(e.headers.get("Retry-After", wait_time)) if e.headers and "Retry-After" in e.headers else wait_time
                 st.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
@@ -349,7 +349,7 @@ def display_music_personality(sp):
 
 # Main app logic
 if is_authenticated():
-    sp = spotipy.Spotipy(auth=st.session_state['token_info']['access_token'])
+    sp = spotify.spotify(auth=st.session_state['token_info']['access_token'])
 
     # Tabs for different features
     tab1, tab2, tab3 = st.tabs([
