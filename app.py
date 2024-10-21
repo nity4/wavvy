@@ -227,7 +227,7 @@ def discover_new_songs(sp, mood, intensity):
 
 # Feature: Undiscovered Songs in Top Albums
 def undiscovered_songs_in_top_albums(sp):
-    st.write("### 🎧 Undiscovered Songs in Top Albums")
+    st.write("Undiscovered Songs in Top Albums")
     
     # Fetch top albums and track information
     top_albums = sp.current_user_top_tracks(limit=10)
@@ -257,7 +257,7 @@ def display_top_insights_with_emojis(sp, time_range='short_term'):
 
     # Display top songs with cover images
     if top_tracks:
-        st.write("### 🎵 Top Songs")
+        st.write("Top Songs")
         for track in top_tracks:
             col1, col2 = st.columns([1, 4])
             with col1:
@@ -267,7 +267,7 @@ def display_top_insights_with_emojis(sp, time_range='short_term'):
 
     # Display top artists with their cover images
     if top_artists:
-        st.write("### 🎤 Top Artists")
+        st.write("Top Artists")
         for artist in top_artists:
             col1, col2 = st.columns([1, 4])
             with col1:
