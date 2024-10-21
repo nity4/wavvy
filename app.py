@@ -188,18 +188,17 @@ def display_genres_pie_chart(genre_list):
     wedges, texts, autotexts = ax.pie(
         genre_counts, 
         labels=genre_counts.index, 
-        autopct=lambda p: '{:.0f}'.format(p * sum(genre_counts) / 100),
-        colors=plt.cm.viridis(np.linspace(0, 1, len(genre_counts))),
+        autopct='%1.1f%%',  # Show percentages
+        colors=plt.cm.cool(np.linspace(0, 1, len(genre_counts))),  # Vibrant color scheme
         textprops=dict(color="white"),
         wedgeprops=dict(edgecolor='black'),
     )
 
-    # Set the background color of the plot to match the app's style
     fig.patch.set_facecolor('black')
     ax.set_facecolor('black')
 
     for text in autotexts:
-        text.set_fontsize(10)
+        text.set_fontsize(9)  # Smaller percentage text
         text.set_color("white")
 
     st.write("### Genres Explored (Pie Chart)")
@@ -213,15 +212,23 @@ def analyze_time_of_day(sp):
     
     hours = [pd.to_datetime(item['played_at']).hour for item in results['items']]
     hour_df = pd.DataFrame(hours, columns=["Hour"])
-    
+
+    fig, ax = plt.subplots(figsize=(5, 3))  # Small graph size
+    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF6347', linewidth=2, markersize=8)
+
+    ax.set_title("Listening Patterns by Time of Day", color="white", fontsize=14)
+    ax.set_xlabel("Hour of Day", color="white")
+    ax.set_ylabel("Number of Tracks", color="white")
+    ax.spines['bottom'].set_color('white')
+    ax.spines['top'].set_color('white') 
+    ax.spines['right'].set_color('white')
+    ax.spines['left'].set_color('white')
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+    ax.set_facecolor("#1e1e1e")  # Dark background
+    fig.patch.set_facecolor("#1e1e1e")
+
     st.write("### Listening Patterns by Time of Day")
-    
-    fig, ax = plt.subplots()
-    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#1DB954')
-    
-    ax.set_title("Listening Distribution by Hour")
-    ax.set_xlabel("Hour of Day")
-    ax.set_ylabel("Tracks Played")
     st.pyplot(fig)
 
     peak_hour = hour_df["Hour"].mode()[0]
@@ -294,24 +301,61 @@ def display_top_insights(sp, time_range='short_term'):
         st.markdown(f"<div class='insight-box'><strong>Average Tempo of Top Songs:</strong> {avg_tempo} BPM</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='insight-box'><strong>Hidden Gems (Less Popular Tracks):</strong> {len(hidden_gems)} discovered</div>", unsafe_allow_html=True)
 
+# Analyze listening behavior for the personality profile
+def analyze_listening_behavior(sp):
+    top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
+    total_artists = len(top_artists)
+    
+    top_tracks = get_top_items(sp, item_type='tracks', time_range='long_term', limit=50)
+    total_songs = len(top_tracks)
+
+    avg_songs_per_artist = total_songs / total_artists if total_artists else 0
+
+    if avg_songs_per_artist > 30:
+        return "Deep Diver", "blue", "You're all about depth—diving deep into a few artists and their entire discographies."
+    elif total_artists > 40:
+        return "Explorer", "green", "You're a breadth explorer, constantly seeking new artists and sounds."
+    else:
+        return "Balanced Listener", "yellow", "You strike the perfect balance between exploring new music and sticking to your favorites."
+
 # Display music personality profile
 def display_music_personality(sp):
+    # Analyze listening behavior and determine personality type
+    personality, color, description = analyze_listening_behavior(sp)
+    
     # Fetch recent listening data
-    results = handle_spotify_rate_limit(sp.current_user_recently_played, limit=50)
-    total_songs = len(results['items']) if results else 0
-    total_minutes = sum([item['track']['duration_ms'] for item in results['items']]) / (1000 * 60) if results else 0
+    total_songs_this_week, total_minutes_this_week = fetch_recently_played(sp)
     
     st.write(f"### Your Music Personality Profile")
     st.markdown(f"""
     <div class="personality-card">
+        <h2>Personality Summary</h2>
+        <p><strong>Personality Name</strong>: {personality}</p>
+        <div class="personality-color-box" style="background-color: {color}; display: inline-block;"></div>
+        <strong>Personality Color</strong>: {color.capitalize()}</p>
+        <p>{description}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown(f"""
+    <div class="personality-card">
         <h2>Weekly Listening Stats</h2>
-        <p><strong>Total Tracks This Week:</strong> {total_songs}</p>
-        <p><strong>Total Minutes Listened This Week:</strong> {total_minutes:.1f} minutes</p>
+        <p><strong>Total Tracks This Week:</strong> {total_songs_this_week}</p>
+        <p><strong>Total Minutes Listened This Week:</strong> {total_minutes_this_week} minutes</p>
     </div>
     """, unsafe_allow_html=True)
 
     # Add time of day analysis for listening patterns
     analyze_time_of_day(sp)
+
+# Fetch recent listening data and calculate behavioral insights
+def fetch_recently_played(sp):
+    results = handle_spotify_rate_limit(sp.current_user_recently_played, limit=50)
+    if not results:
+        return 0, 0
+    total_songs = len(results['items'])
+    total_minutes = sum([item['track']['duration_ms'] for item in results['items']]) / (1000 * 60)  # Convert ms to minutes
+    return total_songs, total_minutes
 
 # Main app logic
 if is_authenticated():
@@ -342,7 +386,7 @@ if is_authenticated():
 
     with tab3:
         display_music_personality(sp)
-
+    
 else:
     st.write("Welcome to Wvvy")
     st.write("Login to explore your personalized music experience.")
