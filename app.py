@@ -5,6 +5,7 @@ import time
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import random
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -161,6 +162,7 @@ def get_liked_songs(sp):
             "tempo": audio_features["tempo"],
             "popularity": track['popularity']
         })
+    random.shuffle(liked_songs)  # Shuffle the liked songs before displaying
     return liked_songs
 
 # Function to display songs with their cover images
@@ -183,7 +185,7 @@ def display_songs(song_list, title):
 def display_genres_pie_chart(genre_list):
     genre_df = pd.DataFrame(genre_list, columns=["Genre"])
     genre_counts = genre_df["Genre"].value_counts()
-    genre_colors = plt.cm.Paired(np.linspace(0, 1, len(genre_counts)))
+    genre_colors = plt.cm.viridis(np.linspace(0, 1, len(genre_counts)))  # Cool, sleek color palette
 
     # Create the layout with a list of genres with colors and a smaller pie chart
     col1, col2 = st.columns([1, 1])  # Layout: genres on the left, pie chart on the right
@@ -194,20 +196,21 @@ def display_genres_pie_chart(genre_list):
         for i, genre in enumerate(genre_counts.index):
             st.markdown(f"<span style='color:{genre_colors[i]};'>⬤</span> {genre}", unsafe_allow_html=True)
 
-    # Minimalistic pie chart without labels or percentages
+    # Minimalistic, sleek pie chart
     with col2:
         fig, ax = plt.subplots(figsize=(2, 2))  # Smaller pie chart
         ax.pie(
             genre_counts, 
             colors=genre_colors,
-            wedgeprops=dict(edgecolor='black')
+            wedgeprops=dict(edgecolor='black'),
+            startangle=90  # Sleek start angle for modern look
         )
         # Set pie chart background to transparent
         fig.patch.set_alpha(0)
         ax.set_facecolor("none")
         st.pyplot(fig)
 
-# Analyze time of day listening patterns with a much smaller graph
+# Analyze time of day listening patterns with a compact graph
 def analyze_time_of_day(sp):
     results = handle_spotify_rate_limit(sp.current_user_recently_played, limit=50)
     if not results:
@@ -216,7 +219,7 @@ def analyze_time_of_day(sp):
     hours = [pd.to_datetime(item['played_at']).hour for item in results['items']]
     hour_df = pd.DataFrame(hours, columns=["Hour"])
 
-    fig, ax = plt.subplots(figsize=(2, 1.5))  # Smaller graph size
+    fig, ax = plt.subplots(figsize=(2, 1.2))  # Much smaller graph size
     hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF5733', linewidth=1.5, markersize=4)
 
     ax.set_title("Time of Day Listening Patterns", color="white", fontsize=10)
@@ -378,8 +381,8 @@ if is_authenticated():
             liked_songs = get_liked_songs(sp)
             filtered_liked_songs = [song for song in liked_songs if song['energy'] > 0.5]
             display_songs(filtered_liked_songs, "Your Liked Songs")
-        else:
-            st.warning("Discover New Songs feature not implemented.")
+        elif option == "Discover New Songs":
+            st.warning("Discover New Songs feature not implemented.")  # Placeholder for future implementation
 
     with tab2:
         time_filter = st.selectbox("Select Time Period:", ["This Week", "This Month", "This Year"])
