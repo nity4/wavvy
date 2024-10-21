@@ -50,6 +50,7 @@ st.markdown("""
         padding-top: 50px;
         margin-bottom: 20px;
         letter-spacing: 5px;
+        color: black !important; /* Changed title color to black */
     }
     .login-button {
         color: white;
@@ -82,6 +83,9 @@ st.markdown("""
         margin-bottom: 20px;
         border-radius: 10px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    select, .stSlider label, .stRadio label, .stButton button {
+        color: black !important; /* Set filter labels to black */
     }
     </style>
 """, unsafe_allow_html=True)
@@ -211,11 +215,11 @@ def display_genres_pie_chart(genre_list):
     genre_df = pd.DataFrame(genre_list, columns=["Genre"])
     genre_counts = genre_df["Genre"].value_counts()
 
-    fig, ax = plt.subplots(figsize=(3, 3), facecolor='#000')  # Smaller size, dark background
+    fig, ax = plt.subplots(figsize=(5, 5), facecolor='#000')  # Larger pie chart for readability
     wedges, texts, autotexts = ax.pie(
         genre_counts, 
         labels=genre_counts.index, 
-        autopct='%1.1f%%',
+        autopct=lambda p: '{:.0f}'.format(p * sum(genre_counts) / 100),  # Exact count instead of percentage
         colors=plt.cm.viridis(np.linspace(0, 1, len(genre_counts))),
         textprops=dict(color="white"),
         wedgeprops=dict(edgecolor='black'),
@@ -225,8 +229,10 @@ def display_genres_pie_chart(genre_list):
     fig.patch.set_facecolor('black')
     ax.set_facecolor('black')
 
+    # Improve readability
     for text in autotexts:
-        text.set_fontsize(8)  # Make percentage text smaller
+        text.set_fontsize(10)  # Larger percentage text
+        text.set_color("white")
 
     st.write("### Genres Explored (Pie Chart)")
     st.pyplot(fig)
