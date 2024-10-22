@@ -5,7 +5,6 @@ import time
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import random
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -201,7 +200,7 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
-# Display top songs, artists, and genres with gradient and no background
+# Display top songs, artists, and genres with a reduced-height, thick bar graph
 def display_top_insights_with_genres(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
     top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
@@ -214,9 +213,9 @@ def display_top_insights_with_genres(sp, time_range='short_term'):
     if top_genres:
         st.write("### 🎧 Top Genres")
         genre_counts = pd.Series(top_genres).value_counts()
-        fig, ax = plt.subplots(figsize=(6, 4))
+        fig, ax = plt.subplots(figsize=(6, 2))  # Reduced height
         
-        genre_counts.plot(kind='bar', ax=ax, color=plt.cm.plasma(np.linspace(0, 1, len(genre_counts))))
+        genre_counts.plot(kind='bar', ax=ax, color='#1DB954', width=0.6)  # Thicker bars, unified color
         ax.set_facecolor('none')
         fig.patch.set_alpha(0)  # Remove figure background
 
@@ -240,22 +239,6 @@ def display_top_insights_with_genres(sp, time_range='short_term'):
         st.markdown(f"<div class='insight-box'>🌟 <strong>Average Popularity of Top Songs:</strong> {avg_popularity}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='insight-box'>🎶 <strong>Average Tempo of Top Songs:</strong> {avg_tempo} BPM</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='insight-box'>💎 <strong>Hidden Gems (Less Popular Tracks):</strong> {len(hidden_gems)} discovered</div>", unsafe_allow_html=True)
-
-# Analyze and show songs you love but haven’t added to your liked songs
-def songs_you_love_but_not_liked(sp):
-    st.write("### 🎧 Songs You Love But Haven’t Added to Your Liked Songs")
-
-    # Fetch top-played songs and liked songs
-    top_tracks = get_top_items(sp, item_type='tracks', time_range='long_term', limit=20)
-    liked_songs = get_liked_songs(sp)
-
-    # Use .get() to ensure 'id' is available, otherwise return None
-    liked_song_ids = {song.get('id') for song in liked_songs if song.get('id')}  # Use set for faster lookup
-
-    # Find songs that are played frequently but not liked
-    unliked_tracks = [track for track in top_tracks if track.get('id') not in liked_song_ids]
-    
-    display_songs_with_cover(unliked_tracks, "Frequently Played but Not Liked")
 
 # Fetch and display weekly personality profile
 def display_music_personality(sp):
@@ -297,7 +280,7 @@ def display_weekly_listening_patterns(sp):
 
     # Plot the graph for the past week
     fig, ax = plt.subplots(figsize=(5, 2))
-    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF5733', linewidth=1.5)
+    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF5733', linewidth=2)  # Thicker lines
     
     ax.set_title("Weekly Listening Patterns", color="white")
     ax.set_xlabel("Hour of Day", color="white")
@@ -346,10 +329,9 @@ def fetch_recently_played(sp, time_range='short_term'):
 if is_authenticated():
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3 = st.tabs([
         "Liked Songs & New Discoveries", 
         "Top Songs, Artists & Genres", 
-        "Songs You Love But Not Liked", 
         "Your Music Personality"
     ])
 
@@ -371,9 +353,6 @@ if is_authenticated():
         display_top_insights_with_genres(sp, time_range=time_mapping[time_filter])
 
     with tab3:
-        songs_you_love_but_not_liked(sp)
-
-    with tab4:
         display_music_personality(sp)
     
 else:
