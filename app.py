@@ -156,7 +156,6 @@ def get_liked_songs(sp):
             "tempo": audio_features.get("tempo", 120),
             "popularity": track.get('popularity', 0)
         })
-    random.shuffle(liked_songs)  # Shuffle the liked songs before displaying
     return liked_songs
 
 # Function to display songs with their cover images (cover left, name right)
@@ -202,7 +201,7 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
-# Display top songs, artists, and genres
+# Display top songs, artists, and genres with gradient and no background
 def display_top_insights_with_genres(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
     top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
@@ -215,7 +214,22 @@ def display_top_insights_with_genres(sp, time_range='short_term'):
     if top_genres:
         st.write("### 🎧 Top Genres")
         genre_counts = pd.Series(top_genres).value_counts()
-        st.bar_chart(genre_counts)
+        fig, ax = plt.subplots(figsize=(6, 4))
+        
+        genre_counts.plot(kind='bar', ax=ax, color=plt.cm.plasma(np.linspace(0, 1, len(genre_counts))))
+        ax.set_facecolor('none')
+        fig.patch.set_alpha(0)  # Remove figure background
+
+        # Customize the appearance
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_color('white')
+        ax.spines['bottom'].set_color('white')
+        ax.tick_params(colors='white')
+        ax.set_title('Top Genres', color='white')
+        ax.set_xlabel('Genres', color='white')
+        ax.set_ylabel('Count', color='white')
+        st.pyplot(fig)
 
     st.write("### Fascinating Insights 💡")
     if top_tracks:
@@ -236,7 +250,7 @@ def songs_you_love_but_not_liked(sp):
     liked_songs = get_liked_songs(sp)
 
     # Use .get() to ensure 'id' is available, otherwise return None
-    liked_song_ids = [song.get('id') for song in liked_songs if song.get('id')]
+    liked_song_ids = {song.get('id') for song in liked_songs if song.get('id')}  # Use set for faster lookup
 
     # Find songs that are played frequently but not liked
     unliked_tracks = [track for track in top_tracks if track.get('id') not in liked_song_ids]
