@@ -70,6 +70,17 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
+    .genre-card {
+        background-color: #1e1e1e;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 10px;
+        text-align: center;
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #1DB954;
+        letter-spacing: 1px;
+    }
     select, .stSlider label, .stRadio label, .stButton button {
         color: black !important;
     }
@@ -244,7 +255,7 @@ def discover_new_songs(sp, mood, intensity):
     else:
         st.write("Not enough data to recommend new songs.")
 
-# Display top songs, artists, and genres with a horizontal bar chart for genres
+# Display top songs, artists, and genres without direct comparison
 def display_top_insights_with_genres(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
     top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
@@ -252,37 +263,15 @@ def display_top_insights_with_genres(sp, time_range='short_term'):
     display_songs_with_cover(top_tracks, "🎵 Top Songs")
     display_songs_with_cover(top_artists, "🎤 Top Artists")
 
-    # Display top genres
+    # Display top genres in a clean list format
     top_genres = [artist['genres'][0] for artist in top_artists if 'genres' in artist and artist['genres']]
     if top_genres:
         st.write("### 🎧 Top Genres")
-        genre_counts = pd.Series(top_genres).value_counts()
-        fig, ax = plt.subplots(figsize=(6, 4))  # Increased height
-        
-        genre_counts.plot(kind='barh', ax=ax, color='#1DB954', width=0.6)  # Horizontal bar chart
-        ax.set_facecolor('none')
-        fig.patch.set_alpha(0)  # Remove figure background
+        genre_counts = pd.Series(top_genres).value_counts().index.tolist()  # Just get the unique genres
 
-        # Customize the appearance
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['left'].set_color('white')
-        ax.spines['bottom'].set_color('white')
-        ax.tick_params(colors='white')
-        ax.set_title('Top Genres', color='white')
-        ax.set_xlabel('Count', color='white')
-        ax.set_ylabel('Genres', color='white')
-        st.pyplot(fig)
-
-    st.write("### Fascinating Insights 💡")
-    if top_tracks:
-        avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
-        avg_tempo = round(sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks), 1)
-        hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
-
-        st.markdown(f"<div class='insight-box'>🌟 <strong>Average Popularity of Top Songs:</strong> {avg_popularity}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='insight-box'>🎶 <strong>Average Tempo of Top Songs:</strong> {avg_tempo} BPM</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='insight-box'>💎 <strong>Hidden Gems (Less Popular Tracks):</strong> {len(hidden_gems)} discovered</div>", unsafe_allow_html=True)
+        # Display each genre in a separate styled box
+        for genre in genre_counts:
+            st.markdown(f"<div class='genre-card'>{genre}</div>", unsafe_allow_html=True)
 
 # Fetch and display weekly personality profile
 def display_music_personality(sp):
