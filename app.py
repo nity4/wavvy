@@ -214,27 +214,37 @@ def discover_new_songs(sp, mood, intensity):
     seed_tracks = [track['id'] for track in top_tracks if track.get('id')]
 
     if seed_tracks:
-        recommendations = handle_spotify_rate_limit(
-            sp.recommendations,
-            seed_tracks=seed_tracks,
-            limit=10,
-            target_energy=energy_target,
-            target_valence=valence_target
-        )
+        # Ensure only up to 5 seed tracks are used
+        seed_tracks = seed_tracks[:5]  # Limit to 5 seed tracks
 
-        new_songs = []
-        for rec in recommendations['tracks']:
-            new_songs.append({
-                "name": rec.get('name', "Unknown Track"),
-                "artist": rec['artists'][0]['name'] if 'artists' in rec and rec['artists'] else "Unknown Artist",
-                "cover": rec['album']['images'][0]['url'] if 'album' in rec and rec['album']['images'] else None
-            })
+        try:
+            recommendations = handle_spotify_rate_limit(
+                sp.recommendations,
+                seed_tracks=seed_tracks,
+                limit=10,
+                target_energy=energy_target,
+                target_valence=valence_target
+            )
+            
+            # Check if recommendations were successful
+            if recommendations and 'tracks' in recommendations:
+                new_songs = []
+                for rec in recommendations['tracks']:
+                    new_songs.append({
+                        "name": rec.get('name', "Unknown Track"),
+                        "artist": rec['artists'][0]['name'] if 'artists' in rec and rec['artists'] else "Unknown Artist",
+                        "cover": rec['album']['images'][0]['url'] if 'album' in rec and rec['album']['images'] else None
+                    })
 
-        display_songs_with_cover(new_songs, "🎧 New Songs Based on Your Mood")
+                display_songs_with_cover(new_songs, "🎧 New Songs Based on Your Mood")
+            else:
+                st.write("No recommendations found based on your mood.")
+        except Exception as e:
+            st.error(f"Error fetching recommendations: {e}")
     else:
         st.write("Not enough data to recommend new songs.")
 
-# Display top songs, artists, and genres with a reduced-height, thick bar graph
+# Display top songs, artists, and genres with a horizontal bar chart for genres
 def display_top_insights_with_genres(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
     top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
@@ -247,9 +257,9 @@ def display_top_insights_with_genres(sp, time_range='short_term'):
     if top_genres:
         st.write("### 🎧 Top Genres")
         genre_counts = pd.Series(top_genres).value_counts()
-        fig, ax = plt.subplots(figsize=(6, 2))  # Reduced height
+        fig, ax = plt.subplots(figsize=(6, 4))  # Increased height
         
-        genre_counts.plot(kind='bar', ax=ax, color='#1DB954', width=0.6)  # Thicker bars, unified color
+        genre_counts.plot(kind='barh', ax=ax, color='#1DB954', width=0.6)  # Horizontal bar chart
         ax.set_facecolor('none')
         fig.patch.set_alpha(0)  # Remove figure background
 
@@ -260,8 +270,8 @@ def display_top_insights_with_genres(sp, time_range='short_term'):
         ax.spines['bottom'].set_color('white')
         ax.tick_params(colors='white')
         ax.set_title('Top Genres', color='white')
-        ax.set_xlabel('Genres', color='white')
-        ax.set_ylabel('Count', color='white')
+        ax.set_xlabel('Count', color='white')
+        ax.set_ylabel('Genres', color='white')
         st.pyplot(fig)
 
     st.write("### Fascinating Insights 💡")
@@ -382,14 +392,4 @@ if is_authenticated():
             discover_new_songs(sp, mood, intensity)
 
     with tab2:
-        time_filter = st.selectbox("Select Time Period:", ["This Week", "This Month", "This Year"])
-        time_mapping = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
-        display_top_insights_with_genres(sp, time_range=time_mapping[time_filter])
-
-    with tab3:
-        display_music_personality(sp)
-    
-else:
-    st.write("Welcome to Wvvy")
-    st.write("Login to explore your personalized music experience.")
-    authenticate_user()
+        time_filter = st.selectbox("Select Time Period:",
