@@ -200,6 +200,40 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
+# Function to discover new songs based on mood and intensity
+def discover_new_songs(sp, mood, intensity):
+    top_tracks = get_top_items(sp, item_type='tracks', time_range='short_term', limit=10)
+    
+    # Define mood and intensity mapping
+    mood_valence_map = {"Happy": 0.8, "Calm": 0.3, "Energetic": 0.7, "Sad": 0.2}
+    mood_energy_map = {"Happy": 0.7, "Calm": 0.4, "Energetic": 0.9, "Sad": 0.3}
+    
+    valence_target = mood_valence_map.get(mood, 0.5) * intensity / 5
+    energy_target = mood_energy_map.get(mood, 0.5) * intensity / 5
+
+    seed_tracks = [track['id'] for track in top_tracks if track.get('id')]
+
+    if seed_tracks:
+        recommendations = handle_spotify_rate_limit(
+            sp.recommendations,
+            seed_tracks=seed_tracks,
+            limit=10,
+            target_energy=energy_target,
+            target_valence=valence_target
+        )
+
+        new_songs = []
+        for rec in recommendations['tracks']:
+            new_songs.append({
+                "name": rec.get('name', "Unknown Track"),
+                "artist": rec['artists'][0]['name'] if 'artists' in rec and rec['artists'] else "Unknown Artist",
+                "cover": rec['album']['images'][0]['url'] if 'album' in rec and rec['album']['images'] else None
+            })
+
+        display_songs_with_cover(new_songs, "🎧 New Songs Based on Your Mood")
+    else:
+        st.write("Not enough data to recommend new songs.")
+
 # Display top songs, artists, and genres with a reduced-height, thick bar graph
 def display_top_insights_with_genres(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
