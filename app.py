@@ -147,13 +147,14 @@ def get_liked_songs(sp):
         track = item['track']
         audio_features = handle_spotify_rate_limit(sp.audio_features, [track['id']])[0]
         liked_songs.append({
-            "name": track['name'],
-            "artist": track['artists'][0]['name'],
-            "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
-            "energy": audio_features["energy"],
-            "valence": audio_features["valence"],
-            "tempo": audio_features["tempo"],
-            "popularity": track['popularity']
+            "id": track.get('id', None),
+            "name": track.get('name', "Unknown Track"),
+            "artist": track['artists'][0]['name'] if 'artists' in track and track['artists'] else "Unknown Artist",
+            "cover": track['album']['images'][0]['url'] if 'album' in track and track['album']['images'] else None,
+            "energy": audio_features.get("energy", 0.5),
+            "valence": audio_features.get("valence", 0.5),
+            "tempo": audio_features.get("tempo", 120),
+            "popularity": track.get('popularity', 0)
         })
     random.shuffle(liked_songs)  # Shuffle the liked songs before displaying
     return liked_songs
@@ -181,8 +182,6 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
     if item_type == 'tracks':
         results = handle_spotify_rate_limit(sp.current_user_top_tracks, time_range=time_range, limit=limit)
     elif item_type == 'artists':
-        results = handle_spotify_rate_limit(sp.current_user_top_artists, time_range=time_range, limit=limit)
-    elif item_type == 'genres':
         results = handle_spotify_rate_limit(sp.current_user_top_artists, time_range=time_range, limit=limit)
     items = []
     for item in results['items']:
@@ -235,10 +234,13 @@ def songs_you_love_but_not_liked(sp):
     # Fetch top-played songs and liked songs
     top_tracks = get_top_items(sp, item_type='tracks', time_range='long_term', limit=20)
     liked_songs = get_liked_songs(sp)
-    liked_song_ids = [song['id'] for song in liked_songs]
+
+    # Use .get() to ensure 'id' is available, otherwise return None
+    liked_song_ids = [song.get('id') for song in liked_songs if song.get('id')]
 
     # Find songs that are played frequently but not liked
-    unliked_tracks = [track for track in top_tracks if track['id'] not in liked_song_ids]
+    unliked_tracks = [track for track in top_tracks if track.get('id') not in liked_song_ids]
+    
     display_songs_with_cover(unliked_tracks, "Frequently Played but Not Liked")
 
 # Fetch and display weekly personality profile
@@ -256,7 +258,7 @@ def display_music_personality(sp):
         <strong>Personality Color:</strong> {color.capitalize()}</p>
         <p>{description}</p>
     </div>
-    """, unsafe_allow_html=True)
+    """ , unsafe_allow_html=True)
 
     # Fetch peak listening hours
     peak_hour = display_weekly_listening_patterns(sp)
