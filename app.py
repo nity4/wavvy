@@ -165,12 +165,14 @@ def display_songs_with_cover(song_list, title):
         for song in song_list:
             col1, col2 = st.columns([1, 4])
             with col1:
-                if song["cover"]:
+                if song.get("cover"):
                     st.image(song["cover"], width=80)
                 else:
                     st.write("No cover")
             with col2:
-                st.write(f"**{song['name']}** by {song['artist']}")
+                song_name = song.get("name", "Unknown Song")
+                artist_name = song.get("artist", "Unknown Artist")
+                st.write(f"**{song_name}** by {artist_name}")
     else:
         st.write("No songs found.")
 
@@ -184,20 +186,21 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
     for item in results['items']:
         if item_type == 'tracks':
             items.append({
-                'id': item['id'],  # Track ID for recommendations
-                'name': item['name'],
-                'artist': item['artists'][0]['name'],
+                'id': item.get('id', None),  # Track ID for recommendations
+                'name': item.get('name', "Unknown Track"),
+                'artist': item['artists'][0]['name'] if 'artists' in item and item['artists'] else "Unknown Artist",
                 'popularity': item.get('popularity', 0),
-                'cover': item['album']['images'][0]['url'] if item['album']['images'] else None,
+                'cover': item['album']['images'][0]['url'] if 'album' in item and item['album']['images'] else None,
                 'tempo': item.get('tempo', 120)
             })
         elif item_type == 'artists':
             items.append({
-                'name': item['name'],
+                'name': item.get('name', "Unknown Artist"),
                 'genres': item.get('genres', ['Unknown Genre']),
-                'cover': item['images'][0]['url'] if item['images'] else None
+                'cover': item['images'][0]['url'] if 'images' in item and item['images'] else None
             })
     return items
+
 
 # Function to get albums and suggest undiscovered songs based on user’s history
 def undiscovered_songs_in_top_albums(sp):
