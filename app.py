@@ -4,6 +4,7 @@ from spotipy.oauth2 import SpotifyOAuth
 import time
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import random
 
 # Spotify API credentials from Streamlit Secrets
@@ -157,23 +158,35 @@ def get_liked_songs(sp):
     random.shuffle(liked_songs)  # Shuffle the liked songs before displaying
     return liked_songs
 
-# Function to display songs with their cover images
-def display_songs(song_list, title):
+# Function to display songs with their cover images in side-by-side format
+def display_songs_side_by_side(song_list, title):
     st.write(f"### {title}")
     if song_list:
-        for song in song_list:
-            col1, col2 = st.columns([1, 4])
-            with col1:
+        col1, col2, col3 = st.columns(3)  # Display songs in a 3-column layout
+        for i, song in enumerate(song_list):
+            with [col1, col2, col3][i % 3]:  # Alternate between the 3 columns
                 if song["cover"]:
                     st.image(song["cover"], width=80)
                 else:
                     st.write("No cover")
-            with col2:
                 st.write(f"**{song['name']}** by {song['artist']}")
     else:
         st.write("No songs found.")
 
-# Fetch top items for insights
+# Function to display top items with side-by-side format
+def display_items_side_by_side(item_list, title):
+    st.write(f"### {title}")
+    if item_list:
+        col1, col2, col3 = st.columns(3)  # 3-column layout
+        for i, item in enumerate(item_list):
+            with [col1, col2, col3][i % 3]:  # Distribute items evenly across columns
+                if item["cover"]:
+                    st.image(item["cover"], width=80)
+                st.write(f"**{item['name']}**")
+    else:
+        st.write(f"No {title.lower()} found.")
+
+# Function to fetch top items for insights
 def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
     if item_type == 'tracks':
         results = handle_spotify_rate_limit(sp.current_user_top_tracks, time_range=time_range, limit=limit)
@@ -198,19 +211,18 @@ def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
             })
     return items
 
-# Discover New Songs Based on Listening Habits
+# Discover new songs based on listening habits, mood, and intensity
 def discover_new_songs(sp, mood, intensity):
     top_tracks = get_top_items(sp, item_type='tracks', time_range='medium_term', limit=5)
     if not top_tracks:
         st.write("No songs found based on your listening habits.")
         return
 
-    # Get seed track IDs for recommendations based on user's top tracks
-    seed_tracks = [track['id'] for track in top_tracks]  # Use track IDs, not names
+    # Get seed track IDs for recommendations
+    seed_tracks = [track['id'] for track in top_tracks]
     energy_target = (intensity - 1) * 0.25  # Mapping intensity to a scale
     valence_target = {"Happy": 0.9, "Calm": 0.3, "Energetic": 0.7, "Sad": 0.2}[mood]
 
-    # Use Spotify's recommendation endpoint to get new songs based on these seeds and mood/intensity
     recommendations = sp.recommendations(seed_tracks=seed_tracks[:5], limit=10, target_energy=energy_target, target_valence=valence_target)
 
     st.write("### New Songs Recommendations Based on Your Mood and Listening Habits")
@@ -225,11 +237,28 @@ def discover_new_songs(sp, mood, intensity):
         with col2:
             st.write(f"**{track['name']}** by {track['artists'][0]['name']}")
 
-# Feature: Undiscovered Songs in Top Albums
+# Fetch and display insights
+def display_top_insights_with_emojis(sp, time_range='short_term'):
+    top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
+    top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
+
+    display_songs_side_by_side(top_tracks, "Top Songs")
+    display_items_side_by_side(top_artists, "Top Artists")
+
+    st.write(" Fascinating Insights ")
+    if top_tracks:
+        avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
+        avg_tempo = round(sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks), 1)
+        hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
+
+        st.markdown(f"<div class='insight-box'>🌟 <strong>Average Popularity of Top Songs:</strong> {avg_popularity}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='insight-box'>🎶 <strong>Average Tempo of Top Songs:</strong> {avg_tempo} BPM</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='insight-box'>💎 <strong>Hidden Gems (Less Popular Tracks):</strong> {len(hidden_gems)} discovered</div>", unsafe_allow_html=True)
+
+# Fetch the top albums and suggest undiscovered songs
 def undiscovered_songs_in_top_albums(sp):
-    st.write("Undiscovered Songs in Top Albums")
+    st.write("### 🎧 Undiscovered Songs in Top Albums")
     
-    # Fetch top albums and track information
     top_albums = sp.current_user_top_tracks(limit=10)
     if not top_albums:
         st.write("No top albums found.")
@@ -241,7 +270,6 @@ def undiscovered_songs_in_top_albums(sp):
         
         undiscovered_songs = []
         for track in album_tracks['items']:
-            # Use a safe fallback for track popularity if it's missing
             track_popularity = track.get('popularity', None)
             if track_popularity is not None and track_popularity < 30:  # Arbitrary condition for "undiscovered"
                 undiscovered_songs.append(track['name'])
@@ -249,45 +277,6 @@ def undiscovered_songs_in_top_albums(sp):
         if undiscovered_songs:
             st.write(f"**{album_name}**")
             st.write(", ".join(undiscovered_songs))
-
-# Display top songs and artists insights with emojis
-def display_top_insights_with_emojis(sp, time_range='short_term'):
-    top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
-    top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
-    
-    st.write(f"### Top Insights for {time_range.replace('_', ' ').title()}")
-
-    # Display top songs with cover images
-    if top_tracks:
-        st.write("Top Songs")
-        for track in top_tracks:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.image(track['cover'], width=80)
-            with col2:
-                st.write(f"**{track['name']}** by {track['artist']}")
-
-    # Display top artists with their cover images
-    if top_artists:
-        st.write("Top Artists")
-        for artist in top_artists:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.image(artist['cover'], width=80)
-            with col2:
-                st.write(f"**{artist['name']}**")
-
-    # Fascinating insights with emojis
-    if top_tracks:
-        avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
-        avg_tempo = round(sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks), 1)
-        hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
-
-        # Display insights in well-formatted boxes with emojis
-        st.write("### Fascinating Insights 💡")
-        st.markdown(f"<div class='insight-box'>🌟 <strong>Average Popularity of Top Songs:</strong> {avg_popularity}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='insight-box'>🎶 <strong>Average Tempo of Top Songs:</strong> {avg_tempo} BPM</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='insight-box'>💎 <strong>Hidden Gems (Less Popular Tracks):</strong> {len(hidden_gems)} discovered</div>", unsafe_allow_html=True)
 
 # Analyze listening behavior for the personality profile
 def analyze_listening_behavior(sp):
@@ -306,12 +295,10 @@ def analyze_listening_behavior(sp):
     else:
         return "Balanced Listener", "yellow", "You strike the perfect balance between exploring new music and sticking to your favorites."
 
-# Display music personality profile
+# Fetch and display music personality profile
 def display_music_personality(sp):
-    # Analyze listening behavior and determine personality type
     personality, color, description = analyze_listening_behavior(sp)
     
-    # Fetch recent listening data
     total_songs_this_week, total_minutes_this_week = fetch_recently_played(sp)
     
     st.write(f"### Your Music Personality Profile")
@@ -333,6 +320,37 @@ def display_music_personality(sp):
     </div>
     """, unsafe_allow_html=True)
 
+    analyze_listening_patterns(sp)
+
+# Analyze listening patterns and show peak timing
+def analyze_listening_patterns(sp):
+    results = handle_spotify_rate_limit(sp.current_user_recently_played, limit=50)
+    if not results:
+        return None
+    
+    hours = [pd.to_datetime(item['played_at']).hour for item in results['items']]
+    hour_df = pd.DataFrame(hours, columns=["Hour"])
+    
+    # Plot the graph for the past month
+    fig, ax = plt.subplots(figsize=(5, 2))
+    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF5733', linewidth=1.5)
+    
+    ax.set_title("Listening Patterns Over the Past Month", color="white")
+    ax.set_xlabel("Hour of Day", color="white")
+    ax.set_ylabel("Number of Tracks", color="white")
+    ax.spines['bottom'].set_color('white')
+    ax.spines['top'].set_color('white')
+    ax.spines['right'].set_color('white')
+    ax.spines['left'].set_color('white')
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+    fig.patch.set_alpha(0)
+    ax.set_facecolor("none")
+    st.pyplot(fig)
+
+    peak_hour = hour_df["Hour"].mode()[0]
+    st.markdown(f"<div class='insight-box'>Your peak listening hour in the past month is {peak_hour}:00.</div>", unsafe_allow_html=True)
+
 # Fetch recent listening data and calculate behavioral insights
 def fetch_recently_played(sp):
     results = handle_spotify_rate_limit(sp.current_user_recently_played, limit=50)
@@ -346,9 +364,10 @@ def fetch_recently_played(sp):
 if is_authenticated():
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "Liked Songs & New Discoveries", 
         "Top Songs, Artists & Genres", 
+        "Top Albums", 
         "Your Music Personality"
     ])
 
@@ -360,7 +379,7 @@ if is_authenticated():
         if option == "Liked Songs":
             liked_songs = get_liked_songs(sp)
             filtered_liked_songs = [song for song in liked_songs if song['energy'] > 0.5]
-            display_songs(filtered_liked_songs, "Your Liked Songs")
+            display_songs_side_by_side(filtered_liked_songs, "Your Liked Songs")
         elif option == "Discover New Songs":
             discover_new_songs(sp, mood, intensity)
 
@@ -368,9 +387,11 @@ if is_authenticated():
         time_filter = st.selectbox("Select Time Period:", ["This Week", "This Month", "This Year"])
         time_mapping = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
         display_top_insights_with_emojis(sp, time_range=time_mapping[time_filter])
-        undiscovered_songs_in_top_albums(sp)  # Display undiscovered songs feature
 
     with tab3:
+        undiscovered_songs_in_top_albums(sp)  # Display undiscovered songs from top albums
+
+    with tab4:
         display_music_personality(sp)
     
 else:
