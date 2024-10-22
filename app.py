@@ -241,7 +241,9 @@ def undiscovered_songs_in_top_albums(sp):
         
         undiscovered_songs = []
         for track in album_tracks['items']:
-            if track['popularity'] < 30:  # Arbitrary condition for "undiscovered"
+            # Use a safe fallback for track popularity if it's missing
+            track_popularity = track.get('popularity', None)
+            if track_popularity is not None and track_popularity < 30:  # Arbitrary condition for "undiscovered"
                 undiscovered_songs.append(track['name'])
         
         if undiscovered_songs:
