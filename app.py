@@ -73,11 +73,17 @@ st.markdown("""
     .genre-item {
         padding: 10px;
         font-size: 1.2em;
+        font-weight: bold;
         color: #1DB954;
         margin-bottom: 10px;
         background-color: #1e1e1e;
         border-radius: 10px;
         text-align: center;
+        transition: transform 0.2s;
+    }
+    .genre-item:hover {
+        transform: scale(1.05);
+        text-shadow: 2px 2px 5px #1DB954;
     }
     select, .stSlider label, .stRadio label, .stButton button {
         color: black !important;
@@ -253,7 +259,7 @@ def discover_new_songs(sp, mood, intensity):
     else:
         st.write("Not enough data to recommend new songs.")
 
-# Display top songs, artists, and genres without direct comparison
+# Display top songs, artists, and genres with some styling
 def display_top_insights_with_genres(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
     top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
@@ -261,13 +267,12 @@ def display_top_insights_with_genres(sp, time_range='short_term'):
     display_songs_with_cover(top_tracks, "Top Songs")
     display_songs_with_cover(top_artists, "Top Artists")
 
-    # Display top genres in a clean list format
+    # Display top genres with hover and subtle effects
     top_genres = [artist['genres'][0] for artist in top_artists if 'genres' in artist and artist['genres']]
     if top_genres:
         st.write("### Top Genres")
         genre_counts = pd.Series(top_genres).value_counts().index.tolist()  # Just get the unique genres
 
-        # Display each genre in a simple text format
         for genre in genre_counts:
             st.markdown(f"<div class='genre-item'>{genre}</div>", unsafe_allow_html=True)
 
