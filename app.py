@@ -392,4 +392,14 @@ if is_authenticated():
             discover_new_songs(sp, mood, intensity)
 
     with tab2:
-        time_filter = st.selectbox("Select Time Period:",
+        time_filter = st.selectbox("Select Time Period:", ["This Week", "This Month", "This Year"])
+        time_mapping = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
+        display_top_insights_with_genres(sp, time_range=time_mapping[time_filter])
+
+    with tab3:
+        display_music_personality(sp)
+    
+else:
+    st.write("Welcome to Wvvy")
+    st.write("Login to explore your personalized music experience.")
+    authenticate_user()
