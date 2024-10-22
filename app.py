@@ -70,16 +70,14 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
-    .genre-card {
-        background-color: #1e1e1e;
+    .genre-item {
         padding: 10px;
+        font-size: 1.2em;
+        color: #1DB954;
         margin-bottom: 10px;
+        background-color: #1e1e1e;
         border-radius: 10px;
         text-align: center;
-        font-size: 1.2em;
-        font-weight: bold;
-        color: #1DB954;
-        letter-spacing: 1px;
     }
     select, .stSlider label, .stRadio label, .stButton button {
         color: black !important;
@@ -247,7 +245,7 @@ def discover_new_songs(sp, mood, intensity):
                         "cover": rec['album']['images'][0]['url'] if 'album' in rec and rec['album']['images'] else None
                     })
 
-                display_songs_with_cover(new_songs, "🎧 New Songs Based on Your Mood")
+                display_songs_with_cover(new_songs, "New Songs Based on Your Mood")
             else:
                 st.write("No recommendations found based on your mood.")
         except Exception as e:
@@ -260,18 +258,30 @@ def display_top_insights_with_genres(sp, time_range='short_term'):
     top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
     top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
 
-    display_songs_with_cover(top_tracks, "🎵 Top Songs")
-    display_songs_with_cover(top_artists, "🎤 Top Artists")
+    display_songs_with_cover(top_tracks, "Top Songs")
+    display_songs_with_cover(top_artists, "Top Artists")
 
     # Display top genres in a clean list format
     top_genres = [artist['genres'][0] for artist in top_artists if 'genres' in artist and artist['genres']]
     if top_genres:
-        st.write("### 🎧 Top Genres")
+        st.write("### Top Genres")
         genre_counts = pd.Series(top_genres).value_counts().index.tolist()  # Just get the unique genres
 
-        # Display each genre in a separate styled box
+        # Display each genre in a simple text format
         for genre in genre_counts:
-            st.markdown(f"<div class='genre-card'>{genre}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='genre-item'>{genre}</div>", unsafe_allow_html=True)
+
+    # Fascinating insights based on the user's top songs
+    if top_tracks:
+        avg_popularity = round(sum(track['popularity'] for track in top_tracks) / len(top_tracks), 1) if top_tracks else 0
+        avg_tempo = round(sum(track.get('tempo', 120) for track in top_tracks) / len(top_tracks), 1)
+        hidden_gems = [track for track in top_tracks if track['popularity'] < 50]
+
+        # Display insights in well-formatted boxes
+        st.write("### Fascinating Insights")
+        st.markdown(f"<div class='insight-box'><strong>Average Popularity of Top Songs:</strong> {avg_popularity}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='insight-box'><strong>Average Tempo of Top Songs:</strong> {avg_tempo} BPM</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='insight-box'><strong>Hidden Gems (Less Popular Tracks):</strong> {len(hidden_gems)} discovered</div>", unsafe_allow_html=True)
 
 # Fetch and display weekly personality profile
 def display_music_personality(sp):
