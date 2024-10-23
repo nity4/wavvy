@@ -130,12 +130,12 @@ def authenticate_user():
         )
 
 # Helper Function for Handling Spotify API Rate Limit (429 Error) and Timeout
-def handle_spotify_rate_limit(sp_func, *args, max_retries=10, timeout=10, **kwargs):
+def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
     retries = 0
     wait_time = 1
     while retries < max_retries:
         try:
-            return sp_func(*args, timeout=timeout, **kwargs)
+            return sp_func(*args, **kwargs)
         except (spotipy.SpotifyException, ReadTimeout) as e:
             if isinstance(e, spotipy.SpotifyException) and e.http_status == 429:
                 retry_after = int(e.headers.get("Retry-After", wait_time)) if e.headers and "Retry-After" in e.headers else wait_time
