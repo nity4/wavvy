@@ -5,6 +5,7 @@ import time
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import random
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -70,20 +71,15 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
-    .genre-item {
-        padding: 10px;
-        font-size: 1.2em;
+    .genre-text {
+        font-size: 1.3em;
         font-weight: bold;
         color: #1DB954;
         margin-bottom: 10px;
-        background-color: #1e1e1e;
-        border-radius: 10px;
-        text-align: center;
-        transition: transform 0.2s;
+        transition: color 0.2s;
     }
-    .genre-item:hover {
-        transform: scale(1.05);
-        text-shadow: 2px 2px 5px #1DB954;
+    .genre-text:hover {
+        color: #66FF99;
     }
     select, .stSlider label, .stRadio label, .stButton button {
         color: black !important;
@@ -229,8 +225,9 @@ def discover_new_songs(sp, mood, intensity):
     seed_tracks = [track['id'] for track in top_tracks if track.get('id')]
 
     if seed_tracks:
-        # Ensure only up to 5 seed tracks are used
-        seed_tracks = seed_tracks[:5]  # Limit to 5 seed tracks
+        # Shuffle and use only up to 5 seed tracks
+        random.shuffle(seed_tracks)
+        seed_tracks = seed_tracks[:5]
 
         try:
             recommendations = handle_spotify_rate_limit(
@@ -267,14 +264,15 @@ def display_top_insights_with_genres(sp, time_range='short_term'):
     display_songs_with_cover(top_tracks, "Top Songs")
     display_songs_with_cover(top_artists, "Top Artists")
 
-    # Display top genres with hover and subtle effects
+    # Display top genres as styled text
     top_genres = [artist['genres'][0] for artist in top_artists if 'genres' in artist and artist['genres']]
     if top_genres:
         st.write("### Top Genres")
-        genre_counts = pd.Series(top_genres).value_counts().index.tolist()  # Just get the unique genres
+        genre_counts = pd.Series(top_genres).value_counts().index.tolist()
 
-        for genre in genre_counts:
-            st.markdown(f"<div class='genre-item'>{genre}</div>", unsafe_allow_html=True)
+        # Display genres in an interesting format
+        genre_text = ", ".join(genre_counts)
+        st.markdown(f"<div class='genre-text'>{genre_text}</div>", unsafe_allow_html=True)
 
     # Fascinating insights based on the user's top songs
     if top_tracks:
@@ -312,7 +310,7 @@ def display_music_personality(sp):
     <div class="personality-card">
         <h2>Weekly Listening Stats</h2>
         <p><strong>Total Tracks This Week:</strong> {weekly_tracks}</p>
-        <p><strong>Total Minutes Listened This Week:</strong> {weekly_minutes} minutes</p>
+        <p><strong>Total Minutes Listened This Week:</strong> {int(weekly_minutes)} minutes</p>
         <p><strong>Peak Listening Hour:</strong> {peak_hour}:00</p>
     </div>
     """, unsafe_allow_html=True)
@@ -390,7 +388,7 @@ if is_authenticated():
 
         if option == "Liked Songs":
             liked_songs = get_liked_songs(sp)
-            filtered_liked_songs = [song for song in liked_songs if song['energy'] > 0.5]
+            filtered_liked_songs = random.sample(liked_songs, min(len(liked_songs), 20))  # Limit and shuffle
             display_songs_with_cover(filtered_liked_songs, "Your Liked Songs")
         elif option == "Discover New Songs":
             discover_new_songs(sp, mood, intensity)
