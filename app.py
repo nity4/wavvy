@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+from requests.exceptions import ReadTimeout
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -128,23 +129,25 @@ def authenticate_user():
             unsafe_allow_html=True
         )
 
-# Helper Function for Handling Spotify API Rate Limit (429 Error)
-def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
+# Helper Function for Handling Spotify API Rate Limit (429 Error) and Timeout
+def handle_spotify_rate_limit(sp_func, *args, max_retries=10, timeout=10, **kwargs):
     retries = 0
     wait_time = 1
     while retries < max_retries:
         try:
-            return sp_func(*args, **kwargs)
-        except spotipy.SpotifyException as e:
-            if e.http_status == 429:
+            return sp_func(*args, timeout=timeout, **kwargs)
+        except (spotipy.SpotifyException, ReadTimeout) as e:
+            if isinstance(e, spotipy.SpotifyException) and e.http_status == 429:
                 retry_after = int(e.headers.get("Retry-After", wait_time)) if e.headers and "Retry-After" in e.headers else wait_time
                 st.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
                 time.sleep(retry_after)
-                retries += 1
-                wait_time *= 2
+            elif isinstance(e, ReadTimeout):
+                st.warning(f"Request timed out. Retrying... ({retries + 1}/{max_retries})")
             else:
                 st.error(f"Error: {e}")
                 break
+            retries += 1
+            wait_time *= 2  # Exponential backoff
     return None
 
 # Function to fetch all liked songs
