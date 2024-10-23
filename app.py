@@ -16,13 +16,13 @@ REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 # Define the required scope for Spotify access
 scope = "user-library-read user-top-read playlist-read-private user-read-recently-played"
 
-# Initialize Spotify OAuth object
+# Initialize Spotify OAuth object (used for user-specific authentication)
 sp_oauth = SpotifyOAuth(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     redirect_uri=REDIRECT_URI,
     scope=scope,
-    cache_path=".cache"
+    cache_path=None  # Remove cache file to ensure user-specific sessions
 )
 
 # Set Streamlit page configuration
@@ -95,8 +95,12 @@ st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
 def refresh_token():
     token_info = st.session_state.get('token_info', None)
     if token_info and sp_oauth.is_token_expired(token_info):
-        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-        st.session_state['token_info'] = token_info
+        try:
+            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+            st.session_state['token_info'] = token_info
+        except Exception as e:
+            st.error(f"Error refreshing token: {e}")
+            st.session_state.pop('token_info', None)  # Remove invalid token
 
 # Function to check if the user is authenticated
 def is_authenticated():
@@ -112,17 +116,20 @@ def authenticate_user():
     if "code" in query_params:
         code = query_params["code"][0]
         try:
+            # Generate a token for the specific user
             token_info = sp_oauth.get_cached_token()
             if not token_info:
                 token_info = sp_oauth.get_access_token(code)
+            # Store the user's unique token in session_state
             st.session_state['token_info'] = token_info
-            st.experimental_set_query_params()
+            st.experimental_set_query_params()  # Clear the query params after authentication
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
                 st.experimental_rerun()
         except Exception as e:
             st.error(f"Authentication error: {e}")
     else:
+        # Generate the authentication URL for each user
         auth_url = sp_oauth.get_authorize_url()
         st.markdown(
             f'<a href="{auth_url}" class="login-button">Login with Spotify</a>',
@@ -130,7 +137,7 @@ def authenticate_user():
         )
 
 # Helper Function for Handling Spotify API Rate Limit (429 Error) and Timeout
-def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
+def handle_spotify_rate_limit(sp_func, *args, max_retries=10, silent=True, **kwargs):
     retries = 0
     wait_time = 1
     while retries < max_retries:
@@ -139,18 +146,21 @@ def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
         except (spotipy.SpotifyException, ReadTimeout) as e:
             if isinstance(e, spotipy.SpotifyException) and e.http_status == 429:
                 retry_after = int(e.headers.get("Retry-After", wait_time)) if e.headers and "Retry-After" in e.headers else wait_time
-                st.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
+                if not silent:
+                    st.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
                 time.sleep(retry_after)
             elif isinstance(e, ReadTimeout):
-                st.warning(f"Request timed out. Retrying... ({retries + 1}/{max_retries})")
+                if not silent:
+                    st.warning(f"Request timed out. Retrying... ({retries + 1}/{max_retries})")
             else:
-                st.error(f"Error: {e}")
+                if not silent:
+                    st.error(f"Error: {e}")
                 break
             retries += 1
             wait_time *= 2  # Exponential backoff
     return None
 
-# Function to fetch all liked songs
+# Function to fetch all liked songs for the authenticated user
 def get_all_liked_songs(sp):
     liked_songs = []
     offset = 0
@@ -174,7 +184,7 @@ def get_all_liked_songs(sp):
         offset += 50  # Move to the next set of tracks
     return liked_songs
 
-# Function to fetch all top items
+# Function to fetch top items (tracks or artists) for the authenticated user
 def get_all_top_items(sp, item_type='tracks', time_range='short_term'):
     top_items = []
     offset = 0
@@ -205,7 +215,7 @@ def get_all_top_items(sp, item_type='tracks', time_range='short_term'):
         offset += 50  # Move to the next set of items
     return top_items
 
-# Function to display songs with their cover images (cover left, name right)
+# Function to display songs with their cover images
 def display_songs_with_cover(song_list, title):
     st.write(f"### {title}")
     if song_list:
@@ -338,7 +348,7 @@ def display_weekly_listening_patterns(sp):
 
     # Plot the graph for the past week
     fig, ax = plt.subplots(figsize=(5, 2))
-    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF5733', linewidth=2)  # Thicker lines
+    hour_df["Hour"].value_counts().sort_index().plot(kind='line', marker='o', ax=ax, color='#FF5733', linewidth=2)
     
     ax.set_title("Weekly Listening Patterns", color="white")
     ax.set_xlabel("Hour of Day", color="white")
