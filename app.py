@@ -147,26 +147,60 @@ def handle_spotify_rate_limit(sp_func, *args, max_retries=10, **kwargs):
                 break
     return None
 
-# Fetch liked songs and audio features
-def get_liked_songs(sp):
-    results = handle_spotify_rate_limit(sp.current_user_saved_tracks, limit=50)
-    if not results:
-        return []  # Return empty list if retries exceeded
+# Function to fetch all liked songs
+def get_all_liked_songs(sp):
     liked_songs = []
-    for item in results['items']:
-        track = item['track']
-        audio_features = handle_spotify_rate_limit(sp.audio_features, [track['id']])[0]
-        liked_songs.append({
-            "id": track.get('id', None),
-            "name": track.get('name', "Unknown Track"),
-            "artist": track['artists'][0]['name'] if 'artists' in track and track['artists'] else "Unknown Artist",
-            "cover": track['album']['images'][0]['url'] if 'album' in track and track['album']['images'] else None,
-            "energy": audio_features.get("energy", 0.5),
-            "valence": audio_features.get("valence", 0.5),
-            "tempo": audio_features.get("tempo", 120),
-            "popularity": track.get('popularity', 0)
-        })
+    offset = 0
+    while True:
+        results = handle_spotify_rate_limit(sp.current_user_saved_tracks, limit=50, offset=offset)
+        if not results or not results['items']:
+            break
+        for item in results['items']:
+            track = item['track']
+            audio_features = handle_spotify_rate_limit(sp.audio_features, [track['id']])[0]
+            liked_songs.append({
+                "id": track.get('id', None),
+                "name": track.get('name', "Unknown Track"),
+                "artist": track['artists'][0]['name'] if 'artists' in track and track['artists'] else "Unknown Artist",
+                "cover": track['album']['images'][0]['url'] if 'album' in track and track['album']['images'] else None,
+                "energy": audio_features.get("energy", 0.5),
+                "valence": audio_features.get("valence", 0.5),
+                "tempo": audio_features.get("tempo", 120),
+                "popularity": track.get('popularity', 0)
+            })
+        offset += 50  # Move to the next set of tracks
     return liked_songs
+
+# Function to fetch all top items
+def get_all_top_items(sp, item_type='tracks', time_range='short_term'):
+    top_items = []
+    offset = 0
+    while True:
+        if item_type == 'tracks':
+            results = handle_spotify_rate_limit(sp.current_user_top_tracks, time_range=time_range, limit=50, offset=offset)
+        elif item_type == 'artists':
+            results = handle_spotify_rate_limit(sp.current_user_top_artists, time_range=time_range, limit=50, offset=offset)
+        
+        if not results or not results['items']:
+            break
+        for item in results['items']:
+            if item_type == 'tracks':
+                top_items.append({
+                    'id': item.get('id', None),
+                    'name': item.get('name', "Unknown Track"),
+                    'artist': item['artists'][0]['name'] if 'artists' in item and item['artists'] else "Unknown Artist",
+                    'popularity': item.get('popularity', 0),
+                    'cover': item['album']['images'][0]['url'] if 'album' in item and item['album']['images'] else None,
+                    'tempo': item.get('tempo', 120)
+                })
+            elif item_type == 'artists':
+                top_items.append({
+                    'name': item.get('name', "Unknown Artist"),
+                    'genres': item.get('genres', ['Unknown Genre']),
+                    'cover': item['images'][0]['url'] if 'images' in item and item['images'] else None
+                })
+        offset += 50  # Move to the next set of items
+    return top_items
 
 # Function to display songs with their cover images (cover left, name right)
 def display_songs_with_cover(song_list, title):
@@ -186,34 +220,9 @@ def display_songs_with_cover(song_list, title):
     else:
         st.write("No songs found.")
 
-# Fetch top items for insights
-def get_top_items(sp, item_type='tracks', time_range='short_term', limit=10):
-    if item_type == 'tracks':
-        results = handle_spotify_rate_limit(sp.current_user_top_tracks, time_range=time_range, limit=limit)
-    elif item_type == 'artists':
-        results = handle_spotify_rate_limit(sp.current_user_top_artists, time_range=time_range, limit=limit)
-    items = []
-    for item in results['items']:
-        if item_type == 'tracks':
-            items.append({
-                'id': item.get('id', None),
-                'name': item.get('name', "Unknown Track"),
-                'artist': item['artists'][0]['name'] if 'artists' in item and item['artists'] else "Unknown Artist",
-                'popularity': item.get('popularity', 0),
-                'cover': item['album']['images'][0]['url'] if 'album' in item and item['album']['images'] else None,
-                'tempo': item.get('tempo', 120)
-            })
-        elif item_type == 'artists':
-            items.append({
-                'name': item.get('name', "Unknown Artist"),
-                'genres': item.get('genres', ['Unknown Genre']),
-                'cover': item['images'][0]['url'] if 'images' in item and item['images'] else None
-            })
-    return items
-
 # Function to discover new songs based on mood and intensity
 def discover_new_songs(sp, mood, intensity):
-    top_tracks = get_top_items(sp, item_type='tracks', time_range='short_term', limit=10)
+    top_tracks = get_all_top_items(sp, item_type='tracks', time_range='short_term')
     
     # Define mood and intensity mapping
     mood_valence_map = {"Happy": 0.8, "Calm": 0.3, "Energetic": 0.7, "Sad": 0.2}
@@ -258,8 +267,8 @@ def discover_new_songs(sp, mood, intensity):
 
 # Display top songs, artists, and genres with some styling
 def display_top_insights_with_genres(sp, time_range='short_term'):
-    top_tracks = get_top_items(sp, item_type='tracks', time_range=time_range)
-    top_artists = get_top_items(sp, item_type='artists', time_range=time_range)
+    top_tracks = get_all_top_items(sp, item_type='tracks', time_range=time_range)
+    top_artists = get_all_top_items(sp, item_type='artists', time_range=time_range)
 
     display_songs_with_cover(top_tracks, "Top Songs")
     display_songs_with_cover(top_artists, "Top Artists")
@@ -347,10 +356,10 @@ def display_weekly_listening_patterns(sp):
 
 # Analyze listening behavior for the personality profile
 def analyze_listening_behavior(sp):
-    top_artists = get_top_items(sp, item_type='artists', time_range='long_term', limit=50)
+    top_artists = get_all_top_items(sp, item_type='artists', time_range='long_term')
     total_artists = len(top_artists)
     
-    top_tracks = get_top_items(sp, item_type='tracks', time_range='long_term', limit=50)
+    top_tracks = get_all_top_items(sp, item_type='tracks', time_range='long_term')
     total_songs = len(top_tracks)
 
     avg_songs_per_artist = total_songs / total_artists if total_artists else 0
@@ -387,8 +396,8 @@ if is_authenticated():
         intensity = st.slider("Choose intensity:", 1, 5, 3)
 
         if option == "Liked Songs":
-            liked_songs = get_liked_songs(sp)
-            filtered_liked_songs = random.sample(liked_songs, min(len(liked_songs), 20))  # Limit and shuffle
+            liked_songs = get_all_liked_songs(sp)
+            filtered_liked_songs = random.sample(liked_songs, min(len(liked_songs), 20))  # Limit and shuffle for display
             display_songs_with_cover(filtered_liked_songs, "Your Liked Songs")
         elif option == "Discover New Songs":
             discover_new_songs(sp, mood, intensity)
