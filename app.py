@@ -117,13 +117,30 @@ def authenticate_user():
 
 # Helper Function for Handling Spotify API Rate Limit (429 Error) and Timeout
 def handle_spotify_api(sp_func, *args, **kwargs):
-    try:
-        return sp_func(*args, **kwargs)
-    except (spotipy.SpotifyException, ReadTimeout) as e:
-        st.error(f"Error: {e}")
-        return None
+    wait_time = 1  # Start with a 1-second wait time
+    while True:
+        try:
+            return sp_func(*args, **kwargs)
+        except spotipy.SpotifyException as e:
+            if e.http_status == 429:  # Rate limit error
+                retry_after = int(e.headers.get("Retry-After", wait_time)) if e.headers and "Retry-After" in e.headers else wait_time
+                wait_time = max(retry_after, wait_time)  # Use Spotify's suggested wait time if available
+                st.warning(f"Rate limit reached. Retrying after {wait_time} seconds...")
+                time.sleep(wait_time)
+                wait_time *= 2  # Exponential backoff
+            else:
+                st.error(f"Spotify API Error: {e}")
+                return None
+        except ReadTimeout:
+            st.warning(f"Request timed out. Retrying...")
+            time.sleep(wait_time)
+            wait_time *= 2  # Double the wait time
+        except Exception as e:
+            st.error(f"Unexpected error: {e}")
+            return None
 
 # Function to fetch all liked songs for the authenticated user
+@st.cache_data
 def get_all_liked_songs(sp):
     liked_songs = []
     offset = 0
@@ -147,10 +164,11 @@ def get_all_liked_songs(sp):
                     "tempo": audio_features[0].get("tempo", 120),
                     "popularity": track.get('popularity', 0)
                 })
-        offset += 50
+        offset += 50  # Move to the next set of tracks
     return liked_songs
 
 # Function to fetch top items (tracks or artists) for the authenticated user
+@st.cache_data
 def get_all_top_items(sp, item_type='tracks', time_range='short_term'):
     top_items = []
     offset = 0
