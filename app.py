@@ -37,10 +37,10 @@ st.markdown("""
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     .brand {text-align: center; font-size: 4em; font-weight: bold; color: white; margin-top: 10px;}
     .description {text-align: center; font-size: 1.5em; color: white; margin-top: -10px; margin-bottom: 20px;}
-    .tabs-container {display: flex; justify-content: center; gap: 20px; margin-top: 20px; margin-bottom: 30px; position: relative;}
-    .tab {color: white; padding: 10px 20px; cursor: pointer; font-size: 1.2em; border-bottom: 2px solid transparent;}
-    .tab:hover {color: red;}
-    .active-tab {color: red; border-bottom: 2px solid red;}
+    .tabs-container {display: flex; justify-content: center; gap: 20px; margin-top: 20px; margin-bottom: 30px;}
+    .tab-button {color: white; background-color: transparent; border: 2px solid white; border-radius: 5px; padding: 10px 20px; cursor: pointer; font-size: 1.2em; transition: 0.3s;}
+    .tab-button:hover {background-color: red; color: white;}
+    .tab-active {color: black; background-color: white; border: 2px solid red;}
     .cover-square {width: 80px; height: 80px; border-radius: 10px; margin-right: 10px;}
     .cover-circle {width: 80px; height: 80px; border-radius: 50%; margin-right: 10px;}
     </style>
@@ -50,22 +50,7 @@ st.markdown("""
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Liked Songs and Recommendations"
 
-# Navigation
-def render_tabs():
-    tabs = ["Liked Songs and Recommendations", "Top Insights", "Behavior"]
-    selected_tab = st.session_state["active_tab"]
-
-    html = '<div class="tabs-container">'
-    for tab in tabs:
-        css_class = "tab active-tab" if tab == selected_tab else "tab"
-        if st.button(tab, key=tab):
-            st.session_state["active_tab"] = tab
-            st.experimental_rerun()
-        html += f'<div class="{css_class}">{tab}</div>'
-    html += "</div>"
-    st.markdown(html, unsafe_allow_html=True)
-
-# Spotify Authentication
+# Authentication
 def authenticate_user():
     if "token_info" not in st.session_state:
         query_params = st.experimental_get_query_params()
@@ -84,6 +69,14 @@ def authenticate_user():
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>', unsafe_allow_html=True)
             return False
     return True
+
+# Navigation
+def render_tabs():
+    tabs = ["Liked Songs and Recommendations", "Top Insights", "Behavior"]
+    for tab in tabs:
+        if st.button(tab, key=tab, help=f"Navigate to {tab}"):
+            st.session_state["active_tab"] = tab
+            st.experimental_rerun()
 
 # Data Fetching Functions
 def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
