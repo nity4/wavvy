@@ -74,7 +74,8 @@ def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
                 st.warning("Access token expired. Refreshing token...")
                 new_token = refresh_access_token()
                 if new_token:
-                    sp.auth = new_token  # Update Spotify client with new token
+                    global sp
+                    sp = spotipy.Spotify(auth=new_token)  # Reinitialize Spotify client
                 else:
                     st.error("Failed to refresh access token. Please log in again.")
                     return None
