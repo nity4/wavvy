@@ -39,13 +39,12 @@ st.markdown("""
     .brand-box {text-align: center; margin: 20px 0;}
     .brand-logo {font-size: 3.5em; font-weight: bold; color: white;}
     .persona-box {background: #1DB954; color: black; padding: 20px; border-radius: 15px; text-align: center; font-size: 2.5em; font-weight: bold; margin: 20px 0;}
-    .persona-desc {background: #333; color: white; padding: 20px; border-radius: 15px; font-size: 1.3em; text-align: center; margin: 20px 0;}
+    .persona-desc {background: #333; color: white; padding: 20px; border-radius: 15px; font-size: 1.2em; text-align: center; margin: 20px 0;}
     .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
     .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
-    .data-box {background: #444; color: white; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center; font-size: 1.2em;}
-    .insights-box {background: #1DB954; color: black; padding: 15px; border-radius: 15px; font-size: 1.3em; margin-top: 20px; line-height: 1.8;}
-    .insight-item {margin-bottom: 10px; display: flex; align-items: center;}
-    .insight-icon {margin-right: 15px; font-size: 1.5em;}
+    .insights-box {background: #1DB954; color: black; padding: 15px; border-radius: 15px; font-size: 1.2em; margin-top: 20px; line-height: 1.8;}
+    .insight-item {margin-bottom: 10px; display: flex; align-items: center; font-size: 1.1em;}
+    .insight-icon {margin-right: 10px; font-size: 1.5em;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -92,31 +91,20 @@ def fetch_behavioral_data(sp):
     if recent_plays:
         timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
         track_names = [item["track"]["name"] for item in recent_plays["items"]]
-        df = pd.DataFrame({"played_at": timestamps, "track_name": track_names})
+        track_tempo = [item["track"]["tempo"] if "tempo" in item["track"] else 120 for item in recent_plays["items"]]
+        df = pd.DataFrame({"played_at": timestamps, "track_name": track_names, "tempo": track_tempo})
         df["date"] = df["played_at"].dt.date
         df["hour"] = df["played_at"].dt.hour
         df["weekday"] = df["played_at"].dt.weekday
         return df
     return pd.DataFrame()
 
-# Fetch Top Data
-def fetch_top_data(sp):
-    top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
-    top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=5, time_range="short_term")
-    genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])]
-    return top_tracks, top_artists, genres
-
 # Display Persona
 def display_persona():
-    persona_name = random.choice(["Melody Seeker", "Rhythm Explorer", "Harmony Architect", "Vibe Pioneer"])
-    explanation = {
-        "Melody Seeker": "You're a Melody Seeker—always exploring new vibes, grooving to rhythms, and embracing melodies like no one else!",
-        "Rhythm Explorer": "You're a Rhythm Explorer—your playlists are like a map of the beats that move your soul.",
-        "Harmony Architect": "You're a Harmony Architect—building your world around symphonies and serene tunes.",
-        "Vibe Pioneer": "You're a Vibe Pioneer—leading the charge in discovering the most unique tracks!"
-    }
+    persona_name = "Rhythm Explorer"
+    explanation = "You're a Rhythm Explorer—your playlists are like a map of the beats that move your soul."
     st.markdown(f"<div class='persona-box'>{persona_name}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='persona-desc'>{explanation[persona_name]}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='persona-desc'>{explanation}</div>", unsafe_allow_html=True)
 
 # Display Insights in a Single Styled Box
 def display_insights(behavior_data):
@@ -144,7 +132,7 @@ def display_insights(behavior_data):
 
         # Day or Night Listener
         avg_hour = behavior_data["hour"].mean()
-        listener_type = "Night Owl" if avg_hour > 18 else "Day Explorer"
+        listener_type = "Day Explorer" if avg_hour <= 18 else "Night Owl"
 
         # Unique Artist Discovery
         unique_artists = behavior_data["track_name"].nunique()
@@ -152,10 +140,6 @@ def display_insights(behavior_data):
         # Insights Display
         insights_content = f"""
         <div class="insights-box">
-            <div class="insight-item">
-                <span class="insight-icon">📅</span>
-                Longest Listening Streak: <strong>{max_streak} days</strong>
-            </div>
             <div class="insight-item">
                 <span class="insight-icon">🔥</span>
                 Current Streak: <strong>{current_streak} days</strong>
@@ -187,16 +171,17 @@ def plot_listening_heatmap(behavior_data):
         plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
-# Plot Listening Intensity Over Time
-def plot_listening_intensity(behavior_data):
+# Plot Beat Tempo Analysis
+def plot_beat_tempo_analysis(behavior_data):
     if not behavior_data.empty:
-        intensity_data = behavior_data.groupby("date").size()
+        bins = pd.cut(behavior_data["tempo"], bins=[0, 90, 120, 300], labels=["Slow", "Medium", "Fast"])
+        tempo_counts = bins.value_counts()
         plt.figure(figsize=(10, 6))
-        intensity_data.plot(kind="line", marker="o", color="#1DB954", linewidth=2)
-        plt.title("Listening Intensity Over Time", color="white")
-        plt.xlabel("Date", color="white")
-        plt.ylabel("Tracks Played", color="white")
-        plt.xticks(color="white", rotation=45)
+        tempo_counts.plot(kind="bar", color="#1DB954")
+        plt.title("Beat Tempo Analysis (Slow vs Medium vs Fast)", color="white")
+        plt.xlabel("Tempo Category", color="white")
+        plt.ylabel("Track Count", color="white")
+        plt.xticks(color="white", rotation=0)
         plt.yticks(color="white")
         plt.gca().patch.set_facecolor("black")
         plt.gcf().set_facecolor("black")
@@ -272,7 +257,6 @@ if "token_info" in st.session_state:
     elif page == "Insights & Behavior":
         st.header("Insights & Behavior (Last Week)")
         behavior_data = fetch_behavioral_data(sp)
-        top_tracks, top_artists, genres = fetch_top_data(sp)
 
         # Persona Section
         display_persona()
@@ -281,45 +265,7 @@ if "token_info" in st.session_state:
         st.subheader("Your Insights")
         display_insights(behavior_data)
 
-        # Top Songs
-        st.subheader("Your Top Songs")
-        if top_tracks and "items" in top_tracks:
-            for track in top_tracks["items"]:
-                st.markdown(
-                    f"""
-                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-small">
-                        <div>
-                            <p><strong>{track['name']}</strong></p>
-                            <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-        # Top Artists
-        st.subheader("Your Top Artists")
-        if top_artists and "items" in top_artists:
-            for artist in top_artists["items"]:
-                st.markdown(
-                    f"""
-                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <img src="{artist['images'][0]['url']}" alt="Artist" class="cover-circle">
-                        <div>
-                            <p><strong>{artist['name']}</strong></p>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-        # Top Genres
-        st.subheader("Your Top Genres")
-        if genres:
-            st.markdown(", ".join(genres[:5]))
-
         # Graphs Section
         st.subheader("Graphical Analysis")
         plot_listening_heatmap(behavior_data)
-        plot_listening_intensity(behavior_data)
+        plot_beat_tempo_analysis(behavior_data)
