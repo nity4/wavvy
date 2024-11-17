@@ -24,23 +24,10 @@ sp_oauth = SpotifyOAuth(
 
 # Streamlit Page Configuration
 st.set_page_config(
-    page_title="WVY",
+    page_title="WVY - Spotify Insights",
     page_icon="🌊",
     layout="wide"
 )
-
-# CSS for Styling
-st.markdown("""
-    <style>
-    body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
-    .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
-    h1, h2, h3, p {color: white !important;}
-    .brand-box {text-align: center; margin: 20px 0;}
-    .brand-logo {font-size: 3.5em; font-weight: bold; color: white;}
-    .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
-    .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
-    </style>
-""", unsafe_allow_html=True)
 
 # Token Refresh Helper
 def refresh_access_token():
@@ -103,17 +90,6 @@ def fetch_top_data(sp):
     genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])]
     return top_tracks, top_artists, genres
 
-# Display Persona
-def display_persona():
-    persona_name = "Rhythm Explorer"
-    explanation = "You're a Rhythm Explorer—your playlists are like a map of the beats that move your soul."
-    st.markdown(f"""
-        <div class="persona-card">
-            <div class="persona-title">{persona_name}</div>
-            <div class="persona-desc">{explanation}</div>
-        </div>
-    """, unsafe_allow_html=True)
-
 # Display Insights as Enhanced Badges
 def display_insights(behavior_data):
     if behavior_data.empty:
@@ -124,6 +100,8 @@ def display_insights(behavior_data):
         current_streak = len(days_played)
         avg_hour = behavior_data["hour"].mean()
         listener_type = "Day Explorer" if avg_hour <= 18 else "Night Owl"
+
+        # Unique artists based on the last week's data
         unique_artists = behavior_data["artist_name"].nunique()
 
         st.markdown("""
@@ -236,9 +214,6 @@ if "token_info" in st.session_state:
 
     sp = st.session_state["sp"]
 
-    # Display Brand Name and Logo at the top
-    st.markdown('<div class="brand-box"><div class="brand-logo">WVY 🌊</div></div>', unsafe_allow_html=True)
-
     page = st.radio("Navigate to:", ["Liked Songs & Discover New", "Insights & Behavior"])
 
     if page == "Liked Songs & Discover New":
@@ -248,17 +223,10 @@ if "token_info" in st.session_state:
         feature = st.radio("Explore:", ["Liked Songs", "Discover New Songs"])
 
         if feature == "Liked Songs":
-            # Fetch liked songs filtered by mood
             liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
             if liked_songs and "items" in liked_songs:
-                filtered_songs = []
-                for item in liked_songs["items"]:
+                for item in liked_songs["items"][:10]:
                     track = item["track"]
-                    track_name = track["name"].lower()
-                    if any(keyword in track_name for keyword in mood_keywords[mood]):
-                        filtered_songs.append(track)
-
-                for track in filtered_songs[:10]:
                     st.markdown(
                         f"""
                         <div style="display: flex; align-items: center; margin-bottom: 10px;">
