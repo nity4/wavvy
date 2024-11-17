@@ -4,8 +4,8 @@ from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
-import time
 import random
+import time
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -23,6 +23,7 @@ sp_oauth = SpotifyOAuth(
     scope=scope
 )
 
+# Set up Streamlit app
 st.set_page_config(
     page_title="WVY - Your Spotify Companion",
     page_icon="🌊",
@@ -36,13 +37,11 @@ st.markdown("""
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     h1, h2, h3, p {color: white !important;}
     .cover {border-radius: 15px; margin: 5px;}
-    .fun-insight-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px;}
-    .artist-box {display: flex; align-items: center; margin-bottom: 15px;}
-    .artist-img {margin-right: 10px; border-radius: 50%; width: 60px; height: 60px;}
-    .tabs-container {display: flex; justify-content: center; gap: 20px; margin-top: 10px; margin-bottom: 20px;}
-    .tab {color: white; padding: 10px 15px; cursor: pointer; border-radius: 5px; border: 1px solid #1DB954;}
+    .tabs-container {display: flex; justify-content: center; gap: 20px; margin-top: 20px; margin-bottom: 30px;}
+    .tab {color: white; padding: 10px 20px; cursor: pointer; border-radius: 10px; border: 2px solid #1DB954;}
     .tab:hover {background-color: #1DB954; color: black;}
     .active-tab {background-color: #1DB954; color: black; border: none;}
+    .brand {text-align: center; font-size: 3em; font-weight: bold; margin-bottom: 10px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -63,25 +62,24 @@ def authenticate_user():
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>', unsafe_allow_html=True)
     return "token_info" in st.session_state
 
-# Page Management
+# Tab Management
 def render_tabs():
     tabs = ["Liked & Discover", "Top Insights", "Behavior"]
     if "active_tab" not in st.session_state:
         st.session_state["active_tab"] = tabs[0]
 
-    selected_tab = st.session_state["active_tab"]
-
     html = '<div class="tabs-container">'
     for tab in tabs:
-        css_class = "tab active-tab" if tab == selected_tab else "tab"
-        tab_action = f"st.session_state.active_tab = '{tab}'"
-        html += f'<span class="{css_class}" onClick="{tab_action}">{tab}</span>'
+        css_class = "tab active-tab" if tab == st.session_state["active_tab"] else "tab"
+        html += f'<div class="{css_class}" onClick="window.location.href=\'?active_tab={tab}\'">{tab}</div>'
     html += "</div>"
     st.markdown(html, unsafe_allow_html=True)
 
-    return selected_tab
+    # Read active tab from query params
+    active_tab = st.experimental_get_query_params().get("active_tab", [st.session_state["active_tab"]])[0]
+    st.session_state["active_tab"] = active_tab
 
-# Data Fetch Functions
+# Fetch data functions
 def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
     for attempt in range(retries):
         try:
@@ -122,8 +120,12 @@ def fetch_behavioral_data(sp):
 if authenticate_user():
     sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
 
-    # Render Tabs and Get Active Page
-    active_tab = render_tabs()
+    # Display Brand Name
+    st.markdown('<div class="brand">WVY</div>', unsafe_allow_html=True)
+
+    # Render Tabs
+    render_tabs()
+    active_tab = st.session_state["active_tab"]
 
     if active_tab == "Liked & Discover":
         st.title("Liked Songs and Recommendations")
