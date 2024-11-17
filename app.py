@@ -36,9 +36,12 @@ st.markdown("""
     body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     h1, h2, h3, p {color: white !important;}
+    .brand-box {text-align: center; margin: 20px 0;}
+    .brand-logo {width: 100px; height: 100px; margin-bottom: 10px;}
     .persona-box {background: #1DB954; color: black; padding: 20px; border-radius: 15px; text-align: center; font-size: 2.5em; font-weight: bold; margin: 20px 0;}
     .persona-desc {background: #333; color: white; padding: 20px; border-radius: 15px; font-size: 1.3em; text-align: center; margin: 20px 0;}
     .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
+    .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
     .data-box {background: #444; color: white; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center; font-size: 1.2em;}
     </style>
 """, unsafe_allow_html=True)
@@ -104,7 +107,8 @@ def fetch_recommendations(sp, mood, intensity):
 def fetch_top_data(sp):
     top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
     top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=5, time_range="short_term")
-    return top_tracks, top_artists
+    genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])]
+    return top_tracks, top_artists, genres
 
 # Fetch Behavioral Data
 def fetch_behavioral_data(sp):
@@ -114,7 +118,7 @@ def fetch_behavioral_data(sp):
         track_names = [item["track"]["name"] for item in recent_plays["items"]]
         df = pd.DataFrame({"played_at": timestamps, "track_name": track_names})
         df["hour"] = df["played_at"].dt.hour
-        df["date"] = df["played_at"].dt.date
+        df["weekday"] = df["played_at"].dt.weekday
         return df
     return pd.DataFrame()
 
@@ -132,14 +136,14 @@ def display_insights(behavior_data):
     if behavior_data.empty:
         st.warning("No recent play data available.")
     else:
-        most_played_day = behavior_data["date"].mode()[0]
+        peak_hour = behavior_data["hour"].mode()[0]
+        most_active_day = behavior_data["weekday"].mode()[0]
         total_tracks = len(behavior_data)
-        unique_songs = len(behavior_data["track_name"].unique())
 
         insights = [
-            f"You listened the most on {most_played_day}.",
-            f"You vibed with {total_tracks} tracks this month.",
-            f"You explored {unique_songs} unique songs. Curator vibes?"
+            f"Your favorite time to listen is {peak_hour}:00.",
+            f"You vibed the most on {'Monday Tuesday Wednesday Thursday Friday Saturday Sunday'.split()[most_active_day]}.",
+            f"You explored {total_tracks} tracks this week. You're unstoppable!"
         ]
         for insight in insights:
             st.markdown(f"<div class='data-box'>{insight}</div>", unsafe_allow_html=True)
@@ -147,28 +151,28 @@ def display_insights(behavior_data):
 # Plot Listening Heatmap
 def plot_listening_heatmap(behavior_data):
     if not behavior_data.empty:
-        heatmap_data = behavior_data.groupby(["hour", "date"]).size().unstack(fill_value=0)
+        heatmap_data = behavior_data.groupby(["hour", "weekday"]).size().unstack(fill_value=0)
         plt.figure(figsize=(12, 6))
         sns.heatmap(heatmap_data, cmap="magma", linewidths=0.5)
-        plt.title("Listening Heatmap (Date vs. Hour)", color="white")
-        plt.xlabel("Date", color="white")
+        plt.title("Listening Heatmap (Hour vs. Day)", color="white")
+        plt.xlabel("Day", color="white")
         plt.ylabel("Hour", color="white")
-        plt.xticks(color="white", rotation=45)
+        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], color="white", rotation=45)
         plt.yticks(color="white")
         plt.gca().patch.set_facecolor("black")
         plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
-# Plot Fun Chart (Track Diversity)
+# Plot Fun Chart (Unique Tracks by Day)
 def plot_fun_chart(behavior_data):
     if not behavior_data.empty:
-        diversity_data = behavior_data.groupby("date")["track_name"].nunique()
+        daily_unique_tracks = behavior_data.groupby("weekday")["track_name"].nunique()
         plt.figure(figsize=(10, 6))
-        diversity_data.plot(kind="line", marker="o", color="#1DB954", linewidth=2)
-        plt.title("Daily Track Diversity", color="white")
-        plt.xlabel("Date", color="white")
+        daily_unique_tracks.plot(kind="bar", color="#1DB954")
+        plt.title("Unique Tracks Played by Day", color="white")
+        plt.xlabel("Day", color="white")
         plt.ylabel("Unique Tracks", color="white")
-        plt.xticks(color="white", rotation=45)
+        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], color="white", rotation=45)
         plt.yticks(color="white")
         plt.gca().patch.set_facecolor("black")
         plt.gcf().set_facecolor("black")
@@ -198,6 +202,18 @@ if "token_info" in st.session_state:
         st.session_state["sp"] = initialize_spotify()
 
     sp = st.session_state["sp"]
+
+    # Brand Section
+    st.markdown(
+        """
+        <div class="brand-box">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg" class="brand-logo">
+            <h1>WVY - Your Spotify Companion</h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
     page = st.radio("Navigate to:", ["Liked Songs & Discover New", "Insights & Behavior"])
 
     if page == "Liked Songs & Discover New":
@@ -242,10 +258,55 @@ if "token_info" in st.session_state:
                     )
 
     elif page == "Insights & Behavior":
-        st.title("Insights & Behavior (Last Month)")
+        st.title("Insights & Behavior (Last Week)")
+        top_tracks, top_artists, genres = fetch_top_data(sp)
         behavior_data = fetch_behavioral_data(sp)
         display_persona()
+
+        # Display Top Songs
+        st.header("Top Songs")
+        if top_tracks and "items" in top_tracks:
+            for track in top_tracks["items"]:
+                st.markdown(
+                    f"""
+                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-small">
+                        <div>
+                            <p><strong>{track['name']}</strong></p>
+                            <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        # Display Top Artists
+        st.header("Top Artists")
+        if top_artists and "items" in top_artists:
+            for artist in top_artists["items"]:
+                st.markdown(
+                    f"""
+                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <img src="{artist['images'][0]['url']}" alt="Artist" class="cover-circle">
+                        <div>
+                            <p><strong>{artist['name']}</strong></p>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        # Display Top Genres
+        st.header("Top Genres")
+        if genres:
+            st.markdown(f"**{', '.join(genres[:5])}**")
+        else:
+            st.warning("No genres available.")
+
+        # Display Insights
         display_insights(behavior_data)
+
+        # Graphical Analysis
         st.header("Graphical Analysis")
         plot_listening_heatmap(behavior_data)
         plot_fun_chart(behavior_data)
