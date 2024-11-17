@@ -1,10 +1,11 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import time
 import pandas as pd
 import matplotlib.pyplot as plt
-from requests.exceptions import ReadTimeout
+from datetime import datetime
+import time
+import random
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -25,17 +26,18 @@ sp_oauth = SpotifyOAuth(
 # Streamlit configuration
 st.set_page_config(
     page_title="Wvvy",
-    page_icon="〰",
+    page_icon="🎵",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for styling
+# Custom CSS for Black-Green Theme
 st.markdown("""
     <style>
-    body {background: linear-gradient(to right, black, #1DB954) !important;}
+    body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
-    h1, h2, h3 {color: white !important;}
+    h1, h2, h3, p {color: white !important;}
+    .metric {background-color: #333; border-radius: 8px; padding: 10px; color: #1DB954;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -47,139 +49,117 @@ def authenticate_user():
             try:
                 token_info = sp_oauth.get_access_token(query_params["code"][0])
                 st.session_state["token_info"] = token_info
-                st.experimental_set_query_params()  # Clear query params
+                st.experimental_set_query_params()
                 st.experimental_rerun()
             except Exception as e:
                 st.error(f"Authentication failed: {e}")
         else:
             auth_url = sp_oauth.get_authorize_url()
-            st.markdown(f'<a href="{auth_url}" target="_self">**Login with Spotify**</a>', unsafe_allow_html=True)
+            st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>', unsafe_allow_html=True)
     return "token_info" in st.session_state
 
-# Function to refresh token if expired
-def refresh_token():
-    if "token_info" in st.session_state and sp_oauth.is_token_expired(st.session_state["token_info"]):
-        st.session_state["token_info"] = sp_oauth.refresh_access_token(st.session_state["token_info"]["refresh_token"])
-
-# Function to fetch Spotify data with error handling
-def fetch_spotify_data(sp_func, *args, retries=5, **kwargs):
+# Fetch data with retry logic
+def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
     for attempt in range(retries):
         try:
             return sp_func(*args, **kwargs)
-        except (spotipy.exceptions.SpotifyException, ReadTimeout) as e:
-            if isinstance(e, spotipy.exceptions.SpotifyException) and e.http_status == 429:
-                retry_after = int(e.headers.get("Retry-After", 1))
-                time.sleep(retry_after)
-            else:
-                time.sleep(2 ** attempt)
-    return None
-
-# Retry logic for fetching audio features
-def fetch_audio_features(sp, track_id, retries=3):
-    for attempt in range(retries):
-        try:
-            features = sp.audio_features([track_id])
-            if features and isinstance(features, list) and features[0]:
-                return features[0]
         except Exception as e:
-            st.warning(f"Retry {attempt + 1}: Failed to fetch features for track {track_id}. Error: {e}")
-        time.sleep(2 ** attempt)  # Exponential backoff
-    st.error(f"Exhausted retries for track {track_id}. Skipping.")
+            if "rate limit" in str(e).lower():
+                time.sleep(2 ** attempt)
+            else:
+                st.warning(f"Attempt {attempt + 1} failed. Retrying...")
     return None
 
-# Function to get liked songs
-def get_liked_songs(sp):
-    songs, offset = [], 0
-    while True:
-        results = fetch_spotify_data(sp.current_user_saved_tracks, limit=50, offset=offset)
-        if not results or not results["items"]:
-            break
-        for item in results["items"]:
-            track = item["track"]
-            track_id = track.get("id")
-            track_name = track.get("name", "Unknown Track")
-            track_artist = track["artists"][0]["name"] if track["artists"] else "Unknown Artist"
-
-            if not track_id:
-                st.warning(f"Skipping track without valid ID: {track_name} by {track_artist}")
-                continue
-
-            features = fetch_audio_features(sp, track_id)
-            if features:
-                songs.append({
-                    "Name": track_name,
-                    "Artist": track_artist,
-                    "Energy": features.get("energy"),
-                    "Valence": features.get("valence"),
-                    "Popularity": track.get("popularity")
-                })
-            else:
-                st.warning(f"Could not fetch audio features for track: {track_name} by {track_artist}")
-        offset += 50
-    return pd.DataFrame(songs)
-
-# Display insights from liked songs
-def display_insights(df):
-    if df.empty:
-        st.write("No data available.")
-        return
-
-    avg_energy = df["Energy"].mean()
-    avg_valence = df["Valence"].mean()
-    avg_popularity = df["Popularity"].mean()
-
-    st.write("### Insights from Your Liked Songs")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Average Energy", f"{avg_energy:.2f}")
-    col2.metric("Average Valence", f"{avg_valence:.2f}")
-    col3.metric("Average Popularity", f"{avg_popularity:.1f}")
-
-    st.write("#### Distribution of Energy and Valence")
-    fig, ax = plt.subplots()
-    df.plot.scatter(x="Energy", y="Valence", alpha=0.7, ax=ax)
-    ax.set_title("Energy vs Valence")
-    st.pyplot(fig)
-
-# Recommend songs based on mood and intensity
-def recommend_songs(sp, mood, intensity):
-    top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=10)
-    if not top_tracks or not top_tracks["items"]:
-        st.write("No sufficient data for recommendations.")
-        return
-    seed_tracks = [track["id"] for track in top_tracks["items"][:5]]
+# 1. Feature: Filtered Liked Songs and Recommendations
+def get_liked_songs(sp, mood, intensity):
     mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
-    valence, energy = [val * intensity / 5 for val in mood_map.get(mood, (0.5, 0.5))]
-
+    valence, energy = [val * intensity / 5 for val in mood_map[mood]]
+    liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=20)
     recommendations = fetch_spotify_data(
         sp.recommendations,
-        seed_tracks=seed_tracks,
+        seed_tracks=[item["track"]["id"] for item in liked_songs["items"][:5]],
         limit=10,
         target_valence=valence,
         target_energy=energy
     )
-    if not recommendations or not recommendations["tracks"]:
-        st.write("No recommendations available.")
-        return
-    st.write("### Recommended Songs")
-    for rec in recommendations["tracks"]:
-        st.write(f"**{rec['name']}** by {rec['artists'][0]['name']}")
+    return recommendations
+
+# 2. Feature: Last Month's Top Data
+def get_top_items(sp, time_range="short_term"):
+    top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=10, time_range=time_range)
+    top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=10, time_range=time_range)
+    genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])]
+    return top_tracks, top_artists, genres
+
+# 3. Feature: Behavioral Insights
+def get_recently_played(sp):
+    recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
+    hours = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ").hour for item in recent_plays["items"]]
+    return pd.Series(hours).value_counts()
+
+# Fun Personality Label
+def get_personality_label(peak_hour):
+    if 0 <= peak_hour <= 6:
+        return "Night Owl", "You groove in the silence of the night!"
+    elif 7 <= peak_hour <= 12:
+        return "Morning Motivator", "Your mornings start with a beat!"
+    elif 13 <= peak_hour <= 18:
+        return "Afternoon Explorer", "Music fuels your productive afternoons."
+    else:
+        return "Evening Relaxer", "Your evenings are for chilling and beats."
 
 # Main App Logic
 if authenticate_user():
-    refresh_token()
     sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
-    st.title("〰 Wvvy - Your Music Insights")
 
-    tab1, tab2 = st.tabs(["Liked Songs Analysis", "Discover New Music"])
-    with tab1:
-        liked_songs_df = get_liked_songs(sp)
-        if st.checkbox("Show Raw Data"):
-            st.dataframe(liked_songs_df)
-        display_insights(liked_songs_df)
+    # Tab 1: Filter Liked Songs and Recommendations
+    with st.container():
+        st.header("Discover Music Based on Your Mood")
+        mood = st.selectbox("Select Mood:", ["Happy", "Calm", "Energetic", "Sad"])
+        intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
+        recommendations = get_liked_songs(sp, mood, intensity)
+        if recommendations:
+            st.write(f"### Songs for Your {mood} Mood:")
+            for track in recommendations["tracks"]:
+                st.write(f"**{track['name']}** by {track['artists'][0]['name']}")
 
-    with tab2:
-        mood = st.selectbox("Select Mood", ["Happy", "Calm", "Energetic", "Sad"])
-        intensity = st.slider("Intensity", 1, 5, 3)
-        recommend_songs(sp, mood, intensity)
+    # Tab 2: Last Month's Top Music
+    with st.container():
+        st.header("Last Month's Top Music, Artists, and Genres")
+        top_tracks, top_artists, genres = get_top_items(sp, "short_term")
+        st.write("### Top Tracks:")
+        for track in top_tracks["items"]:
+            st.write(f"**{track['name']}** by {track['artists'][0]['name']}")
+        st.write("### Top Artists:")
+        for artist in top_artists["items"]:
+            st.write(f"**{artist['name']}**")
+        st.write("### Top Genres:")
+        st.write(", ".join(set(genres)))
+
+        # Fun Insight
+        st.write("### Fun Insight:")
+        total_genres = len(set(genres))
+        st.info(f"You explored {total_genres} unique genres last month. You are a true music adventurer!")
+
+    # Tab 3: Listening Behavior
+    with st.container():
+        st.header("Your Listening Behavior")
+        listening_hours = get_recently_played(sp)
+        peak_hour = listening_hours.idxmax()
+        personality, description = get_personality_label(peak_hour)
+
+        # Plotting Listening Hours
+        st.write("### Listening Hours Over the Day")
+        fig, ax = plt.subplots()
+        listening_hours.sort_index().plot(kind="bar", ax=ax, color="#1DB954")
+        ax.set_title("Listening Behavior")
+        ax.set_xlabel("Hour of Day")
+        ax.set_ylabel("Tracks Played")
+        st.pyplot(fig)
+
+        # Personality Insight
+        st.write("### Your Music Personality:")
+        st.success(f"**{personality}:** {description}")
+
 else:
     st.write("Please log in to access your Spotify data.")
