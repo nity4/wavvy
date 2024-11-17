@@ -25,7 +25,7 @@ sp_oauth = SpotifyOAuth(
 
 # Streamlit configuration
 st.set_page_config(
-    page_title="Wvvy",
+    page_title="Wvvy - Your Music World",
     page_icon="🎵",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -37,7 +37,7 @@ st.markdown("""
     body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     h1, h2, h3, p {color: white !important;}
-    .metric {background-color: #333; border-radius: 8px; padding: 10px; color: #1DB954;}
+    .cover {border-radius: 15px; margin: 5px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -113,53 +113,75 @@ if authenticate_user():
     sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
 
     # Tab 1: Filter Liked Songs and Recommendations
-    with st.container():
-        st.header("Discover Music Based on Your Mood")
-        mood = st.selectbox("Select Mood:", ["Happy", "Calm", "Energetic", "Sad"])
-        intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
-        recommendations = get_liked_songs(sp, mood, intensity)
-        if recommendations:
-            st.write(f"### Songs for Your {mood} Mood:")
-            for track in recommendations["tracks"]:
-                st.write(f"**{track['name']}** by {track['artists'][0]['name']}")
+    st.header("🎶 Discover Music Based on Your Mood")
+    mood = st.selectbox("Select Mood:", ["Happy", "Calm", "Energetic", "Sad"])
+    intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
+    recommendations = get_liked_songs(sp, mood, intensity)
+    if recommendations:
+        st.write(f"### Songs for Your {mood} Mood:")
+        for track in recommendations["tracks"]:
+            album_cover = track["album"]["images"][0]["url"] if track["album"]["images"] else None
+            st.markdown(f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="{album_cover}" alt="Cover" width="80" height="80" class="cover">
+                    <div style="margin-left: 10px;">
+                        <p><b>{track['name']}</b><br><i>{track['artists'][0]['name']}</i></p>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+    st.divider()
 
     # Tab 2: Last Month's Top Music
-    with st.container():
-        st.header("Last Month's Top Music, Artists, and Genres")
-        top_tracks, top_artists, genres = get_top_items(sp, "short_term")
-        st.write("### Top Tracks:")
-        for track in top_tracks["items"]:
-            st.write(f"**{track['name']}** by {track['artists'][0]['name']}")
-        st.write("### Top Artists:")
-        for artist in top_artists["items"]:
-            st.write(f"**{artist['name']}**")
-        st.write("### Top Genres:")
-        st.write(", ".join(set(genres)))
+    st.header("🌟 Last Month's Top Music, Artists, and Genres")
+    top_tracks, top_artists, genres = get_top_items(sp, "short_term")
+    st.write("### Top Tracks:")
+    for track in top_tracks["items"]:
+        album_cover = track["album"]["images"][0]["url"] if track["album"]["images"] else None
+        st.markdown(f"""
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <img src="{album_cover}" alt="Cover" width="80" height="80" class="cover">
+                <div style="margin-left: 10px;">
+                    <p><b>{track['name']}</b><br><i>{track['artists'][0]['name']}</i></p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
-        # Fun Insight
-        st.write("### Fun Insight:")
-        total_genres = len(set(genres))
-        st.info(f"You explored {total_genres} unique genres last month. You are a true music adventurer!")
+    st.write("### Top Artists:")
+    for artist in top_artists["items"]:
+        artist_image = artist["images"][0]["url"] if artist["images"] else None
+        st.markdown(f"""
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <img src="{artist_image}" alt="Artist" width="80" height="80" class="cover">
+                <div style="margin-left: 10px;">
+                    <p><b>{artist['name']}</b></p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.write("### Top Genres:")
+    st.write(", ".join(set(genres)))
+
+    st.divider()
 
     # Tab 3: Listening Behavior
-    with st.container():
-        st.header("Your Listening Behavior")
-        listening_hours = get_recently_played(sp)
-        peak_hour = listening_hours.idxmax()
-        personality, description = get_personality_label(peak_hour)
+    st.header("📊 Your Listening Behavior")
+    listening_hours = get_recently_played(sp)
+    peak_hour = listening_hours.idxmax()
+    personality, description = get_personality_label(peak_hour)
 
-        # Plotting Listening Hours
-        st.write("### Listening Hours Over the Day")
-        fig, ax = plt.subplots()
-        listening_hours.sort_index().plot(kind="bar", ax=ax, color="#1DB954")
-        ax.set_title("Listening Behavior")
-        ax.set_xlabel("Hour of Day")
-        ax.set_ylabel("Tracks Played")
-        st.pyplot(fig)
+    # Plotting Listening Hours
+    st.write("### Listening Hours Over the Day")
+    fig, ax = plt.subplots()
+    listening_hours.sort_index().plot(kind="bar", ax=ax, color="#1DB954")
+    ax.set_title("Listening Behavior")
+    ax.set_xlabel("Hour of Day")
+    ax.set_ylabel("Tracks Played")
+    st.pyplot(fig)
 
-        # Personality Insight
-        st.write("### Your Music Personality:")
-        st.success(f"**{personality}:** {description}")
+    # Personality Insight
+    st.write("### Your Music Personality:")
+    st.success(f"**{personality}:** {description}")
 
 else:
     st.write("Please log in to access your Spotify data.")
