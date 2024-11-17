@@ -36,10 +36,10 @@ st.markdown("""
     body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     h1, h2, h3, p {color: white !important;}
-    .persona-box {background: #1DB954; color: black; padding: 20px; border-radius: 15px; text-align: center; font-size: 2.5em; font-weight: bold; margin: 20px 0;}
-    .persona-desc {background: #333; color: white; padding: 20px; border-radius: 15px; font-size: 1.3em; text-align: center; margin: 20px 0;}
-    .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
+    .title-box {background: linear-gradient(to right, #1DB954, black); padding: 20px; border-radius: 15px; text-align: center; color: white; font-size: 2em; font-weight: bold;}
     .data-box {background: #444; color: white; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center; font-size: 1.2em;}
+    .cover-square {border-radius: 10px; margin: 10px; width: 120px; height: 120px; object-fit: cover;}
+    .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -52,46 +52,26 @@ def fetch_spotify_data(sp_func, *args, **kwargs):
         st.error(f"Spotify API error: {e}")
         return None
 
-def fetch_liked_songs(sp):
-    """Fetch user's liked songs."""
-    return fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
-
-def fetch_recommendations(sp, mood, intensity):
-    """Fetch recommendations based on mood and intensity."""
-    mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
-    valence, energy = [val * intensity / 5 for val in mood_map[mood]]
-    seed_tracks = fetch_spotify_data(sp.current_user_saved_tracks, limit=5)
-    if seed_tracks and "items" in seed_tracks:
-        seed_ids = [item["track"]["id"] for item in seed_tracks["items"][:5]]
-        return fetch_spotify_data(
-            sp.recommendations,
-            seed_tracks=seed_ids,
-            limit=10,
-            target_valence=valence,
-            target_energy=energy
-        )
-    return None
-
 def fetch_top_data(sp):
-    """Fetch user's top tracks and artists."""
+    """Fetch user's top tracks, artists, and genres."""
     top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
     top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=5, time_range="short_term")
-    return top_tracks, top_artists
+    genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])]
+    return top_tracks, top_artists, genres
 
 def fetch_behavioral_data(sp):
     """Fetch and analyze user's recently played tracks."""
     recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
     if recent_plays:
         timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
-        track_names = [item["track"]["name"] for item in recent_plays["items"]]
-        df = pd.DataFrame({"played_at": timestamps, "track_name": track_names})
+        df = pd.DataFrame({"played_at": timestamps})
         df["hour"] = df["played_at"].dt.hour
-        df["date"] = df["played_at"].dt.date
+        df["weekday"] = df["played_at"].dt.weekday
         return df
     return pd.DataFrame()
 
 def display_top_songs(top_tracks):
-    """Display user's top songs with smaller covers."""
+    """Display the user's top songs."""
     st.header("Your Top Songs")
     if top_tracks and "items" in top_tracks:
         for track in top_tracks["items"]:
@@ -101,7 +81,7 @@ def display_top_songs(top_tracks):
             st.markdown(
                 f"""
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <img src="{album_image}" alt="Cover" class="cover-small">
+                    <img src="{album_image}" alt="Cover" class="cover-square">
                     <div>
                         <p><strong>{song_name}</strong></p>
                         <p>by {artists}</p>
@@ -111,31 +91,51 @@ def display_top_songs(top_tracks):
                 unsafe_allow_html=True
             )
     else:
-        st.warning("No top songs available.")
+        st.warning("No top songs data available.")
 
-def display_persona():
-    """Generate and display user's persona."""
-    persona_name = random.choice(["Beat Maverick", "Harmony Prodigy", "Rhythm Nomad", "Melody Seeker"])
-    st.markdown(f"<div class='persona-box'>{persona_name}</div>", unsafe_allow_html=True)
-    st.markdown(
-        f"<div class='persona-desc'>You're a {persona_name}—always exploring new vibes, grooving to rhythms, and embracing melodies like no one else!</div>",
-        unsafe_allow_html=True
-    )
+def display_top_artists(top_artists):
+    """Display the user's top artists."""
+    st.header("Your Top Artists")
+    if top_artists and "items" in top_artists:
+        for artist in top_artists["items"]:
+            artist_image = artist['images'][0]['url']
+            artist_name = artist['name']
+            st.markdown(
+                f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="{artist_image}" alt="Artist" class="cover-circle">
+                    <div>
+                        <p><strong>{artist_name}</strong></p>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    else:
+        st.warning("No top artists data available.")
+
+def display_top_genres(genres):
+    """Display user's favorite genres."""
+    st.header("Your Top Genres")
+    if genres:
+        st.markdown(f"**{', '.join(genres[:5])}**")
+    else:
+        st.warning("No genres available.")
 
 def display_insights(behavior_data):
-    """Display revamped insights in a Gen Z style."""
+    """Display insights based on the user's listening behavior."""
     st.header("Insights")
     if behavior_data.empty:
         st.warning("No recent play data available.")
     else:
-        most_played_day = behavior_data["date"].mode()[0]
+        peak_hour = behavior_data["hour"].mode()[0]
         total_tracks = len(behavior_data)
-        unique_songs = len(behavior_data["track_name"].unique())
+        unique_hours = len(behavior_data["hour"].unique())
 
         insights = [
-            f"You listened the most on {most_played_day}.",
-            f"You vibed with {total_tracks} tracks this month.",
-            f"You explored {unique_songs} unique songs. Curator vibes?"
+            f"Peak listening hour: {peak_hour}:00.",
+            f"Total tracks played: {total_tracks}.",
+            f"Unique listening hours: {unique_hours}."
         ]
 
         for insight in insights:
@@ -149,32 +149,32 @@ def display_insights(behavior_data):
             )
 
 def plot_listening_heatmap(behavior_data):
-    """Plot a heatmap showing listening activity by date and time."""
+    """Plot a heatmap showing listening activity by hour and day."""
     if not behavior_data.empty:
-        st.subheader("Listening Heatmap (Date vs. Hour)")
-        heatmap_data = behavior_data.groupby(["hour", "date"]).size().unstack(fill_value=0)
-        plt.figure(figsize=(12, 6))
-        sns.heatmap(heatmap_data, cmap="magma", linewidths=0.5)
-        plt.title("Listening Activity Heatmap", color="white")
-        plt.xlabel("Date", color="white")
+        st.subheader("Listening Activity Heatmap")
+        heatmap_data = behavior_data.groupby(["hour", "weekday"]).size().unstack(fill_value=0)
+        plt.figure(figsize=(10, 6))
+        sns.heatmap(heatmap_data, cmap="magma", annot=True, fmt="d", linewidths=0.5)
+        plt.title("Listening Activity by Hour and Day", color="white")
+        plt.xlabel("Day of the Week", color="white")
         plt.ylabel("Hour of the Day", color="white")
-        plt.xticks(color="white", rotation=45)
+        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], color="white")
         plt.yticks(color="white")
         plt.gca().patch.set_facecolor("black")
         plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
-def plot_fun_chart(behavior_data):
-    """Plot a fun chart showing track diversity by date."""
+def plot_unique_hours_graph(behavior_data):
+    """Plot the distribution of unique listening hours."""
     if not behavior_data.empty:
-        st.subheader("Track Diversity Over the Month")
-        diversity_data = behavior_data.groupby("date")["track_name"].nunique()
+        st.subheader("Unique Listening Hours Distribution")
+        unique_hours = behavior_data["hour"].value_counts().sort_index()
         plt.figure(figsize=(10, 6))
-        diversity_data.plot(kind="line", marker="o", color="#1DB954", linewidth=2)
-        plt.title("Daily Track Diversity", color="white")
-        plt.xlabel("Date", color="white")
-        plt.ylabel("Unique Tracks", color="white")
-        plt.xticks(color="white", rotation=45)
+        unique_hours.plot(kind="bar", color="#1DB954")
+        plt.title("Unique Listening Hours", color="white")
+        plt.xlabel("Hour of the Day", color="white")
+        plt.ylabel("Frequency", color="white")
+        plt.xticks(color="white")
         plt.yticks(color="white")
         plt.gca().patch.set_facecolor("black")
         plt.gcf().set_facecolor("black")
@@ -202,41 +202,27 @@ if "token_info" in st.session_state:
     sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
 
     # Page Navigation
-    page = st.radio("Navigate to:", ["Liked Songs & Discover New", "Insights & Behavior"])
+    page = st.radio("Navigate to:", ["Insights & Behavior"])
 
-    # Page 1: Liked Songs & Discover New
-    if page == "Liked Songs & Discover New":
-        st.title("Liked Songs & Discover New")
-        mood = st.selectbox("Choose a Mood:", ["Happy", "Calm", "Energetic", "Sad"])
-        intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
-        feature = st.radio("Explore:", ["Liked Songs", "Discover New Songs"])
-
-        if feature == "Liked Songs":
-            st.header("Your Liked Songs")
-            liked_songs = fetch_liked_songs(sp)
-            display_top_songs(liked_songs)
-
-        elif feature == "Discover New Songs":
-            st.header("Discover New Songs")
-            recommendations = fetch_recommendations(sp, mood, intensity)
-            display_top_songs(recommendations)
-
-    # Page 2: Insights & Behavior
-    elif page == "Insights & Behavior":
+    if page == "Insights & Behavior":
         st.title("Insights & Behavior (Last Month)")
 
         # Fetch Data
-        top_tracks, top_artists = fetch_top_data(sp)
+        top_tracks, top_artists, genres = fetch_top_data(sp)
         behavior_data = fetch_behavioral_data(sp)
 
         # Persona
-        display_persona()
+        persona_name = random.choice(["Vibe Explorer", "Rhythm Ninja", "Beat Whisperer", "Melody Maverick"])
+        st.markdown(f"<div class='title-box'>Your Persona: <strong>{persona_name}</strong></div>", unsafe_allow_html=True)
+        st.markdown(f"You've been on a musical journey as a true {persona_name}. Always exploring, vibing, and feeling the beats!")
 
         # Display Sections
         display_top_songs(top_tracks)
+        display_top_artists(top_artists)
+        display_top_genres(genres)
         display_insights(behavior_data)
 
         # Graphical Analysis
         st.header("Graphical Analysis")
         plot_listening_heatmap(behavior_data)
-        plot_fun_chart(behavior_data)
+        plot_unique_hours_graph(behavior_data)
