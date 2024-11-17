@@ -3,9 +3,9 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import matplotlib.pyplot as plt
+from datetime import datetime
 import random
 import time
-from datetime import datetime
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -57,24 +57,31 @@ def render_tabs():
     html = '<div class="tabs-container">'
     for tab in tabs:
         css_class = "tab active-tab" if tab == st.session_state["active_tab"] else "tab"
-        html += f'<div class="{css_class}" onClick="window.location.href=\'#\'">{tab}</div>'
-    html += "</div>"
-    st.markdown(html, unsafe_allow_html=True)
-
-    # Capture clicks
-    for tab in tabs:
-        if st.button(tab):
+        if st.button(tab, key=tab):
             st.session_state["active_tab"] = tab
             st.experimental_rerun()
+        html += f'<div class="{css_class}">{tab}</div>'
+    html += "</div>"
+    st.markdown(html, unsafe_allow_html=True)
 
 # Authentication
 def authenticate_user():
     if "token_info" not in st.session_state:
-        st.markdown('<div class="brand">WVY</div>', unsafe_allow_html=True)
-        st.markdown('<div class="description">Discover your Spotify listening habits, top songs, and behavioral patterns with WVY.</div>', unsafe_allow_html=True)
-        auth_url = sp_oauth.get_authorize_url()
-        st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>', unsafe_allow_html=True)
-        return False
+        query_params = st.experimental_get_query_params()
+        if "code" in query_params:
+            try:
+                token_info = sp_oauth.get_access_token(query_params["code"][0])
+                st.session_state["token_info"] = token_info
+                st.experimental_set_query_params()  # Clear query params
+                st.success("Authentication successful! Refresh the page to continue.")
+            except Exception as e:
+                st.error(f"Authentication failed: {e}")
+        else:
+            st.markdown('<div class="brand">WVY</div>', unsafe_allow_html=True)
+            st.markdown('<div class="description">Discover your Spotify listening habits, top songs, and behavioral patterns with WVY.</div>', unsafe_allow_html=True)
+            auth_url = sp_oauth.get_authorize_url()
+            st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>', unsafe_allow_html=True)
+            return False
     return True
 
 # Data Fetch Functions
@@ -112,7 +119,7 @@ def fetch_behavioral_data(sp):
 
 # Main App Logic
 if authenticate_user():
-    sp = spotipy.Spotify(auth=st.secrets["spotify"]["access_token"])
+    sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
 
     # Render Tabs
     render_tabs()
