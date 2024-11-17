@@ -25,7 +25,7 @@ sp_oauth = SpotifyOAuth(
 
 # Streamlit Page Configuration
 st.set_page_config(
-    page_title="WVY - Your Spotify Insights",
+    page_title="WVY - Spotify Insights",
     page_icon="🌊",
     layout="wide"
 )
@@ -90,9 +90,7 @@ def fetch_behavioral_data(sp):
     if recent_plays:
         timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
         track_names = [item["track"]["name"] for item in recent_plays["items"]]
-        artist_names = [item["track"]["artists"][0]["name"] for item in recent_plays["items"]]
-        durations = [item["track"]["duration_ms"] / 60000 for item in recent_plays["items"]]  # Duration in minutes
-        df = pd.DataFrame({"played_at": timestamps, "track_name": track_names, "artist_name": artist_names, "duration": durations})
+        df = pd.DataFrame({"played_at": timestamps, "track_name": track_names})
         df["date"] = df["played_at"].dt.date
         df["hour"] = df["played_at"].dt.hour
         df["weekday"] = df["played_at"].dt.weekday
@@ -147,7 +145,7 @@ def display_insights(behavior_data):
         listener_type = "Night Owl" if avg_hour > 18 else "Day Explorer"
 
         # Unique Artist Discovery
-        unique_artists = behavior_data["artist_name"].nunique()
+        unique_artists = behavior_data["track_name"].nunique()
 
         insights = f"""
         - **Longest Listening Streak**: {max_streak} days.
@@ -172,16 +170,16 @@ def plot_listening_heatmap(behavior_data):
         plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
-# Plot Average Track Length
-def plot_average_track_length(behavior_data):
+# Plot Repeat Song Frequency
+def plot_repeat_song_frequency(behavior_data):
     if not behavior_data.empty:
-        avg_duration = behavior_data.groupby("weekday")["duration"].mean()
+        repeat_counts = behavior_data["track_name"].value_counts().head(10)
         plt.figure(figsize=(10, 6))
-        avg_duration.plot(kind="bar", color="#1DB954")
-        plt.title("Average Track Length (Minutes)", color="white")
-        plt.xlabel("Day of the Week", color="white")
-        plt.ylabel("Average Length (Minutes)", color="white")
-        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], color="white", rotation=45)
+        repeat_counts.plot(kind="bar", color="#1DB954")
+        plt.title("Top 10 Most Repeated Songs", color="white")
+        plt.xlabel("Track Name", color="white")
+        plt.ylabel("Repeat Count", color="white")
+        plt.xticks(color="white", rotation=45, fontsize=10)
         plt.yticks(color="white")
         plt.gca().patch.set_facecolor("black")
         plt.gcf().set_facecolor("black")
@@ -211,7 +209,16 @@ if "token_info" in st.session_state:
 
     sp = st.session_state["sp"]
 
-    st.title("WVY 🌊 - Your Spotify Insights")
+    # App Welcome Screen
+    if "authenticated" not in st.session_state:
+        st.markdown("""
+        <div style="text-align: center; margin: 20px; font-size: 1.5em; color: white;">
+            <p>Welcome to <strong>WVY 🌊</strong>! Your ultimate Spotify companion.</p>
+            <p>Explore your music insights, uncover trends, and discover new tracks tailored to your mood and preferences.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.session_state["authenticated"] = True
+
     page = st.radio("Navigate to:", ["Liked Songs & Discover New", "Insights & Behavior"])
 
     if page == "Liked Songs & Discover New":
@@ -239,7 +246,7 @@ if "token_info" in st.session_state:
                     )
 
         elif feature == "Discover New Songs":
-            recommendations = fetch_recommendations(sp, mood, intensity)
+            recommendations = fetch_spotify_data(sp.recommendations, seed_genres=["pop", "rock"], limit=10)
             if recommendations and "tracks" in recommendations:
                 for track in recommendations["tracks"]:
                     st.markdown(
@@ -308,4 +315,4 @@ if "token_info" in st.session_state:
         # Graphs Section
         st.subheader("Graphical Analysis")
         plot_listening_heatmap(behavior_data)
-        plot_average_track_length(behavior_data)
+        plot_repeat_song_frequency(behavior_data)
