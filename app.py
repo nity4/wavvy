@@ -38,6 +38,9 @@ st.markdown("""
     h1, h2, h3, p {color: white !important;}
     .cover {border-radius: 15px; margin: 5px;}
     .fun-insight-box {background: #333; padding: 15px; border-radius: 10px; margin-top: 20px;}
+    .grid {display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px;}
+    .grid-item {text-align: center;}
+    .grid img {width: 100%; border-radius: 10px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -81,7 +84,7 @@ def fetch_top_data(sp):
 def generate_funny_insights(top_artists, genres):
     artist_names = [artist["name"] for artist in top_artists["items"]]
     return f"""Your top artist is **{artist_names[0]}**—basically your soulmate.
-               With genres like **{genres[0]}** and **{genres[1]}**, you're definitely out here making the cool kids jealous."""
+               With genres like **{genres[0]}** and **{genres[1]}**, you're clearly cooler than everyone else."""
 
 # Fetch Behavioral Data
 def fetch_behavioral_data(sp):
@@ -94,11 +97,11 @@ def get_personality_label(peak_hour):
     if 0 <= peak_hour <= 6:
         return "Night Owl", "Grooving in the quiet hours."
     elif 7 <= peak_hour <= 12:
-        return "Morning Motivator", "Getting inspired early in the day."
+        return "Morning Motivator", "Starting your day with vibes."
     elif 13 <= peak_hour <= 18:
-        return "Afternoon Explorer", "Discovering beats while staying productive."
+        return "Afternoon Explorer", "Jamming through productive hours."
     else:
-        return "Evening Relaxer", "Unwinding with chill vibes."
+        return "Evening Relaxer", "Chilling and vibing post-sunset."
 
 # Main App Logic
 if authenticate_user():
@@ -106,10 +109,11 @@ if authenticate_user():
 
     # Sidebar Navigation
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to:", ["Liked Songs and Discover", "Top Songs and Genres", "Behavior and Insights"])
+    page = st.sidebar.selectbox("Choose a Page:", ["Liked Songs and Discover", "Top Songs and Genres", "Behavior and Insights"])
 
     if page == "Liked Songs and Discover":
         st.title("Liked Songs and Discover New Recommendations")
+
         # Mood and Intensity Filter
         mood = st.selectbox("Select Mood:", ["Happy", "Calm", "Energetic", "Sad"])
         intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
@@ -118,16 +122,16 @@ if authenticate_user():
         st.header("Liked Songs")
         liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=20)
         if liked_songs:
+            st.markdown('<div class="grid">', unsafe_allow_html=True)
             for item in random.sample(liked_songs["items"], min(len(liked_songs["items"]), 10)):
                 track = item["track"]
                 st.markdown(f"""
-                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <img src="{track['album']['images'][0]['url']}" alt="Cover" width="80" height="80" class="cover">
-                        <div style="margin-left: 10px;">
-                            <p><b>{track['name']}</b><br><i>{track['artists'][0]['name']}</i></p>
-                        </div>
+                    <div class="grid-item">
+                        <img src="{track['album']['images'][0]['url']}" alt="Cover">
+                        <p><b>{track['name']}</b><br>{track['artists'][0]['name']}</p>
                     </div>
                 """, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         # Discover New Songs
         st.header("Discover New Songs")
@@ -137,29 +141,45 @@ if authenticate_user():
             limit=10
         )
         if recommendations:
+            st.markdown('<div class="grid">', unsafe_allow_html=True)
             for track in recommendations["tracks"]:
                 st.markdown(f"""
-                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <img src="{track['album']['images'][0]['url']}" alt="Cover" width="80" height="80" class="cover">
-                        <div style="margin-left: 10px;">
-                            <p><b>{track['name']}</b><br><i>{track['artists'][0]['name']}</i></p>
-                        </div>
+                    <div class="grid-item">
+                        <img src="{track['album']['images'][0]['url']}" alt="Cover">
+                        <p><b>{track['name']}</b><br>{track['artists'][0]['name']}</p>
                     </div>
                 """, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     elif page == "Top Songs and Genres":
         st.title("Top Songs, Artists, and Genres")
+
+        # Fetch and Display Data
         top_tracks, top_artists, genres = fetch_top_data(sp)
 
         # Top Tracks
         st.header("Top Tracks")
+        st.markdown('<div class="grid">', unsafe_allow_html=True)
         for track in top_tracks["items"]:
-            st.write(f"**{track['name']}** by {track['artists'][0]['name']}")
+            st.markdown(f"""
+                <div class="grid-item">
+                    <img src="{track['album']['images'][0]['url']}" alt="Cover">
+                    <p><b>{track['name']}</b><br>{track['artists'][0]['name']}</p>
+                </div>
+            """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
         # Top Artists
         st.header("Top Artists")
+        st.markdown('<div class="grid">', unsafe_allow_html=True)
         for artist in top_artists["items"]:
-            st.write(f"**{artist['name']}**")
+            st.markdown(f"""
+                <div class="grid-item">
+                    <img src="{artist['images'][0]['url']}" alt="Artist">
+                    <p><b>{artist['name']}</b></p>
+                </div>
+            """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
         # Top Genres
         st.header("Top Genres")
@@ -196,7 +216,7 @@ if authenticate_user():
         st.header("Additional Insight")
         st.markdown(f"""
             <div class="fun-insight-box">
-                You're listening more during the {personality} hours. Keep it up, music genius!
+                You're clearly vibing during {personality} hours. Keep it up, music guru!
             </div>
         """, unsafe_allow_html=True)
 
