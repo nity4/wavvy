@@ -27,6 +27,12 @@ st.markdown("""
     body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     h1, h2, h3, p {color: white !important;}
+    .persona-box {display: flex; justify-content: space-between; flex-wrap: wrap; background: #333; padding: 20px; border-radius: 15px; margin-top: 20px;}
+    .persona-card {flex: 1 1 calc(33.333% - 20px); background: #444; color: white; margin: 10px; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
+    .persona-title {font-size: 1.8em; font-weight: bold; margin-bottom: 10px;}
+    .persona-value {font-size: 2.5em; font-weight: bold; margin-top: 10px;}
+    .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
+    .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -102,56 +108,60 @@ def fetch_top_data(sp):
     genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])] if top_artists else []
     return top_tracks, top_artists, genres
 
-# Display Persona
-def display_persona():
-    st.markdown("""
-        <div style="text-align: center; margin: 20px;">
-            <h2>Your Spotify Persona</h2>
-            <p>You are a "Rhythm Explorer"—mapping beats that move your soul!</p>
+# Display Persona and Insights
+def display_persona_and_insights(behavior_data, streak, style, artists):
+    st.markdown(f"""
+        <div class="persona-box">
+            <div class="persona-card">
+                <div class="persona-title">🔥 Listening Streak</div>
+                <div class="persona-value">{streak} days</div>
+            </div>
+            <div class="persona-card">
+                <div class="persona-title">☀️🌙 Listening Style</div>
+                <div class="persona-value">{style}</div>
+            </div>
+            <div class="persona-card">
+                <div class="persona-title">🎨 Unique Artists</div>
+                <div class="persona-value">{artists}</div>
+            </div>
         </div>
     """, unsafe_allow_html=True)
 
-# Display Insights
-def display_insights(behavior_data):
-    if behavior_data.empty:
-        st.warning("No recent play data available.")
-    else:
-        days_played = behavior_data["date"].nunique()
-        avg_hour = behavior_data["hour"].mean()
-        listener_type = "Day Explorer" if avg_hour <= 18 else "Night Owl"
-        unique_artists = behavior_data["artist_name"].nunique()
-
-        st.markdown(f"""
-        <div style="display: flex; justify-content: space-around; margin-top: 20px;">
-            <div style="text-align: center;">
-                <h3>🔥 Listening Streak</h3>
-                <p>{days_played} days</p>
-            </div>
-            <div style="text-align: center;">
-                <h3>☀️🌙 Listening Style</h3>
-                <p>{listener_type}</p>
-            </div>
-            <div style="text-align: center;">
-                <h3>🎨 Unique Artists</h3>
-                <p>{unique_artists}</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
 # Display Top Data
 def display_top_data(top_tracks, top_artists, genres):
+    st.subheader("Your Top Songs")
     if top_tracks:
-        st.subheader("Top Tracks")
         for track in top_tracks["items"]:
-            st.write(f"{track['name']} by {', '.join(artist['name'] for artist in track['artists'])}")
+            st.markdown(
+                f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-small">
+                    <div>
+                        <p><strong>{track['name']}</strong></p>
+                        <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
+    st.subheader("Your Top Artists")
     if top_artists:
-        st.subheader("Top Artists")
         for artist in top_artists["items"]:
-            st.write(artist["name"])
+            st.markdown(
+                f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="{artist['images'][0]['url']}" alt="Artist" class="cover-circle">
+                    <div>
+                        <p><strong>{artist['name']}</strong></p>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
+    st.subheader("Your Top Genres")
     if genres:
-        st.subheader("Top Genres")
         st.write(", ".join(genres[:5]))
 
 # Plot Listening Heatmap
@@ -160,10 +170,13 @@ def plot_listening_heatmap(behavior_data):
         heatmap_data = behavior_data.groupby(["hour", "weekday"]).size().unstack(fill_value=0)
         plt.figure(figsize=(12, 6))
         sns.heatmap(heatmap_data, cmap="magma", linewidths=0.5, annot=True, fmt="d")
-        plt.title("Listening Heatmap (Hour vs. Day)")
-        plt.xlabel("Day")
-        plt.ylabel("Hour")
-        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], rotation=45)
+        plt.title("Listening Heatmap (Hour vs. Day)", color="white")
+        plt.xlabel("Day", color="white")
+        plt.ylabel("Hour", color="white")
+        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], color="white")
+        plt.yticks(color="white")
+        plt.gca().patch.set_facecolor("black")
+        plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
 # Main App Logic
@@ -187,13 +200,35 @@ else:
             liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
             if liked_songs:
                 for item in liked_songs["items"]:
-                    st.write(f"{item['track']['name']} by {', '.join(artist['name'] for artist in item['track']['artists'])}")
+                    st.markdown(
+                        f"""
+                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <img src="{item['track']['album']['images'][0]['url']}" alt="Cover" class="cover-small">
+                            <div>
+                                <p><strong>{item['track']['name']}</strong></p>
+                                <p>by {', '.join(artist['name'] for artist in item['track']['artists'])}</p>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
         elif feature == "Discover New Songs":
             recommendations = fetch_spotify_data(sp.recommendations, seed_genres=["pop", "rock"], limit=10)
             if recommendations:
                 for track in recommendations["tracks"]:
-                    st.write(f"{track['name']} by {', '.join(artist['name'] for artist in track['artists'])}")
+                    st.markdown(
+                        f"""
+                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-small">
+                            <div>
+                                <p><strong>{track['name']}</strong></p>
+                                <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
     elif page == "Insights & Behavior":
         st.title("Insights & Behavior")
@@ -201,7 +236,11 @@ else:
         behavior_data = fetch_behavioral_data(sp, week_type)
         top_tracks, top_artists, genres = fetch_top_data(sp)
 
-        display_persona()
-        display_insights(behavior_data)
+        display_persona_and_insights(
+            behavior_data,
+            streak=5,  # Example streak
+            style="Day Explorer",
+            artists=29  # Example unique artist count
+        )
         display_top_data(top_tracks, top_artists, genres)
         plot_listening_heatmap(behavior_data)
