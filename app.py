@@ -3,9 +3,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import time
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-import random
 from requests.exceptions import ReadTimeout
 
 # Spotify API credentials from Streamlit Secrets
@@ -38,7 +36,6 @@ st.markdown("""
     body {background: linear-gradient(to right, black, #1DB954) !important;}
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     h1, h2, h3 {color: white !important;}
-    .highlight {background-color: #1DB954; color: black; padding: 2px 6px; border-radius: 4px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -77,6 +74,18 @@ def fetch_spotify_data(sp_func, *args, retries=5, **kwargs):
                 time.sleep(2 ** attempt)
     return None
 
+# Retry logic for fetching audio features
+def fetch_audio_features(sp, track_id, retries=3):
+    for attempt in range(retries):
+        try:
+            features = sp.audio_features([track_id])
+            if features and isinstance(features, list) and features[0]:
+                return features[0]
+        except Exception as e:
+            st.warning(f"Retry {attempt + 1}: Failed to fetch features for track {track_id}")
+        time.sleep(2 ** attempt)  # Exponential backoff
+    return None
+
 # Function to get liked songs
 def get_liked_songs(sp):
     songs, offset = [], 0
@@ -86,18 +95,23 @@ def get_liked_songs(sp):
             break
         for item in results["items"]:
             track = item["track"]
+            # Ensure the track has an ID and is not None
+            track_id = track.get("id")
+            if not track_id:
+                st.warning(f"Skipping track without valid ID: {track['name']}")
+                continue
+
             # Fetch audio features safely
-            features = fetch_spotify_data(sp.audio_features, [track["id"]])
-            if features and isinstance(features, list) and features[0]:  # Ensure features[0] exists
+            features = fetch_audio_features(sp, track_id)
+            if features:
                 songs.append({
                     "Name": track["name"],
                     "Artist": track["artists"][0]["name"],
-                    "Energy": features[0]["energy"],
-                    "Valence": features[0]["valence"],
-                    "Popularity": track["popularity"]
+                    "Energy": features.get("energy", None),
+                    "Valence": features.get("valence", None),
+                    "Popularity": track.get("popularity", None)
                 })
             else:
-                # Log or handle the missing feature case
                 st.warning(f"Could not fetch audio features for track: {track['name']} by {track['artists'][0]['name']}")
         offset += 50
     return pd.DataFrame(songs)
