@@ -155,9 +155,16 @@ if authenticate_user():
         top_tracks, top_artists, genres = fetch_top_data(sp)
         if top_tracks and top_artists:
             st.header("Fun Insights")
-            st.markdown('<div class="fun-insight-box"> Your top genre this month is: ' + random.choice(genres) + '</div>', unsafe_allow_html=True)
-            st.markdown('<div class="fun-insight-box"> You’ve jammed for over ' + str(len(top_tracks["items"]) * 3) + ' hours this month!</div>', unsafe_allow_html=True)
-            st.markdown('<div class="fun-insight-box"> You listened to ' + str(len(top_artists["items"])) + ' unique artists!</div>', unsafe_allow_html=True)
+            st.markdown(f"""
+                <div class="fun-insight-box">
+                    🎧 Your top genre this month is: <strong>{random.choice(genres).capitalize()}</strong>.
+                </div>
+            """, unsafe_allow_html=True)
+            st.markdown(f"""
+                <div class="fun-insight-box">
+                    🎵 You've jammed to <strong>{len(top_tracks['items'])} top songs</strong> this month.
+                </div>
+            """, unsafe_allow_html=True)
 
     elif page == "Behavior":
         st.title("Your Personalized Music Behavior")
@@ -179,7 +186,6 @@ if authenticate_user():
         ax.set_ylabel("Tracks Played")
         st.pyplot(fig)
 
-        # Personalized Music Personality Gift
         peak_hour = listening_hours.idxmax()
         if peak_hour >= 18:
             personality = "🎶 Night Owl"
