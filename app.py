@@ -151,23 +151,40 @@ if authenticate_user():
 
     elif page == "Top Insights":
         st.title("Your Top Insights (Last Month)")
+
+        # Fetch top tracks, artists, and genres
         top_tracks, top_artists, genres = fetch_top_data(sp)
 
+        # Top Songs Section
         st.header("Your Top Songs")
         for track in top_tracks["items"]:
             st.markdown(f"""
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                     <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-square">
                     <div style="margin-left: 10px;">
-                        <p><strong>{track['name']}</strong></p>
-                        <p>by {track['artists'][0]['name']}</p>
+                        <p style="margin: 0;"><strong>{track['name']}</strong></p>
+                        <p style="margin: 0;">by {track['artists'][0]['name']}</p>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
 
+        # Top Artists Section
+        st.header("Your Top Artists")
+        for artist in top_artists["items"]:
+            st.markdown(f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="{artist['images'][0]['url']}" alt="Artist Cover" class="cover-circle" style="width: 80px; height: 80px;">
+                    <div style="margin-left: 10px;">
+                        <p style="margin: 0;"><strong>{artist['name']}</strong></p>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        # Genres Section
         st.header("Genres You Vibe With")
         st.write(", ".join(genres[:5]))
 
+        # Fun Insights Section
         st.header("Fun Insights")
         insights = [
             "Your music taste is elite...but like only 3 people agree.",
