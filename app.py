@@ -37,15 +37,15 @@ st.markdown("""
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     h1, h2, h3, p {color: white !important;}
     .brand {position: absolute; top: 20px; left: 20px; font-size: 3.5em; font-weight: bold; color: white;}
-    .cover-square {border-radius: 10px; margin: 10px; width: 120px; height: 120px;}
-    .fun-insight-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px; font-size: 1.2em; line-height: 1.5;}
+    .cover-circle {border-radius: 50%; margin: 10px; width: 120px; height: 120px;}
+    .fun-insight-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px; font-size: 1.2em; line-height: 1.5; text-align: center;}
+    .gift-box {background: #1DB954; color: black; padding: 20px; border-radius: 15px; margin-top: 20px; font-size: 2em; font-weight: bold; text-align: center;}
+    .dramatic-box {background: linear-gradient(to right, #1DB954, black); color: white; padding: 40px; border-radius: 15px; margin-bottom: 20px; font-size: 2.5em; text-align: center; font-family: 'Courier New', Courier, monospace;}
     .personalized-box {background: #444; color: white; padding: 20px; border-radius: 15px; margin-top: 20px; font-size: 1.3em; line-height: 1.6;}
-    .gift-box {background: #1DB954; color: black; padding: 20px; border-radius: 15px; margin-top: 20px; font-size: 1.5em; font-weight: bold; text-align: center;}
-    .graph-bg {background-color: black; color: white;}
     </style>
 """, unsafe_allow_html=True)
 
-# Refresh Token Function
+# Refresh Token and Initialization (from previous implementation)
 def refresh_access_token():
     try:
         if "token_info" in st.session_state and "refresh_token" in st.session_state["token_info"]:
@@ -59,32 +59,10 @@ def refresh_access_token():
         st.error(f"Failed to refresh access token: {e}")
         return None
 
-# Initialize Spotify Client
 def initialize_spotify():
     if "token_info" in st.session_state:
         access_token = st.session_state["token_info"]["access_token"]
         return spotipy.Spotify(auth=access_token)
-    return None
-
-# Fetch Spotify Data Function
-def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
-    delay = 1
-    for attempt in range(retries):
-        try:
-            return sp_func(*args, **kwargs)
-        except spotipy.exceptions.SpotifyException as e:
-            if e.http_status == 401:  # Token expired
-                st.warning("Access token expired. Attempting to refresh...")
-                new_token = refresh_access_token()
-                if new_token:
-                    st.session_state["sp"] = initialize_spotify()  # Reinitialize Spotify client
-                else:
-                    st.error("Failed to refresh access token. Please log in again.")
-                    return None
-            else:
-                st.error(f"Spotify API error: {e}")
-                return None
-    st.error("Failed to fetch data after multiple retries. Please try again later.")
     return None
 
 # Authentication
@@ -125,14 +103,14 @@ def fetch_recommendations(sp, mood, intensity):
         target_energy=energy
     )
 
-# Fetch Top Insights
-def fetch_top_data(sp):
-    if "top_data" not in st.session_state:
-        top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
-        top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=5, time_range="short_term")
+# Fetch Top Insights for Last Month
+def fetch_top_data_month(sp):
+    if "top_data_month" not in st.session_state:
+        top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="medium_term")
+        top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=5, time_range="medium_term")
         genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])]
-        st.session_state["top_data"] = (top_tracks, top_artists, genres)
-    return st.session_state["top_data"]
+        st.session_state["top_data_month"] = (top_tracks, top_artists, genres)
+    return st.session_state["top_data_month"]
 
 # Fetch Behavioral Data
 def fetch_behavioral_data_1month(sp):
@@ -144,6 +122,27 @@ def fetch_behavioral_data_1month(sp):
         df["weekday"] = df["played_at"].dt.weekday
         st.session_state["behavior_data_month"] = df
     return st.session_state["behavior_data_month"]
+
+# Fetch Spotify Data Function
+def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
+    delay = 1
+    for attempt in range(retries):
+        try:
+            return sp_func(*args, **kwargs)
+        except spotipy.exceptions.SpotifyException as e:
+            if e.http_status == 401:  # Token expired
+                st.warning("Access token expired. Attempting to refresh...")
+                new_token = refresh_access_token()
+                if new_token:
+                    st.session_state["sp"] = initialize_spotify()  # Reinitialize Spotify client
+                else:
+                    st.error("Failed to refresh access token. Please log in again.")
+                    return None
+            else:
+                st.error(f"Spotify API error: {e}")
+                return None
+    st.error("Failed to fetch data after multiple retries. Please try again later.")
+    return None
 
 # Main App Logic
 if authenticate_user():
@@ -168,7 +167,7 @@ if authenticate_user():
                 track = item["track"]
                 st.markdown(f"""
                     <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-square">
+                        <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-circle">
                         <div style="margin-left: 10px;">
                             <p><strong>{track['name']}</strong></p>
                             <p>by {track['artists'][0]['name']}</p>
@@ -183,7 +182,7 @@ if authenticate_user():
                 for track in recommendations["tracks"]:
                     st.markdown(f"""
                         <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                            <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-square">
+                            <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-circle">
                             <div style="margin-left: 10px;">
                                 <p><strong>{track['name']}</strong></p>
                                 <p>by {track['artists'][0]['name']}</p>
@@ -192,15 +191,34 @@ if authenticate_user():
                     """, unsafe_allow_html=True)
 
     elif page == "Insights & Behavior":
-        st.title("Insights & Behavior")
-        top_tracks, top_artists, genres = fetch_top_data(sp)
+        st.title("Insights & Behavior (Last Month)")
+        
+        # Fun Music Personality
         behavior_data = fetch_behavioral_data_1month(sp)
+        peak_hour = behavior_data["hour"].mode()[0]
+        personality_name = random.choice(["The Nocturnal Groover", "Melodic Morning Maestro", "The Vibe Weaver", "Night Vibes Architect"])
+        personality_desc = random.choice([
+            "Your playlists shape your days with rich emotions and energy.",
+            "Music fuels your world with rhythm and soul, day and night.",
+            "Every track you play seems to write a unique story.",
+        ])
+        st.markdown(f"""
+            <div class="dramatic-box">
+                Welcome, {personality_name}!
+            </div>
+            <div class="personalized-box">
+                {personality_desc}
+            </div>
+        """)
+
+        # Fetch Top Data (Last Month)
+        top_tracks, top_artists, genres = fetch_top_data_month(sp)
 
         st.header("Your Top Songs")
         for track in top_tracks["items"]:
             st.markdown(f"""
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-square">
+                    <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-circle">
                     <div style="margin-left: 10px;">
                         <p><strong>{track['name']}</strong></p>
                         <p>by {track['artists'][0]['name']}</p>
@@ -212,7 +230,7 @@ if authenticate_user():
         for artist in top_artists["items"]:
             st.markdown(f"""
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <img src="{artist['images'][0]['url']}" alt="Artist Cover" class="cover-square">
+                    <img src="{artist['images'][0]['url']}" alt="Artist Cover" class="cover-circle">
                     <div style="margin-left: 10px;">
                         <p><strong>{artist['name']}</strong></p>
                     </div>
@@ -230,7 +248,7 @@ if authenticate_user():
         fun_insights = [
             f"🎧 Your top genre this month is: <strong>{favorite_genre}</strong>.",
             f"🎵 You've vibed with <strong>{total_top_songs} top songs</strong> this month.",
-            f"🔥 You're enjoying <strong>{total_top_artists} amazing artists</strong> recently!"
+            f"🔥 You're enjoying <strong>{total_top_artists} amazing artists</strong> recently!",
         ]
 
         for insight in fun_insights:
@@ -240,6 +258,7 @@ if authenticate_user():
                 </div>
             """)
 
+        # Behavioral Trends (Hourly and Weekly)
         st.header("Listening Trends Over the Month")
         fig, ax = plt.subplots(facecolor="black")
         behavior_data["hour"].value_counts().sort_index().plot(kind="bar", ax=ax, color="#1DB954")
