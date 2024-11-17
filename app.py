@@ -68,10 +68,13 @@ def render_tabs():
     if "active_tab" not in st.session_state:
         st.session_state["active_tab"] = tabs[0]
 
+    selected_tab = st.session_state["active_tab"]
+
     html = '<div class="tabs-container">'
     for tab in tabs:
-        css_class = "tab active-tab" if tab == st.session_state["active_tab"] else "tab"
-        html += f'<div class="{css_class}" onClick="window.location.href=\'?active_tab={tab}\'">{tab}</div>'
+        css_class = "tab active-tab" if tab == selected_tab else "tab"
+        action = f"window.location.href='?active_tab={tab}'"
+        html += f'<div class="{css_class}" onClick="{action}">{tab}</div>'
     html += "</div>"
     st.markdown(html, unsafe_allow_html=True)
 
@@ -79,7 +82,9 @@ def render_tabs():
     active_tab = st.experimental_get_query_params().get("active_tab", [st.session_state["active_tab"]])[0]
     st.session_state["active_tab"] = active_tab
 
-# Fetch data functions
+    return active_tab
+
+# Data Fetch Functions
 def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
     for attempt in range(retries):
         try:
@@ -91,17 +96,24 @@ def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
                 st.warning(f"Attempt {attempt + 1} failed. Retrying...")
     return None
 
-def fetch_liked_songs(sp):
-    return fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
+def fetch_liked_songs(sp, mood, intensity):
+    mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
+    valence, energy = [val * intensity / 5 for val in mood_map[mood]]
+    liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
+    return liked_songs
 
-def fetch_recommendations(sp):
+def fetch_recommendations(sp, mood, intensity):
+    mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
+    valence, energy = [val * intensity / 5 for val in mood_map[mood]]
     seed_tracks = fetch_spotify_data(sp.current_user_saved_tracks, limit=5)
     if not seed_tracks:
         return None
     return fetch_spotify_data(
         sp.recommendations,
         seed_tracks=[item["track"]["id"] for item in seed_tracks["items"]],
-        limit=10
+        limit=10,
+        target_valence=valence,
+        target_energy=energy
     )
 
 def fetch_top_data(sp):
@@ -124,16 +136,17 @@ if authenticate_user():
     st.markdown('<div class="brand">WVY</div>', unsafe_allow_html=True)
 
     # Render Tabs
-    render_tabs()
-    active_tab = st.session_state["active_tab"]
+    active_tab = render_tabs()
 
     if active_tab == "Liked & Discover":
         st.title("Liked Songs and Recommendations")
+        mood = st.selectbox("Select Mood:", ["Happy", "Calm", "Energetic", "Sad"])
+        intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
         feature = st.radio("What do you want to explore?", ["Liked Songs", "Discover New Songs"])
 
         if feature == "Liked Songs":
             st.header("Liked Songs")
-            liked_songs = fetch_liked_songs(sp)
+            liked_songs = fetch_liked_songs(sp, mood, intensity)
             for item in random.sample(liked_songs["items"], min(len(liked_songs["items"]), 10)):
                 track = item["track"]
                 st.markdown(f"""
@@ -147,7 +160,7 @@ if authenticate_user():
 
         elif feature == "Discover New Songs":
             st.header("Discover New Songs")
-            recommendations = fetch_recommendations(sp)
+            recommendations = fetch_recommendations(sp, mood, intensity)
             for track in recommendations["tracks"]:
                 st.markdown(f"""
                     <div style="display: flex; align-items: center; margin-bottom: 10px;">
