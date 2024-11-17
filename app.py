@@ -60,20 +60,42 @@ def authenticate_user():
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>', unsafe_allow_html=True)
     return "token_info" in st.session_state
 
-# Data Fetch Functions
+# Fetch Spotify Data with Retry Mechanism
 def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
-    for attempt in range(retries):
+    """
+    Fetch data from the Spotify API with retries and exponential backoff.
+
+    Parameters:
+        sp_func: Spotify API function to call.
+        *args: Positional arguments for the API function.
+        retries: Number of retry attempts.
+        **kwargs: Keyword arguments for the API function.
+
+    Returns:
+        Response from the Spotify API or None if retries fail.
+    """
+    delay = 1  # Start with a 1-second delay for retries
+    for attempt in range(1, retries + 1):
         try:
             return sp_func(*args, **kwargs)
         except Exception as e:
             if "rate limit" in str(e).lower():
-                time.sleep(2 ** attempt)
+                st.warning(f"Rate limit hit. Retrying in {delay} seconds... (Attempt {attempt}/{retries})")
+                time.sleep(delay)
+                delay *= 2  # Exponential backoff
             else:
-                st.warning(f"Attempt {attempt + 1} failed. Retrying...")
+                st.warning(f"Attempt {attempt} failed: {e}")
+                time.sleep(delay)
+        delay *= 2  # Increase delay after each attempt
+
+    st.error("Failed to fetch data after multiple retries. Please try again later.")
     return None
 
+# Data Fetching Functions
 def fetch_liked_songs(sp):
-    return fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
+    if "liked_songs" not in st.session_state:
+        st.session_state["liked_songs"] = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
+    return st.session_state["liked_songs"]
 
 def fetch_recommendations(sp, mood, intensity):
     mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
@@ -90,16 +112,20 @@ def fetch_recommendations(sp, mood, intensity):
     )
 
 def fetch_top_data(sp):
-    top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
-    top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=5, time_range="short_term")
-    genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])]
-    return top_tracks, top_artists, genres
+    if "top_data" not in st.session_state:
+        top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
+        top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=5, time_range="short_term")
+        genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])]
+        st.session_state["top_data"] = (top_tracks, top_artists, genres)
+    return st.session_state["top_data"]
 
 def fetch_behavioral_data(sp):
-    recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
-    hours = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ").hour for item in recent_plays["items"]]
-    weekdays = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ").weekday() for item in recent_plays["items"]]
-    return pd.Series(hours).value_counts(), pd.Series(weekdays).value_counts()
+    if "behavior_data" not in st.session_state:
+        recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
+        hours = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ").hour for item in recent_plays["items"]]
+        weekdays = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ").weekday() for item in recent_plays["items"]]
+        st.session_state["behavior_data"] = (pd.Series(hours).value_counts(), pd.Series(weekdays).value_counts())
+    return st.session_state["behavior_data"]
 
 # Main App Logic
 if authenticate_user():
@@ -119,22 +145,27 @@ if authenticate_user():
 
         if feature == "Liked Songs":
             st.header("Liked Songs")
-            liked_songs = fetch_liked_songs(sp)
-            for item in random.sample(liked_songs["items"], min(len(liked_songs["items"]), 10)):
-                track = item["track"]
-                st.markdown(f"""
-                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-circle">
-                        <div style="margin-left: 10px;">
-                            <p><strong>{track['name']}</strong></p>
-                            <p>by {track['artists'][0]['name']}</p>
+            with st.spinner("Fetching your liked songs..."):
+                liked_songs = fetch_liked_songs(sp)
+            if liked_songs:
+                for item in random.sample(liked_songs["items"], min(len(liked_songs["items"]), 10)):
+                    track = item["track"]
+                    st.markdown(f"""
+                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-circle">
+                            <div style="margin-left: 10px;">
+                                <p><strong>{track['name']}</strong></p>
+                                <p>by {track['artists'][0]['name']}</p>
+                            </div>
                         </div>
-                    </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+            else:
+                st.warning("Could not load your liked songs. Please try again later.")
 
         elif feature == "Discover New Songs":
             st.header("Discover New Songs")
-            recommendations = fetch_recommendations(sp, mood, intensity)
+            with st.spinner("Fetching recommendations..."):
+                recommendations = fetch_recommendations(sp, mood, intensity)
             if recommendations:
                 for track in recommendations["tracks"]:
                     st.markdown(f"""
@@ -147,15 +178,12 @@ if authenticate_user():
                         </div>
                     """, unsafe_allow_html=True)
             else:
-                st.write("No recommendations available. Try adjusting the mood or intensity.")
+                st.warning("No recommendations available. Try adjusting the mood or intensity.")
 
     elif page == "Top Insights":
         st.title("Your Top Insights (Last Month)")
-
-        # Fetch top tracks, artists, and genres
         top_tracks, top_artists, genres = fetch_top_data(sp)
 
-        # Top Songs Section
         st.header("Your Top Songs")
         for track in top_tracks["items"]:
             st.markdown(f"""
@@ -168,7 +196,6 @@ if authenticate_user():
                 </div>
             """, unsafe_allow_html=True)
 
-        # Top Artists Section
         st.header("Your Top Artists")
         for artist in top_artists["items"]:
             st.markdown(f"""
@@ -180,11 +207,9 @@ if authenticate_user():
                 </div>
             """, unsafe_allow_html=True)
 
-        # Genres Section
         st.header("Genres You Vibe With")
         st.write(", ".join(genres[:5]))
 
-        # Fun Insights Section
         st.header("Fun Insights")
         insights = [
             "Your music taste is elite...but like only 3 people agree.",
@@ -200,11 +225,8 @@ if authenticate_user():
 
     elif page == "Behavior":
         st.title("Your Listening Behavior")
-
-        # Behavioral Insights Data
         listening_hours, listening_weekdays = fetch_behavioral_data(sp)
 
-        # Listening Hours Chart
         st.header("Hourly Listening Trends")
         fig, ax = plt.subplots()
         listening_hours.sort_index().plot(kind="bar", ax=ax, color="#1DB954")
@@ -213,7 +235,6 @@ if authenticate_user():
         ax.set_ylabel("Tracks Played")
         st.pyplot(fig)
 
-        # Weekly Listening Trends
         st.header("Weekly Listening Trends")
         fig, ax = plt.subplots()
         listening_weekdays.sort_index().plot(kind="bar", ax=ax, color="#1DB954")
@@ -222,7 +243,6 @@ if authenticate_user():
         ax.set_ylabel("Tracks Played")
         st.pyplot(fig)
 
-        # Personality Insights
         st.header("Your Music Personality")
         if listening_hours.idxmax() >= 18:
             st.write("🎶 Night Owl: You love vibing late into the night!")
