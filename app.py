@@ -39,7 +39,7 @@ st.markdown("""
     .brand {position: absolute; top: 20px; left: 20px; font-size: 3.5em; font-weight: bold; color: white;}
     .cover-circle {border-radius: 50%; margin: 10px; width: 100px; height: 100px;}
     .cover-square {border-radius: 10px; margin: 10px; width: 100px; height: 100px;}
-    .fun-insight-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px;}
+    .fun-insight-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px; font-size: 1.2em; line-height: 1.5;}
     </style>
 """, unsafe_allow_html=True)
 
