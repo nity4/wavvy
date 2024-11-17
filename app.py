@@ -36,13 +36,13 @@ st.markdown("""
     body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     h1, h2, h3, p {color: white !important;}
-    .brand-box {text-align: center; margin: 20px 0;}
-    .brand-logo {font-size: 3.5em; font-weight: bold; color: white;}
     .persona-box {background: linear-gradient(to right, gold, #f0e68c); color: black; padding: 20px; border-radius: 15px; text-align: center; font-size: 2.5em; font-weight: bold; margin: 20px 0; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
     .persona-desc {background: #333; color: white; padding: 20px; border-radius: 15px; font-size: 1.2em; text-align: center; margin: 20px 0;}
-    .insights-box {background: linear-gradient(to right, gold, #f0e68c); color: black; padding: 15px; border-radius: 15px; font-size: 1.3em; margin-top: 20px; line-height: 1.8; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
-    .insight-item {margin-bottom: 10px; display: flex; align-items: center; font-size: 1.1em;}
-    .insight-icon {margin-right: 10px; font-size: 1.5em;}
+    .insights-box {display: flex; justify-content: space-between; flex-wrap: wrap; background: #444; padding: 20px; border-radius: 15px; margin-top: 20px;}
+    .insight-badge {flex: 1 1 calc(33.333% - 20px); background: #1DB954; color: black; margin: 10px; padding: 20px; border-radius: 15px; text-align: center; font-size: 1.2em; font-weight: bold; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
+    .insight-icon {font-size: 2em; margin-bottom: 10px; display: block;}
+    .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
+    .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -89,8 +89,8 @@ def fetch_behavioral_data(sp):
     if recent_plays:
         timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
         track_names = [item["track"]["name"] for item in recent_plays["items"]]
-        track_genres = ["pop" if "genres" not in item["track"]["album"] else random.choice(item["track"]["album"]["genres"]) for item in recent_plays["items"]]
-        df = pd.DataFrame({"played_at": timestamps, "track_name": track_names, "genre": track_genres})
+        artist_names = [item["track"]["artists"][0]["name"] for item in recent_plays["items"]]
+        df = pd.DataFrame({"played_at": timestamps, "track_name": track_names, "artist_name": artist_names})
         df["date"] = df["played_at"].dt.date
         df["hour"] = df["played_at"].dt.hour
         df["weekday"] = df["played_at"].dt.weekday
@@ -104,47 +104,34 @@ def display_persona():
     st.markdown(f"<div class='persona-box'>{persona_name}</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='persona-desc'>{explanation}</div>", unsafe_allow_html=True)
 
-# Display Insights in Award-Like Box
+# Display Insights as Enhanced Badges
 def display_insights(behavior_data):
     if behavior_data.empty:
         st.warning("No recent play data available.")
     else:
         # Calculate Insights
         days_played = behavior_data["date"].unique()
-        streak, max_streak = 1, 1
-        for i in range(1, len(days_played)):
-            if (days_played[i] - days_played[i - 1]).days == 1:
-                streak += 1
-                max_streak = max(max_streak, streak)
-            else:
-                streak = 1
-        current_streak = streak
-
-        # Day or Night Listener
+        current_streak = len(days_played)
         avg_hour = behavior_data["hour"].mean()
         listener_type = "Day Explorer" if avg_hour <= 18 else "Night Owl"
+        unique_artists = behavior_data["artist_name"].nunique()
 
-        # Unique Artist Discovery
-        unique_artists = behavior_data["track_name"].nunique()
-
-        # Insights Display
-        insights_content = f"""
+        st.markdown("""
         <div class="insights-box">
-            <div class="insight-item">
+            <div class="insight-badge">
                 <span class="insight-icon">🔥</span>
-                Current Streak: <strong>{current_streak} days</strong>
+                Current Streak<br><strong>{}</strong> days
             </div>
-            <div class="insight-item">
+            <div class="insight-badge">
                 <span class="insight-icon">☀️🌙</span>
-                Listening Style: <strong>{listener_type}</strong>
+                Listening Style<br><strong>{}</strong>
             </div>
-            <div class="insight-item">
+            <div class="insight-badge">
                 <span class="insight-icon">🎨</span>
-                Unique Artists Discovered: <strong>{unique_artists}</strong>
+                Unique Artists Discovered<br><strong>{}</strong>
             </div>
         </div>
-        """
-        st.markdown(insights_content, unsafe_allow_html=True)
+        """.format(current_streak, listener_type, unique_artists), unsafe_allow_html=True)
 
 # Plot Listening Heatmap
 def plot_listening_heatmap(behavior_data):
@@ -161,14 +148,14 @@ def plot_listening_heatmap(behavior_data):
         plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
-# Plot Listening Genre Preferences
-def plot_genre_preferences(behavior_data):
+# Plot Top 5 Most Played Artists
+def plot_top_artists_chart(behavior_data):
     if not behavior_data.empty:
-        genre_counts = behavior_data["genre"].value_counts()
+        artist_counts = behavior_data["artist_name"].value_counts().head(5)
         plt.figure(figsize=(10, 6))
-        genre_counts.plot(kind="bar", color="#1DB954")
-        plt.title("Listening Genre Preferences", color="white")
-        plt.xlabel("Genre", color="white")
+        artist_counts.plot(kind="bar", color="#1DB954")
+        plt.title("Top 5 Most Played Artists", color="white")
+        plt.xlabel("Artist", color="white")
         plt.ylabel("Track Count", color="white")
         plt.xticks(color="white", rotation=45)
         plt.yticks(color="white")
@@ -257,4 +244,4 @@ if "token_info" in st.session_state:
         # Graphs Section
         st.subheader("Graphical Analysis")
         plot_listening_heatmap(behavior_data)
-        plot_genre_preferences(behavior_data)
+        plot_top_artists_chart(behavior_data)
