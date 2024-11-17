@@ -37,6 +37,7 @@ st.markdown("""
     h1, h2, h3, p {color: white !important;}
     .brand-box {text-align: center; margin: 20px 0;}
     .brand-logo {font-size: 3.5em; font-weight: bold; color: white;}
+    .brand-name {font-size: 2.5em; font-weight: bold; color: white; margin-top: 10px;}
     .persona-card {background: #1a1a1a; color: white; padding: 20px; border-radius: 15px; margin: 20px; text-align: center; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
     .persona-title {font-size: 2.5em; font-weight: bold; margin-bottom: 10px;}
     .persona-desc {font-size: 1.2em; line-height: 1.6; color: #cfcfcf;}
@@ -252,6 +253,8 @@ if "token_info" in st.session_state:
         st.session_state["sp"] = initialize_spotify()
 
     sp = st.session_state["sp"]
+
+    st.markdown('<div class="brand-box"><div class="brand-logo">WVY 🌊</div><div class="brand-name">WVY - Your Spotify Companion</div></div>', unsafe_allow_html=True)
 
     page = st.radio("Navigate to:", ["Liked Songs & Discover New", "Insights & Behavior"])
 
