@@ -3,7 +3,6 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 from datetime import datetime
 import random
 import time
@@ -36,14 +35,11 @@ st.markdown("""
     <style>
     body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
-    .brand {text-align: center; font-size: 4em; font-weight: bold; color: white; margin-top: 10px;}
-    .description {text-align: center; font-size: 1.5em; color: white; margin-top: -10px; margin-bottom: 20px;}
-    .tabs-container {display: flex; justify-content: center; gap: 20px; margin-top: 20px; margin-bottom: 30px;}
-    .tab {color: white; padding: 10px 20px; cursor: pointer; border-radius: 10px; border: 2px solid #1DB954;}
-    .tab:hover {background-color: #1DB954; color: black;}
-    .active-tab {background-color: #1DB954; color: black; border: none;}
-    .cover-square {width: 80px; height: 80px; border-radius: 10px; margin-right: 10px;}
-    .cover-circle {width: 80px; height: 80px; border-radius: 50%; margin-right: 10px;}
+    h1, h2, h3, p {color: white !important;}
+    .brand {position: absolute; top: 10px; left: 20px; font-size: 1.8em; font-weight: bold; color: white;}
+    .loading {text-align: center; font-size: 1.5em; margin-top: 20px;}
+    .loading-spinner {border: 4px solid rgba(255, 255, 255, 0.3); border-top: 4px solid #fff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto;}
+    @keyframes spin {from {transform: rotate(0deg);} to {transform: rotate(360deg);}}
     </style>
 """, unsafe_allow_html=True)
 
@@ -60,33 +56,9 @@ def authenticate_user():
             except Exception as e:
                 st.error(f"Authentication failed: {e}")
         else:
-            st.markdown('<div class="brand">WVY</div>', unsafe_allow_html=True)
-            st.markdown('<div class="description">Discover your Spotify listening habits, top songs, and behavioral patterns with WVY.</div>', unsafe_allow_html=True)
             auth_url = sp_oauth.get_authorize_url()
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>', unsafe_allow_html=True)
     return "token_info" in st.session_state
-
-# Navigation
-def render_tabs():
-    tabs = ["Liked Songs and Recommendations", "Top Insights", "Behavior"]
-    if "active_tab" not in st.session_state:
-        st.session_state["active_tab"] = tabs[0]
-
-    selected_tab = st.session_state["active_tab"]
-
-    html = '<div class="tabs-container">'
-    for tab in tabs:
-        css_class = "tab active-tab" if tab == selected_tab else "tab"
-        action = f"window.location.href='?active_tab={tab}'"
-        html += f'<div class="{css_class}" onClick="{action}">{tab}</div>'
-    html += "</div>"
-    st.markdown(html, unsafe_allow_html=True)
-
-    # Read active tab from query params
-    active_tab = st.experimental_get_query_params().get("active_tab", [st.session_state["active_tab"]])[0]
-    st.session_state["active_tab"] = active_tab
-
-    return active_tab
 
 # Data Fetch Functions
 def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
@@ -100,14 +72,25 @@ def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
                 st.warning(f"Attempt {attempt + 1} failed. Retrying...")
     return None
 
-def fetch_liked_songs(sp):
-    return fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
+def fetch_liked_songs(sp, mood, intensity):
+    mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
+    valence, energy = [val * intensity / 5 for val in mood_map[mood]]
+    liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
+    return liked_songs
 
-def fetch_recommendations(sp):
+def fetch_recommendations(sp, mood, intensity):
+    mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
+    valence, energy = [val * intensity / 5 for val in mood_map[mood]]
     seed_tracks = fetch_spotify_data(sp.current_user_saved_tracks, limit=5)
     if not seed_tracks:
         return None
-    return fetch_spotify_data(sp.recommendations, seed_tracks=[item["track"]["id"] for item in seed_tracks["items"]], limit=10)
+    return fetch_spotify_data(
+        sp.recommendations,
+        seed_tracks=[item["track"]["id"] for item in seed_tracks["items"]],
+        limit=10,
+        target_valence=valence,
+        target_energy=energy
+    )
 
 def fetch_top_data(sp):
     top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
@@ -125,67 +108,69 @@ def fetch_behavioral_data(sp):
 if authenticate_user():
     sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
 
-    # Render Tabs
-    active_tab = render_tabs()
+    # Brand Name
+    st.markdown('<div class="brand">WVY</div>', unsafe_allow_html=True)
 
-    if active_tab == "Liked Songs and Recommendations":
+    # Navigation Menu
+    page = st.selectbox("Navigate to:", ["Liked Songs and Recommendations", "Top Insights", "Behavior"])
+
+    if page == "Liked Songs and Recommendations":
         st.title("Liked Songs and Recommendations")
+        mood = st.selectbox("Choose Mood:", ["Happy", "Calm", "Energetic", "Sad"])
+        intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
         feature = st.radio("What do you want to explore?", ["Liked Songs", "Discover New Songs"])
 
         if feature == "Liked Songs":
-            st.header("Your Liked Songs")
+            st.header("Liked Songs")
             with st.spinner("Loading your liked songs..."):
-                liked_songs = fetch_liked_songs(sp)
+                time.sleep(2)  # Simulating a delay for loading
+                liked_songs = fetch_liked_songs(sp, mood, intensity)
                 for item in random.sample(liked_songs["items"], min(len(liked_songs["items"]), 10)):
                     track = item["track"]
                     st.markdown(f"""
                         <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                            <img src="{track['album']['images'][0]['url']}" class="cover-square">
-                            <p>{track['name']} by {track['artists'][0]['name']}</p>
+                            <img src="{track['album']['images'][0]['url']}" alt="Cover" width="80" height="80" class="cover">
+                            <div style="margin-left: 10px;">
+                                <p>{track['name']} by {track['artists'][0]['name']}</p>
+                            </div>
                         </div>
                     """, unsafe_allow_html=True)
 
         elif feature == "Discover New Songs":
-            st.header("Recommended for You")
+            st.header("Discover New Songs")
             with st.spinner("Finding songs you'll love..."):
-                recommendations = fetch_recommendations(sp)
+                time.sleep(2)  # Simulating a delay for loading
+                recommendations = fetch_recommendations(sp, mood, intensity)
                 for track in recommendations["tracks"]:
                     st.markdown(f"""
                         <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                            <img src="{track['album']['images'][0]['url']}" class="cover-square">
-                            <p>{track['name']} by {track['artists'][0]['name']}</p>
+                            <img src="{track['album']['images'][0]['url']}" alt="Cover" width="80" height="80" class="cover">
+                            <div style="margin-left: 10px;">
+                                <p>{track['name']} by {track['artists'][0]['name']}</p>
+                            </div>
                         </div>
                     """, unsafe_allow_html=True)
 
-    elif active_tab == "Top Insights":
-        st.title("Your Top Insights")
-        with st.spinner("Fetching your top tracks and artists..."):
+    elif page == "Top Insights":
+        st.title("Your Top Insights (Last Month)")
+        with st.spinner("Fetching insights..."):
+            time.sleep(2)  # Simulating a delay for loading
             top_tracks, top_artists, genres = fetch_top_data(sp)
-
-            st.header("Top Tracks")
+            st.header("Your Top Songs")
             for track in top_tracks["items"]:
-                st.markdown(f"""
-                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <img src="{track['album']['images'][0]['url']}" class="cover-square">
-                        <p>{track['name']} by {track['artists'][0]['name']}</p>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.write(f"{track['name']} by {track['artists'][0]['name']}")
 
-            st.header("Top Artists")
+            st.header("Your Top Artists")
             for artist in top_artists["items"]:
-                st.markdown(f"""
-                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <img src="{artist['images'][0]['url']}" class="cover-circle">
-                        <p>{artist['name']}</p>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.write(artist["name"])
 
             st.header("Genres You Vibe With")
             st.write(", ".join(genres[:5]))
 
-    elif active_tab == "Behavior":
+    elif page == "Behavior":
         st.title("Your Listening Behavior")
         with st.spinner("Analyzing your behavior..."):
+            time.sleep(2)  # Simulating a delay for loading
             listening_hours, listening_weekdays = fetch_behavioral_data(sp)
 
             st.header("Your Listening Hours")
@@ -194,13 +179,6 @@ if authenticate_user():
             ax.set_title("Hourly Listening Trends")
             ax.set_xlabel("Hour of the Day")
             ax.set_ylabel("Tracks Played")
-            st.pyplot(fig)
-
-            st.header("Genre Affinity")
-            genre_counts = pd.Series(["Pop", "Rock", "Indie", "Electronic", "Hip-Hop"]).value_counts()
-            fig, ax = plt.subplots()
-            genre_counts.plot(kind="pie", ax=ax, autopct="%1.1f%%", startangle=90, colors=["#FF5733", "#33FF57", "#3357FF", "#FFC300", "#C70039"])
-            ax.set_ylabel("")
             st.pyplot(fig)
 
 else:
