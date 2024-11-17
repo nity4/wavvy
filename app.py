@@ -40,11 +40,6 @@ st.markdown("""
     .fun-insight-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px;}
     .artist-box {display: flex; align-items: center; margin-bottom: 15px;}
     .artist-img {margin-right: 10px; border-radius: 50%; width: 60px; height: 60px;}
-    .personality-box {padding: 20px; border-radius: 15px; margin-top: 20px;}
-    .night-owl {background-color: #2c3e50; color: white;}
-    .morning-motivator {background-color: #f1c40f; color: black;}
-    .afternoon-explorer {background-color: #e74c3c; color: white;}
-    .evening-relaxer {background-color: #8e44ad; color: white;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -78,9 +73,23 @@ def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
     return None
 
 # Fetch Liked Songs
-def fetch_liked_songs(sp):
+def fetch_liked_songs(sp, mood, intensity):
+    mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
+    valence, energy = [val * intensity / 5 for val in mood_map[mood]]
     liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
     return liked_songs
+
+# Fetch Recommendations
+def fetch_recommendations(sp):
+    seed_tracks = fetch_spotify_data(sp.current_user_saved_tracks, limit=5)
+    if not seed_tracks:
+        return None
+    recommendations = fetch_spotify_data(
+        sp.recommendations,
+        seed_tracks=[item["track"]["id"] for item in seed_tracks["items"]],
+        limit=10
+    )
+    return recommendations
 
 # Fetch Top Data
 def fetch_top_data(sp):
@@ -93,28 +102,25 @@ def fetch_top_data(sp):
 def fetch_behavioral_data(sp):
     recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
     hours = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ").hour for item in recent_plays["items"]]
-    genres = [item["track"]["album"]["artists"][0]["genres"][0] if "genres" in item["track"]["album"]["artists"][0] else "Unknown" for item in recent_plays["items"]]
-    return pd.Series(hours).value_counts(), pd.Series(genres).value_counts()
+    weekdays = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ").weekday() for item in recent_plays["items"]]
+    return pd.Series(hours).value_counts(), pd.Series(weekdays).value_counts()
 
 # Fun Personality Label
 def get_personality_label(peak_hour):
     if 0 <= peak_hour <= 6:
-        return "Night Owl", "Grooving in the quiet hours.", "night-owl"
+        return "Night Owl", "Grooving in the quiet hours."
     elif 7 <= peak_hour <= 12:
-        return "Morning Motivator", "Getting inspired early in the day.", "morning-motivator"
+        return "Morning Motivator", "Getting inspired early in the day."
     elif 13 <= peak_hour <= 18:
-        return "Afternoon Explorer", "Discovering beats while staying productive.", "afternoon-explorer"
+        return "Afternoon Explorer", "Discovering beats while staying productive."
     else:
-        return "Evening Relaxer", "Unwinding with chill vibes.", "evening-relaxer"
+        return "Evening Relaxer", "Unwinding with chill vibes."
 
 # Generate Fun Insights
 def generate_funny_insights(top_artists, genres):
     artist_names = [artist["name"] for artist in top_artists["items"]]
-    return [
-        f"Your top artist is **{artist_names[0]}**—basically your bestie.",
-        f"With genres like **{genres[0]}** and **{genres[1]}**, you're making the cool kids jealous.",
-        f"You've explored {len(set(genres))} unique genres—true adventurer vibes!"
-    ]
+    return f"""Your top artist is **{artist_names[0]}**—basically your soulmate.
+               With genres like **{genres[0]}** and **{genres[1]}**, you're clearly out here making the cool kids jealous."""
 
 # Main App Logic
 if authenticate_user():
@@ -125,8 +131,13 @@ if authenticate_user():
     page = st.sidebar.radio("Go to:", ["Liked Songs", "Top Songs, Artists, and Genres", "Behavior and Insights"])
 
     if page == "Liked Songs":
-        st.title("Shuffled Liked Songs")
-        liked_songs = fetch_liked_songs(sp)
+        st.title("Shuffled Liked Songs and Recommendations")
+        mood = st.selectbox("Select Mood:", ["Happy", "Calm", "Energetic", "Sad"])
+        intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
+
+        # Shuffle liked songs
+        st.header("Liked Songs (Shuffled)")
+        liked_songs = fetch_liked_songs(sp, mood, intensity)
         if liked_songs:
             shuffled = random.sample(liked_songs["items"], min(len(liked_songs["items"]), 10))
             for item in shuffled:
@@ -140,8 +151,22 @@ if authenticate_user():
                     </div>
                 """, unsafe_allow_html=True)
 
+        # Discover new songs
+        st.header("Discover New Songs")
+        recommendations = fetch_recommendations(sp)
+        if recommendations:
+            for track in recommendations["tracks"]:
+                st.markdown(f"""
+                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <img src="{track['album']['images'][0]['url']}" alt="Cover" width="80" height="80" class="cover">
+                        <div style="margin-left: 10px;">
+                            <p><b>{track['name']}</b><br><i>{track['artists'][0]['name']}</i></p>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+
     elif page == "Top Songs, Artists, and Genres":
-        st.title("Top Songs, Artists, and Genres (Last 1 Month)")
+        st.title("Top Songs, Artists, and Genres (Last Month)")
         top_tracks, top_artists, genres = fetch_top_data(sp)
 
         st.header("Top Tracks")
@@ -170,37 +195,30 @@ if authenticate_user():
         st.write(", ".join(set(genres[:5])))
 
         st.header("Fun Insights")
-        insights = generate_funny_insights(top_artists, genres)
-        for insight in insights:
-            st.markdown(f"""
-                <div class="fun-insight-box">
-                    {insight}
-                </div>
-            """)
-
-    elif page == "Behavior and Insights":
-        st.title("Your Listening Behavior and Insights")
-        listening_hours, genre_affinity = fetch_behavioral_data(sp)
-
-        st.header("Listening Patterns by Hour")
-        fig, ax = plt.subplots()
-        listening_hours.sort_index().plot(kind="bar", ax=ax, color="#1DB954")
-        ax.set_title("Hourly Listening Patterns")
-        ax.set_xlabel("Hour of Day")
-        ax.set_ylabel("Tracks Played")
-        st.pyplot(fig)
-
-        st.header("Top Genres by Listening Time")
-        st.bar_chart(genre_affinity[:5])
-
-        peak_hour = listening_hours.idxmax()
-        personality, description, theme = get_personality_label(peak_hour)
         st.markdown(f"""
-            <div class="personality-box {theme}">
-                <h3>{personality}</h3>
-                <p>{description}</p>
+            <div class="fun-insight-box">
+                {generate_funny_insights(top_artists, genres)}
             </div>
         """, unsafe_allow_html=True)
 
+    elif page == "Behavior and Insights":
+        st.title("Your Listening Behavior and Insights")
+        listening_hours, listening_weekdays = fetch_behavioral_data(sp)
+
+        # Listening Heatmap
+        st.header("Listening Heatmap")
+        fig, ax = plt.subplots()
+        listening_hours.sort_index().plot(kind="bar", ax=ax, color="#1DB954", label="Hourly Listening")
+        listening_weekdays.sort_index().plot(kind="bar", ax=ax, color="#FF5733", alpha=0.5, label="Weekly Listening")
+        ax.set_title("Listening Behavior")
+        ax.set_xlabel("Time/Day")
+        ax.legend()
+        st.pyplot(fig)
+
+        # Personality insights
+        peak_hour = listening_hours.idxmax()
+        personality, description = get_personality_label(peak_hour)
+        st.header("Your Music Personality")
+        st.success(f"**{personality}:** {description}")
 else:
     st.write("Please log in to access your Spotify data.")
