@@ -38,9 +38,11 @@ st.markdown("""
     h1, h2, h3, p {color: white !important;}
     .brand {position: absolute; top: 20px; left: 20px; font-size: 3.5em; font-weight: bold; color: white;}
     .cover-circle {border-radius: 50%; margin: 10px; width: 100px; height: 100px;}
+    .cover-square {border-radius: 10px; margin: 10px; width: 100px; height: 100px;}
     .fun-insight-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px;}
     .genre-box {display: flex; align-items: center; margin-bottom: 15px;}
     .genre-cover {border-radius: 10px; width: 80px; height: 80px; margin-right: 15px;}
+    .chart-title {color: white; font-size: 1.5em; margin-top: 20px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -76,14 +78,18 @@ def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
 def fetch_liked_songs(sp):
     return fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
 
-def fetch_recommendations(sp):
+def fetch_recommendations(sp, mood, intensity):
+    mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
+    valence, energy = [val * intensity / 5 for val in mood_map[mood]]
     seed_tracks = fetch_spotify_data(sp.current_user_saved_tracks, limit=5)
     if not seed_tracks:
         return None
     return fetch_spotify_data(
         sp.recommendations,
         seed_tracks=[item["track"]["id"] for item in seed_tracks["items"]],
-        limit=10
+        limit=10,
+        target_valence=valence,
+        target_energy=energy
     )
 
 def fetch_top_data(sp):
@@ -106,11 +112,14 @@ if authenticate_user():
     st.markdown('<div class="brand">WVY</div>', unsafe_allow_html=True)
 
     # Navigation Menu
-    page = st.radio("Navigate to:", ["Liked Songs and Recommendations", "Top Insights", "Behavior"], index=0)
+    page = st.radio("", ["Liked Songs and Recommendations", "Top Insights", "Behavior"], index=0, label_visibility="collapsed")
 
     if page == "Liked Songs and Recommendations":
         st.title("Liked Songs and Recommendations")
+        mood = st.selectbox("Choose Mood:", ["Happy", "Calm", "Energetic", "Sad"])
+        intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
         feature = st.radio("What do you want to explore?", ["Liked Songs", "Discover New Songs"])
+
         if feature == "Liked Songs":
             st.header("Liked Songs")
             liked_songs = fetch_liked_songs(sp)
@@ -118,7 +127,20 @@ if authenticate_user():
                 track = item["track"]
                 st.markdown(f"""
                     <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <img src="{track['album']['images'][0]['url']}" alt="Cover" width="80" height="80" class="cover-circle">
+                        <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-circle">
+                        <div style="margin-left: 10px;">
+                            <p>{track['name']} by {track['artists'][0]['name']}</p>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+        elif feature == "Discover New Songs":
+            st.header("Discover New Songs")
+            recommendations = fetch_recommendations(sp, mood, intensity)
+            for track in recommendations["tracks"]:
+                st.markdown(f"""
+                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-circle">
                         <div style="margin-left: 10px;">
                             <p>{track['name']} by {track['artists'][0]['name']}</p>
                         </div>
