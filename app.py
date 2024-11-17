@@ -105,7 +105,7 @@ def fetch_behavioral_data(sp):
 if authenticate_user():
     sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
 
-    # Brand Name
+    # Display Brand Name
     st.markdown('<div class="brand">WVY</div>', unsafe_allow_html=True)
 
     # Navigation Menu
@@ -126,7 +126,8 @@ if authenticate_user():
                     <div style="display: flex; align-items: center; margin-bottom: 10px;">
                         <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-circle">
                         <div style="margin-left: 10px;">
-                            <p>{track['name']} by {track['artists'][0]['name']}</p>
+                            <p><strong>{track['name']}</strong></p>
+                            <p>by {track['artists'][0]['name']}</p>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
@@ -134,15 +135,19 @@ if authenticate_user():
         elif feature == "Discover New Songs":
             st.header("Discover New Songs")
             recommendations = fetch_recommendations(sp, mood, intensity)
-            for track in recommendations["tracks"]:
-                st.markdown(f"""
-                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-circle">
-                        <div style="margin-left: 10px;">
-                            <p>{track['name']} by {track['artists'][0]['name']}</p>
+            if recommendations:
+                for track in recommendations["tracks"]:
+                    st.markdown(f"""
+                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-circle">
+                            <div style="margin-left: 10px;">
+                                <p><strong>{track['name']}</strong></p>
+                                <p>by {track['artists'][0]['name']}</p>
+                            </div>
                         </div>
-                    </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+            else:
+                st.write("No recommendations available. Try adjusting the mood or intensity.")
 
     elif page == "Top Insights":
         st.title("Your Top Insights (Last Month)")
@@ -152,10 +157,13 @@ if authenticate_user():
         for track in top_tracks["items"]:
             st.markdown(f"""
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-circle">
-                    <p>{track['name']} by {track['artists'][0]['name']}</p>
+                    <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-square">
+                    <div style="margin-left: 10px;">
+                        <p><strong>{track['name']}</strong></p>
+                        <p>by {track['artists'][0]['name']}</p>
+                    </div>
                 </div>
-            """)
+            """, unsafe_allow_html=True)
 
         st.header("Genres You Vibe With")
         st.write(", ".join(genres[:5]))
