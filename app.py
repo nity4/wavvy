@@ -73,12 +73,12 @@ def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
     return None
 
 def fetch_liked_songs(sp):
-    return fetch_spotify_data(sp.current_user_saved_tracks, limit=100)
+    return fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
 
 def fetch_recommendations(sp, mood, intensity):
     mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
     valence, energy = [val * intensity / 5 for val in mood_map[mood]]
-    seed_tracks = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
+    seed_tracks = fetch_spotify_data(sp.current_user_saved_tracks, limit=5)
     if not seed_tracks:
         return None
     return fetch_spotify_data(
