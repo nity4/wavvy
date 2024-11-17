@@ -43,6 +43,53 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Refresh Token Function
+def refresh_access_token():
+    """
+    Refresh the Spotify access token using the refresh token.
+    """
+    if "token_info" in st.session_state:
+        try:
+            token_info = sp_oauth.refresh_access_token(st.session_state["token_info"]["refresh_token"])
+            st.session_state["token_info"] = token_info  # Update session state with new token info
+            return token_info["access_token"]
+        except Exception as e:
+            st.error(f"Failed to refresh access token: {e}")
+            return None
+    else:
+        st.error("No token info found. Please log in again.")
+        return None
+
+# Fetch Spotify Data Function
+def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
+    """
+    Fetch data from the Spotify API with retries, exponential backoff, and token refresh.
+    """
+    delay = 1  # Start with a 1-second delay for retries
+    for attempt in range(1, retries + 1):
+        try:
+            return sp_func(*args, **kwargs)
+        except spotipy.exceptions.SpotifyException as e:
+            if e.http_status == 401:  # Unauthorized: Access token expired
+                st.warning("Access token expired. Refreshing token...")
+                new_token = refresh_access_token()
+                if new_token:
+                    sp.auth = new_token  # Update Spotify client with new token
+                else:
+                    st.error("Failed to refresh access token. Please log in again.")
+                    return None
+            elif "rate limit" in str(e).lower():
+                st.warning(f"Rate limit hit. Retrying in {delay} seconds... (Attempt {attempt}/{retries})")
+                time.sleep(delay)
+                delay *= 2  # Exponential backoff
+            else:
+                st.warning(f"Attempt {attempt} failed: {e}")
+                time.sleep(delay)
+        delay *= 2  # Increase delay after each attempt
+
+    st.error("Failed to fetch data after multiple retries. Please try again later.")
+    return None
+
 # Authentication
 def authenticate_user():
     if "token_info" not in st.session_state:
@@ -60,38 +107,7 @@ def authenticate_user():
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>', unsafe_allow_html=True)
     return "token_info" in st.session_state
 
-# Fetch Spotify Data with Retry Mechanism
-def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
-    """
-    Fetch data from the Spotify API with retries and exponential backoff.
-
-    Parameters:
-        sp_func: Spotify API function to call.
-        *args: Positional arguments for the API function.
-        retries: Number of retry attempts.
-        **kwargs: Keyword arguments for the API function.
-
-    Returns:
-        Response from the Spotify API or None if retries fail.
-    """
-    delay = 1  # Start with a 1-second delay for retries
-    for attempt in range(1, retries + 1):
-        try:
-            return sp_func(*args, **kwargs)
-        except Exception as e:
-            if "rate limit" in str(e).lower():
-                st.warning(f"Rate limit hit. Retrying in {delay} seconds... (Attempt {attempt}/{retries})")
-                time.sleep(delay)
-                delay *= 2  # Exponential backoff
-            else:
-                st.warning(f"Attempt {attempt} failed: {e}")
-                time.sleep(delay)
-        delay *= 2  # Increase delay after each attempt
-
-    st.error("Failed to fetch data after multiple retries. Please try again later.")
-    return None
-
-# Data Fetching Functions
+# Data Fetch Functions
 def fetch_liked_songs(sp):
     if "liked_songs" not in st.session_state:
         st.session_state["liked_songs"] = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
