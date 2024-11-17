@@ -29,25 +29,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# CSS for Styling
-st.markdown("""
-    <style>
-    body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
-    .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
-    h1, h2, h3, p {color: white !important;}
-    .brand-box {text-align: center; margin: 20px 0;}
-    .brand-logo {font-size: 3.5em; font-weight: bold; color: white;}
-    .persona-card {background: #1a1a1a; color: white; padding: 20px; border-radius: 15px; margin: 20px; text-align: center; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
-    .persona-title {font-size: 2.5em; font-weight: bold; margin-bottom: 10px;}
-    .persona-desc {font-size: 1.2em; line-height: 1.6; color: #cfcfcf;}
-    .insights-box {display: flex; justify-content: space-between; flex-wrap: wrap; background: #333; padding: 20px; border-radius: 15px; margin-top: 20px;}
-    .insight-badge {flex: 1 1 calc(33.333% - 20px); background: #444; color: white; margin: 10px; padding: 20px; border-radius: 15px; text-align: center; font-size: 1.2em; font-weight: bold; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
-    .insight-icon {font-size: 2em; margin-bottom: 10px; display: block;}
-    .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
-    .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
-    </style>
-""", unsafe_allow_html=True)
-
 # Token Refresh Helper
 def refresh_access_token():
     try:
@@ -90,46 +71,24 @@ def fetch_spotify_data(sp_func, *args, **kwargs):
     st.error("Failed to fetch data. Please try again later.")
     return None
 
-# Fetch Behavioral Data (based on current or last week)
-def fetch_behavioral_data(sp, week_type):
-    today = datetime.today().date()  # Convert to datetime.date for comparison
-    if week_type == "current":
-        # For current week (Thursday-Sunday): Get this week's data
-        start_date = today - timedelta(days=today.weekday())  # Start of the week
-    else:
-        # For last week (Mon-Wed): Get last week's data
-        start_date = today - timedelta(days=today.weekday() + 7)  # Start of last week
-    
-    # Fetch data for the week (dummy logic here, replace with actual data logic)
+# Fetch Recently Played Tracks in the past week
+def fetch_recent_tracks(sp):
+    # Get recently played tracks (limit to 50)
     recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
-    if recent_plays:
+    if recent_plays and "items" in recent_plays:
         timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
         track_names = [item["track"]["name"] for item in recent_plays["items"]]
         artist_names = [item["track"]["artists"][0]["name"] for item in recent_plays["items"]]
         df = pd.DataFrame({"played_at": timestamps, "track_name": track_names, "artist_name": artist_names})
-        df["date"] = df["played_at"].dt.date
-        df["hour"] = df["played_at"].dt.hour
-        df["weekday"] = df["played_at"].dt.weekday
-        return df[df["date"] >= start_date]
+        return df
     return pd.DataFrame()
 
-# Fetch Top Data
+# Fetch Top Data (Top Tracks, Artists, Genres)
 def fetch_top_data(sp):
     top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
     top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=5, time_range="short_term")
     genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])]
     return top_tracks, top_artists, genres
-
-# Display Persona
-def display_persona():
-    persona_name = "Rhythm Explorer"
-    explanation = "You're a Rhythm Explorer—your playlists are like a map of the beats that move your soul."
-    st.markdown(f"""
-        <div class="persona-card">
-            <div class="persona-title">{persona_name}</div>
-            <div class="persona-desc">{explanation}</div>
-        </div>
-    """, unsafe_allow_html=True)
 
 # Display Insights as Enhanced Badges
 def display_insights(behavior_data):
@@ -141,6 +100,8 @@ def display_insights(behavior_data):
         current_streak = len(days_played)
         avg_hour = behavior_data["hour"].mean()
         listener_type = "Day Explorer" if avg_hour <= 18 else "Night Owl"
+
+        # Unique artists based on the last week's data
         unique_artists = behavior_data["artist_name"].nunique()
 
         st.markdown("""
