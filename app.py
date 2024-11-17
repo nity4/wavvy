@@ -51,7 +51,6 @@ st.markdown("""
 # Token Refresh Helper
 def refresh_access_token():
     try:
-        # Check if we have the refresh token saved
         if "token_info" in st.session_state and "refresh_token" in st.session_state["token_info"]:
             token_info = sp_oauth.refresh_access_token(st.session_state["token_info"]["refresh_token"])
             st.session_state["token_info"] = token_info
@@ -90,17 +89,15 @@ def fetch_spotify_data(sp_func, *args, **kwargs):
     st.error("Failed to fetch data. Please try again later.")
     return None
 
-# Fetch Behavioral Data (based on current or last week)
-def fetch_behavioral_data(sp, week_type):
+# Fetch Behavioral Data for the Current Month
+def fetch_behavioral_data(sp, month_type):
     today = datetime.today().date()  # Convert to datetime.date for comparison
-    if week_type == "current":
-        # For current week (Thursday-Sunday): Get this week's data
-        start_date = today - timedelta(days=today.weekday())  # Start of the week
+    if month_type == "current":
+        start_date = today.replace(day=1)  # Start of the current month
     else:
-        # For last week (Mon-Wed): Get last week's data
-        start_date = today - timedelta(days=today.weekday() + 7)  # Start of last week
-    
-    # Fetch data for the week (dummy logic here, replace with actual data logic)
+        start_date = (today.replace(month=today.month-1) if today.month > 1 else today.replace(year=today.year-1, month=12)).replace(day=1)
+
+    # Fetch recent plays (dummy logic here, replace with actual logic)
     recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
     if recent_plays:
         timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
@@ -206,7 +203,7 @@ def plot_listening_heatmap(behavior_data):
         plt.title("Listening Heatmap (Hour vs. Day)", color="white")
         plt.xlabel("Day", color="white")
         plt.ylabel("Hour", color="white")
-        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], color="white", rotation=45)
+        plt.xticks(ticks=range(7), labels=["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"], color="white", rotation=45)
         plt.yticks(color="white")
         plt.gca().patch.set_facecolor("black")
         plt.gcf().set_facecolor("black")
@@ -214,7 +211,6 @@ def plot_listening_heatmap(behavior_data):
 
 # Plot Mood vs. Intensity Analysis based on real data
 def plot_mood_intensity_chart(behavior_data):
-    # List of common mood-related keywords
     mood_keywords = {
         "Happy": ["happy", "joy", "smile", "love"],
         "Calm": ["calm", "relax", "chill", "soft"],
@@ -231,7 +227,6 @@ def plot_mood_intensity_chart(behavior_data):
             if any(keyword in track_name for keyword in keywords):
                 mood_count[mood] += 1
 
-    # Create the plot
     moods = list(mood_count.keys())
     counts = list(mood_count.values())
 
@@ -266,18 +261,22 @@ if "token_info" in st.session_state:
             if liked_songs and "items" in liked_songs:
                 for item in liked_songs["items"][:10]:
                     track = item["track"]
-                    st.markdown(
-                        f"""
-                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                            <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-small">
-                            <div>
-                                <p><strong>{track['name']}</strong></p>
-                                <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
+                    track_name = track["name"].lower()
+
+                    # Filter liked songs based on mood and intensity
+                    if any(keyword in track_name for keyword in mood_keywords[mood.lower()]):
+                        st.markdown(
+                            f"""
+                            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                                <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-small">
+                                <div>
+                                    <p><strong>{track['name']}</strong></p>
+                                    <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
+                                </div>
                             </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                            """,
+                            unsafe_allow_html=True
+                        )
 
         elif feature == "Discover New Songs":
             recommendations = fetch_spotify_data(sp.recommendations, seed_genres=["pop", "rock"], limit=10)
@@ -298,10 +297,10 @@ if "token_info" in st.session_state:
 
     elif page == "Insights & Behavior":
         today = datetime.today().date()
-        week_type = "current" if today.weekday() > 2 else "last"  # Check if today is after Wednesday
-        st.header(f"Insights & Behavior ({'Current Week' if week_type == 'current' else 'Last Week'})")
+        month_type = "current" if today.month == datetime.today().month else "last"  # Check current month
+        st.header(f"Insights & Behavior ({'Current Month' if month_type == 'current' else 'Last Month'})")
         
-        behavior_data = fetch_behavioral_data(sp, week_type)
+        behavior_data = fetch_behavioral_data(sp, month_type)
         top_tracks, top_artists, genres = fetch_top_data(sp)
 
         # Persona Section
