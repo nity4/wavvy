@@ -134,10 +134,12 @@ if authenticate_user():
 
     page = st.radio("Navigate to:", ["Liked Songs and Recommendations", "Top Insights", "Behavior"])
 
+    # First Page: Liked Songs & Recommendations
     if page == "Liked Songs and Recommendations":
         st.title("Liked Songs and Recommendations")
         liked_songs = fetch_liked_songs(sp)
         if liked_songs:
+            st.header("Your Liked Songs")
             for item in liked_songs["items"]:
                 track = item["track"]
                 st.markdown(f"""
@@ -150,6 +152,7 @@ if authenticate_user():
                     </div>
                 """, unsafe_allow_html=True)
 
+    # Second Page: Top Insights
     elif page == "Top Insights":
         st.title("Your Top Insights")
         top_tracks, top_artists, genres = fetch_top_data(sp)
@@ -166,6 +169,7 @@ if authenticate_user():
                 </div>
             """, unsafe_allow_html=True)
 
+    # Third Page: Behavior
     elif page == "Behavior":
         st.title("Your Personalized Music Behavior")
         listening_hours, listening_weekdays = fetch_behavioral_data(sp)
