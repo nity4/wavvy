@@ -98,6 +98,13 @@ def fetch_behavioral_data(sp):
         return df
     return pd.DataFrame()
 
+# Fetch Top Data
+def fetch_top_data(sp):
+    top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
+    top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=5, time_range="short_term")
+    genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])]
+    return top_tracks, top_artists, genres
+
 # Display Persona
 def display_persona():
     persona_name = "Rhythm Explorer"
@@ -137,6 +144,43 @@ def display_insights(behavior_data):
             </div>
         </div>
         """.format(current_streak, listener_type, unique_artists), unsafe_allow_html=True)
+
+# Display Top Songs, Artists, and Genres
+def display_top_data(top_tracks, top_artists, genres):
+    if top_tracks and "items" in top_tracks:
+        st.subheader("Your Top Songs")
+        for track in top_tracks["items"]:
+            st.markdown(
+                f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-small">
+                    <div>
+                        <p><strong>{track['name']}</strong></p>
+                        <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    if top_artists and "items" in top_artists:
+        st.subheader("Your Top Artists")
+        for artist in top_artists["items"]:
+            st.markdown(
+                f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="{artist['images'][0]['url']}" alt="Artist" class="cover-circle">
+                    <div>
+                        <p><strong>{artist['name']}</strong></p>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    if genres:
+        st.subheader("Your Top Genres")
+        st.markdown(", ".join(genres[:5]))
 
 # Plot Listening Heatmap
 def plot_listening_heatmap(behavior_data):
@@ -240,6 +284,7 @@ if "token_info" in st.session_state:
     elif page == "Insights & Behavior":
         st.header("Insights & Behavior (Last Week)")
         behavior_data = fetch_behavioral_data(sp)
+        top_tracks, top_artists, genres = fetch_top_data(sp)
 
         # Persona Section
         display_persona()
@@ -247,6 +292,9 @@ if "token_info" in st.session_state:
         # Insights Section
         st.subheader("Your Insights")
         display_insights(behavior_data)
+
+        # Top Songs, Artists, and Genres
+        display_top_data(top_tracks, top_artists, genres)
 
         # Graphs Section
         st.subheader("Graphical Analysis")
