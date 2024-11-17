@@ -211,6 +211,7 @@ def plot_listening_heatmap(behavior_data):
 
 # Plot Mood vs. Intensity Analysis based on real data
 def plot_mood_intensity_chart(behavior_data):
+    # Define the mood keywords here
     mood_keywords = {
         "Happy": ["happy", "joy", "smile", "love"],
         "Calm": ["calm", "relax", "chill", "soft"],
@@ -263,8 +264,8 @@ if "token_info" in st.session_state:
                     track = item["track"]
                     track_name = track["name"].lower()
 
-                    # Filter liked songs based on mood and intensity
-                    if any(keyword in track_name for keyword in mood_keywords[mood.lower()]):
+                    # Filter liked songs based on mood
+                    if any(keyword in track_name for keyword in mood_keywords[mood]):
                         st.markdown(
                             f"""
                             <div style="display: flex; align-items: center; margin-bottom: 10px;">
