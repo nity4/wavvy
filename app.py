@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Spotify API credentials (ensure these are in your Streamlit secrets)
+# Spotify API credentials
 CLIENT_ID = st.secrets["spotify"]["client_id"]
 CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
