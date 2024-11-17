@@ -38,7 +38,6 @@ st.markdown("""
     .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
     .cover-square {border-radius: 10px; margin: 10px; width: 120px; height: 120px; object-fit: cover;}
     .data-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center;}
-    .header {font-size: 1.5em; font-weight: bold; margin-bottom: 10px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -88,6 +87,72 @@ def fetch_behavioral_data(sp):
         return df
     return pd.DataFrame()
 
+def display_top_songs(top_tracks):
+    """Display the user's top songs."""
+    st.header("Your Top Songs")
+    if top_tracks and "items" in top_tracks:
+        for track in top_tracks["items"]:
+            album_image = track['album']['images'][0]['url']
+            song_name = track['name']
+            artists = ', '.join(artist['name'] for artist in track['artists'])
+            st.markdown(
+                f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="{album_image}" alt="Cover" class="cover-square">
+                    <div style="margin-left: 10px;">
+                        <p><strong>{song_name}</strong></p>
+                        <p>by {artists}</p>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    else:
+        st.warning("No top songs data available.")
+
+def display_top_artists(top_artists):
+    """Display the user's top artists."""
+    st.header("Your Top Artists")
+    if top_artists and "items" in top_artists:
+        for artist in top_artists["items"]:
+            artist_image = artist['images'][0]['url']
+            artist_name = artist['name']
+            st.markdown(
+                f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="{artist_image}" alt="Artist" class="cover-circle">
+                    <div style="margin-left: 10px;">
+                        <p><strong>{artist_name}</strong></p>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    else:
+        st.warning("No top artists data available.")
+
+def display_insights(behavior_data):
+    """Display insights based on user's listening behavior."""
+    st.header("Listening Insights")
+    if behavior_data.empty:
+        st.warning("No recent play data available.")
+    else:
+        peak_hour = behavior_data["hour"].mode()[0]
+        total_tracks = len(behavior_data)
+        insights = [
+            f"Your favorite time to listen is {peak_hour}:00.",
+            f"You played {total_tracks} tracks this month."
+        ]
+        for insight in insights:
+            st.markdown(
+                f"""
+                <div class="data-box">
+                    {insight}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
 # Authentication and Initialization
 if "token_info" not in st.session_state:
     query_params = st.experimental_get_query_params()
@@ -101,7 +166,10 @@ if "token_info" not in st.session_state:
             st.error(f"Authentication failed: {e}")
     else:
         auth_url = sp_oauth.get_authorize_url()
-        st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>', unsafe_allow_html=True)
+        st.markdown(
+            f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>',
+            unsafe_allow_html=True
+        )
 
 if "token_info" in st.session_state:
     sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
@@ -122,7 +190,8 @@ if "token_info" in st.session_state:
             if liked_songs and "items" in liked_songs:
                 for item in liked_songs["items"][:10]:
                     track = item["track"]
-                    st.markdown(f"""
+                    st.markdown(
+                        f"""
                         <div style="display: flex; align-items: center; margin-bottom: 10px;">
                             <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-square">
                             <div style="margin-left: 10px;">
@@ -130,14 +199,19 @@ if "token_info" in st.session_state:
                                 <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
                             </div>
                         </div>
-                    """, unsafe_allow_html=True)
+                        """,
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.warning("No liked songs available.")
 
         elif feature == "Discover New Songs":
             st.header("Discover New Songs")
             recommendations = fetch_recommendations(sp, mood, intensity)
             if recommendations and "tracks" in recommendations:
                 for track in recommendations["tracks"]:
-                    st.markdown(f"""
+                    st.markdown(
+                        f"""
                         <div style="display: flex; align-items: center; margin-bottom: 10px;">
                             <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-square">
                             <div style="margin-left: 10px;">
@@ -145,7 +219,11 @@ if "token_info" in st.session_state:
                                 <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
                             </div>
                         </div>
-                    """, unsafe_allow_html=True)
+                        """,
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.warning("No recommendations available.")
 
     # Page 2: Insights & Behavior
     elif page == "Insights & Behavior":
@@ -153,61 +231,26 @@ if "token_info" in st.session_state:
 
         # Fetch Data
         top_tracks, top_artists = fetch_top_tracks_artists(sp)
-        persona_name = random.choice(["Melody Master", "Rhythm Explorer", "Beat Connoisseur", "Vibe Enthusiast"])
-        persona_desc = "Your listening habits this month earned you this unique persona. You explore music with style and purpose."
+        recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
+        behavior_data = pd.DataFrame(
+            [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]],
+            columns=["played_at"]
+        ) if recent_plays else pd.DataFrame()
+        behavior_data["hour"] = behavior_data["played_at"].dt.hour
 
-        # Persona
-        st.markdown(f"""
+        # Display Persona
+        persona_name = random.choice(["Melody Master", "Rhythm Explorer", "Beat Connoisseur", "Vibe Enthusiast"])
+        st.markdown(
+            f"""
             <div class="title-box">
                 Your Monthly Persona: <strong>{persona_name}</strong>
             </div>
-        """)
-        st.write(persona_desc)
+            """,
+            unsafe_allow_html=True
+        )
+        st.write("Your listening habits this month earned you this unique persona. You explore music with style and purpose.")
 
-        # Top Songs Section
-        st.header("Your Top Songs")
-        if top_tracks and "items" in top_tracks:
-            for track in top_tracks["items"]:
-                st.markdown(f"""
-                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-square">
-                        <div style="margin-left: 10px;">
-                            <p><strong>{track['name']}</strong></p>
-                            <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
-                        </div>
-                    </div>
-                """)
-
-        # Top Artists Section
-        st.header("Your Top Artists")
-        if top_artists and "items" in top_artists:
-            for artist in top_artists["items"]:
-                st.markdown(f"""
-                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <img src="{artist['images'][0]['url']}" alt="Artist" class="cover-circle">
-                        <div style="margin-left: 10px;">
-                            <p><strong>{artist['name']}</strong></p>
-                        </div>
-                    </div>
-                """)
-
-        # Fun Insights
-        st.header("Listening Insights")
-        behavior_data = fetch_behavioral_data(sp)
-        if behavior_data.empty:
-            st.warning("No recent play data available.")
-        else:
-            peak_hour = behavior_data["hour"].mode()[0]
-            total_tracks = len(behavior_data)
-
-            insights = [
-                f"Your favorite time to listen is {peak_hour}:00.",
-                f"You played {total_tracks} tracks this month.",
-            ]
-
-            for insight in insights:
-                st.markdown(f"""
-                    <div class="data-box">
-                        {insight}
-                    </div>
-                """)
+        # Display Sections
+        display_top_songs(top_tracks)
+        display_top_artists(top_artists)
+        display_insights(behavior_data)
