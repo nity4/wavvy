@@ -86,7 +86,7 @@ def fetch_spotify_data(sp_func, *args, **kwargs):
 
 # Fetch Behavioral Data (based on current or last week)
 def fetch_behavioral_data(sp, week_type):
-    today = datetime.today()
+    today = datetime.today().date()  # Convert to datetime.date for comparison
     if week_type == "current":
         # For current week (Thursday-Sunday): Get this week's data
         start_date = today - timedelta(days=today.weekday())  # Start of the week
@@ -224,23 +224,6 @@ def plot_mood_intensity_chart():
     st.pyplot(plt)
 
 # Main Application
-if "token_info" not in st.session_state:
-    query_params = st.experimental_get_query_params()
-    if "code" in query_params:
-        try:
-            token_info = sp_oauth.get_access_token(query_params["code"][0])
-            st.session_state["token_info"] = token_info
-            st.experimental_set_query_params()
-            st.success("Authentication successful! Refresh the page to continue.")
-        except Exception as e:
-            st.error(f"Authentication failed: {e}")
-    else:
-        auth_url = sp_oauth.get_authorize_url()
-        st.markdown(
-            f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>',
-            unsafe_allow_html=True
-        )
-
 if "token_info" in st.session_state:
     if "sp" not in st.session_state:
         st.session_state["sp"] = initialize_spotify()
@@ -291,7 +274,7 @@ if "token_info" in st.session_state:
                     )
 
     elif page == "Insights & Behavior":
-        today = datetime.today()
+        today = datetime.today().date()
         week_type = "current" if today.weekday() > 2 else "last"  # Check if today is after Wednesday
         st.header(f"Insights & Behavior ({'Current Week' if week_type == 'current' else 'Last Week'})")
         
