@@ -38,11 +38,9 @@ st.markdown("""
     h1, h2, h3, p {color: white !important;}
     .brand-box {text-align: center; margin: 20px 0;}
     .brand-logo {font-size: 3.5em; font-weight: bold; color: white;}
-    .persona-box {background: #1DB954; color: black; padding: 20px; border-radius: 15px; text-align: center; font-size: 2.5em; font-weight: bold; margin: 20px 0;}
+    .persona-box {background: linear-gradient(to right, gold, #f0e68c); color: black; padding: 20px; border-radius: 15px; text-align: center; font-size: 2.5em; font-weight: bold; margin: 20px 0; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
     .persona-desc {background: #333; color: white; padding: 20px; border-radius: 15px; font-size: 1.2em; text-align: center; margin: 20px 0;}
-    .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
-    .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
-    .insights-box {background: #1DB954; color: black; padding: 15px; border-radius: 15px; font-size: 1.2em; margin-top: 20px; line-height: 1.8;}
+    .insights-box {background: linear-gradient(to right, gold, #f0e68c); color: black; padding: 15px; border-radius: 15px; font-size: 1.3em; margin-top: 20px; line-height: 1.8; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
     .insight-item {margin-bottom: 10px; display: flex; align-items: center; font-size: 1.1em;}
     .insight-icon {margin-right: 10px; font-size: 1.5em;}
     </style>
@@ -91,8 +89,8 @@ def fetch_behavioral_data(sp):
     if recent_plays:
         timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
         track_names = [item["track"]["name"] for item in recent_plays["items"]]
-        track_tempo = [item["track"]["tempo"] if "tempo" in item["track"] else 120 for item in recent_plays["items"]]
-        df = pd.DataFrame({"played_at": timestamps, "track_name": track_names, "tempo": track_tempo})
+        track_genres = ["pop" if "genres" not in item["track"]["album"] else random.choice(item["track"]["album"]["genres"]) for item in recent_plays["items"]]
+        df = pd.DataFrame({"played_at": timestamps, "track_name": track_names, "genre": track_genres})
         df["date"] = df["played_at"].dt.date
         df["hour"] = df["played_at"].dt.hour
         df["weekday"] = df["played_at"].dt.weekday
@@ -106,29 +104,21 @@ def display_persona():
     st.markdown(f"<div class='persona-box'>{persona_name}</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='persona-desc'>{explanation}</div>", unsafe_allow_html=True)
 
-# Display Insights in a Single Styled Box
+# Display Insights in Award-Like Box
 def display_insights(behavior_data):
     if behavior_data.empty:
         st.warning("No recent play data available.")
     else:
-        # Daily Listening Streak
+        # Calculate Insights
         days_played = behavior_data["date"].unique()
-        sorted_days = sorted(days_played)
         streak, max_streak = 1, 1
-        for i in range(1, len(sorted_days)):
-            if (sorted_days[i] - sorted_days[i - 1]).days == 1:
+        for i in range(1, len(days_played)):
+            if (days_played[i] - days_played[i - 1]).days == 1:
                 streak += 1
                 max_streak = max(max_streak, streak)
             else:
                 streak = 1
-
-        # Current Streak
-        current_streak = 1
-        for i in range(len(sorted_days) - 1, 0, -1):
-            if (sorted_days[i] - sorted_days[i - 1]).days == 1:
-                current_streak += 1
-            else:
-                break
+        current_streak = streak
 
         # Day or Night Listener
         avg_hour = behavior_data["hour"].mean()
@@ -171,17 +161,16 @@ def plot_listening_heatmap(behavior_data):
         plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
-# Plot Beat Tempo Analysis
-def plot_beat_tempo_analysis(behavior_data):
+# Plot Listening Genre Preferences
+def plot_genre_preferences(behavior_data):
     if not behavior_data.empty:
-        bins = pd.cut(behavior_data["tempo"], bins=[0, 90, 120, 300], labels=["Slow", "Medium", "Fast"])
-        tempo_counts = bins.value_counts()
+        genre_counts = behavior_data["genre"].value_counts()
         plt.figure(figsize=(10, 6))
-        tempo_counts.plot(kind="bar", color="#1DB954")
-        plt.title("Beat Tempo Analysis (Slow vs Medium vs Fast)", color="white")
-        plt.xlabel("Tempo Category", color="white")
+        genre_counts.plot(kind="bar", color="#1DB954")
+        plt.title("Listening Genre Preferences", color="white")
+        plt.xlabel("Genre", color="white")
         plt.ylabel("Track Count", color="white")
-        plt.xticks(color="white", rotation=0)
+        plt.xticks(color="white", rotation=45)
         plt.yticks(color="white")
         plt.gca().patch.set_facecolor("black")
         plt.gcf().set_facecolor("black")
@@ -268,4 +257,4 @@ if "token_info" in st.session_state:
         # Graphs Section
         st.subheader("Graphical Analysis")
         plot_listening_heatmap(behavior_data)
-        plot_beat_tempo_analysis(behavior_data)
+        plot_genre_preferences(behavior_data)
