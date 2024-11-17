@@ -29,9 +29,29 @@ st.set_page_config(
     layout="wide"
 )
 
+# CSS for Styling
+st.markdown("""
+    <style>
+    body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
+    .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
+    h1, h2, h3, p {color: white !important;}
+    .brand-box {text-align: center; margin: 20px 0;}
+    .brand-logo {font-size: 3.5em; font-weight: bold; color: white;}
+    .persona-card {background: #1a1a1a; color: white; padding: 20px; border-radius: 15px; margin: 20px; text-align: center; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
+    .persona-title {font-size: 2.5em; font-weight: bold; margin-bottom: 10px;}
+    .persona-desc {font-size: 1.2em; line-height: 1.6; color: #cfcfcf;}
+    .insights-box {display: flex; justify-content: space-between; flex-wrap: wrap; background: #333; padding: 20px; border-radius: 15px; margin-top: 20px;}
+    .insight-badge {flex: 1 1 calc(33.333% - 20px); background: #444; color: white; margin: 10px; padding: 20px; border-radius: 15px; text-align: center; font-size: 1.2em; font-weight: bold; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
+    .insight-icon {font-size: 2em; margin-bottom: 10px; display: block;}
+    .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
+    .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
+    </style>
+""", unsafe_allow_html=True)
+
 # Token Refresh Helper
 def refresh_access_token():
     try:
+        # Check if we have the refresh token saved
         if "token_info" in st.session_state and "refresh_token" in st.session_state["token_info"]:
             token_info = sp_oauth.refresh_access_token(st.session_state["token_info"]["refresh_token"])
             st.session_state["token_info"] = token_info
@@ -70,13 +90,17 @@ def fetch_spotify_data(sp_func, *args, **kwargs):
     st.error("Failed to fetch data. Please try again later.")
     return None
 
-# Fetch Behavioral Data for the Last Week
-def fetch_behavioral_data(sp):
-    today = datetime.today().date()
-    monday = today - timedelta(days=today.weekday())  # Start of the week (Monday)
-    sunday = monday + timedelta(days=6)  # End of the week (Sunday)
+# Fetch Behavioral Data (based on current or last week)
+def fetch_behavioral_data(sp, week_type):
+    today = datetime.today().date()  # Convert to datetime.date for comparison
+    if week_type == "current":
+        # For current week (Thursday-Sunday): Get this week's data
+        start_date = today - timedelta(days=today.weekday())  # Start of the week
+    else:
+        # For last week (Mon-Wed): Get last week's data
+        start_date = today - timedelta(days=today.weekday() + 7)  # Start of last week
     
-    # Fetch recent plays from last week
+    # Fetch data for the week (dummy logic here, replace with actual data logic)
     recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
     if recent_plays:
         timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
@@ -86,7 +110,7 @@ def fetch_behavioral_data(sp):
         df["date"] = df["played_at"].dt.date
         df["hour"] = df["played_at"].dt.hour
         df["weekday"] = df["played_at"].dt.weekday
-        return df[(df["date"] >= monday) & (df["date"] <= sunday)]
+        return df[df["date"] >= start_date]
     return pd.DataFrame()
 
 # Fetch Top Data
@@ -136,28 +160,91 @@ def display_insights(behavior_data):
         </div>
         """.format(current_streak, listener_type, unique_artists), unsafe_allow_html=True)
 
-# Filter liked songs based on mood and intensity
-def filter_songs_by_mood_and_intensity(tracks, mood, intensity):
+# Display Top Songs, Artists, and Genres
+def display_top_data(top_tracks, top_artists, genres):
+    if top_tracks and "items" in top_tracks:
+        st.subheader("Your Top Songs")
+        for track in top_tracks["items"]:
+            st.markdown(
+                f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-small">
+                    <div>
+                        <p><strong>{track['name']}</strong></p>
+                        <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    if top_artists and "items" in top_artists:
+        st.subheader("Your Top Artists")
+        for artist in top_artists["items"]:
+            st.markdown(
+                f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="{artist['images'][0]['url']}" alt="Artist" class="cover-circle">
+                    <div>
+                        <p><strong>{artist['name']}</strong></p>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    if genres:
+        st.subheader("Your Top Genres")
+        st.markdown(", ".join(genres[:5]))
+
+# Plot Listening Heatmap
+def plot_listening_heatmap(behavior_data):
+    if not behavior_data.empty:
+        heatmap_data = behavior_data.groupby(["hour", "weekday"]).size().unstack(fill_value=0)
+        plt.figure(figsize=(12, 6))
+        sns.heatmap(heatmap_data, cmap="magma", linewidths=0.5, annot=True, fmt="d")
+        plt.title("Listening Heatmap (Hour vs. Day)", color="white")
+        plt.xlabel("Day", color="white")
+        plt.ylabel("Hour", color="white")
+        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], color="white", rotation=45)
+        plt.yticks(color="white")
+        plt.gca().patch.set_facecolor("black")
+        plt.gcf().set_facecolor("black")
+        st.pyplot(plt)
+
+# Plot Mood vs. Intensity Analysis based on real data
+def plot_mood_intensity_chart(behavior_data):
+    # List of common mood-related keywords
     mood_keywords = {
         "Happy": ["happy", "joy", "smile", "love"],
         "Calm": ["calm", "relax", "chill", "soft"],
         "Energetic": ["energetic", "dance", "party", "upbeat", "fast"],
         "Sad": ["sad", "blue", "down", "heartbroken"]
     }
+
+    # Count tracks related to each mood
+    mood_count = {mood: 0 for mood in mood_keywords}
     
-    filtered_tracks = []
-    keywords = mood_keywords.get(mood, [])
-    
-    for track in tracks:
-        track_name = track["track"]["name"].lower()
-        # Filter based on intensity: Higher intensity means more energetic songs
-        if any(keyword in track_name for keyword in keywords):
-            if intensity >= 3 and "fast" in track_name:
-                filtered_tracks.append(track)
-            elif intensity < 3 and "chill" in track_name:
-                filtered_tracks.append(track)
-    
-    return filtered_tracks
+    for index, row in behavior_data.iterrows():
+        track_name = row["track_name"].lower()
+        for mood, keywords in mood_keywords.items():
+            if any(keyword in track_name for keyword in keywords):
+                mood_count[mood] += 1
+
+    # Create the plot
+    moods = list(mood_count.keys())
+    counts = list(mood_count.values())
+
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x=moods, y=counts, palette="viridis")
+    plt.title("Mood vs. Intensity Analysis", color="white")
+    plt.xlabel("Mood", color="white")
+    plt.ylabel("Track Count", color="white")
+    plt.xticks(color="white", rotation=45)
+    plt.yticks(color="white")
+    plt.gca().patch.set_facecolor("black")
+    plt.gcf().set_facecolor("black")
+    st.pyplot(plt)
 
 # Main Application
 if "token_info" in st.session_state:
@@ -177,8 +264,7 @@ if "token_info" in st.session_state:
         if feature == "Liked Songs":
             liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
             if liked_songs and "items" in liked_songs:
-                filtered_songs = filter_songs_by_mood_and_intensity(liked_songs["items"], mood, intensity)
-                for item in filtered_songs[:10]:
+                for item in liked_songs["items"][:10]:
                     track = item["track"]
                     st.markdown(
                         f"""
@@ -211,9 +297,11 @@ if "token_info" in st.session_state:
                     )
 
     elif page == "Insights & Behavior":
-        st.header("Insights & Behavior (Last Week)")
-
-        behavior_data = fetch_behavioral_data(sp)
+        today = datetime.today().date()
+        week_type = "current" if today.weekday() > 2 else "last"  # Check if today is after Wednesday
+        st.header(f"Insights & Behavior ({'Current Week' if week_type == 'current' else 'Last Week'})")
+        
+        behavior_data = fetch_behavioral_data(sp, week_type)
         top_tracks, top_artists, genres = fetch_top_data(sp)
 
         # Persona Section
@@ -229,3 +317,4 @@ if "token_info" in st.session_state:
         # Graphs Section
         st.subheader("Graphical Analysis")
         plot_listening_heatmap(behavior_data)
+        plot_mood_intensity_chart(behavior_data)
