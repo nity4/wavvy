@@ -43,7 +43,9 @@ st.markdown("""
     .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
     .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
     .data-box {background: #444; color: white; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center; font-size: 1.2em;}
-    .insights-box {background: #1DB954; color: black; padding: 20px; border-radius: 15px; margin-top: 20px; font-size: 1.5em;}
+    .insights-box {background: #1DB954; color: black; padding: 15px; border-radius: 15px; font-size: 1.3em; margin-top: 20px; line-height: 1.8;}
+    .insight-item {margin-bottom: 10px; display: flex; align-items: center;}
+    .insight-icon {margin-right: 15px; font-size: 1.5em;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -116,7 +118,7 @@ def display_persona():
     st.markdown(f"<div class='persona-box'>{persona_name}</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='persona-desc'>{explanation[persona_name]}</div>", unsafe_allow_html=True)
 
-# Display Insights in a Single Box
+# Display Insights in a Single Styled Box
 def display_insights(behavior_data):
     if behavior_data.empty:
         st.warning("No recent play data available.")
@@ -147,13 +149,28 @@ def display_insights(behavior_data):
         # Unique Artist Discovery
         unique_artists = behavior_data["track_name"].nunique()
 
-        insights = f"""
-        - **Longest Listening Streak**: {max_streak} days.
-        - **Current Streak**: {current_streak} days.
-        - **Listening Style**: You're a {listener_type}.
-        - **Unique Artists Discovered**: {unique_artists} this month.
+        # Insights Display
+        insights_content = f"""
+        <div class="insights-box">
+            <div class="insight-item">
+                <span class="insight-icon">📅</span>
+                Longest Listening Streak: <strong>{max_streak} days</strong>
+            </div>
+            <div class="insight-item">
+                <span class="insight-icon">🔥</span>
+                Current Streak: <strong>{current_streak} days</strong>
+            </div>
+            <div class="insight-item">
+                <span class="insight-icon">☀️🌙</span>
+                Listening Style: <strong>{listener_type}</strong>
+            </div>
+            <div class="insight-item">
+                <span class="insight-icon">🎨</span>
+                Unique Artists Discovered: <strong>{unique_artists}</strong>
+            </div>
+        </div>
         """
-        st.markdown(f"<div class='insights-box'>{insights}</div>", unsafe_allow_html=True)
+        st.markdown(insights_content, unsafe_allow_html=True)
 
 # Plot Listening Heatmap
 def plot_listening_heatmap(behavior_data):
@@ -170,16 +187,16 @@ def plot_listening_heatmap(behavior_data):
         plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
-# Plot Repeat Song Frequency
-def plot_repeat_song_frequency(behavior_data):
+# Plot Listening Intensity Over Time
+def plot_listening_intensity(behavior_data):
     if not behavior_data.empty:
-        repeat_counts = behavior_data["track_name"].value_counts().head(10)
+        intensity_data = behavior_data.groupby("date").size()
         plt.figure(figsize=(10, 6))
-        repeat_counts.plot(kind="bar", color="#1DB954")
-        plt.title("Top 10 Most Repeated Songs", color="white")
-        plt.xlabel("Track Name", color="white")
-        plt.ylabel("Repeat Count", color="white")
-        plt.xticks(color="white", rotation=45, fontsize=10)
+        intensity_data.plot(kind="line", marker="o", color="#1DB954", linewidth=2)
+        plt.title("Listening Intensity Over Time", color="white")
+        plt.xlabel("Date", color="white")
+        plt.ylabel("Tracks Played", color="white")
+        plt.xticks(color="white", rotation=45)
         plt.yticks(color="white")
         plt.gca().patch.set_facecolor("black")
         plt.gcf().set_facecolor("black")
@@ -208,16 +225,6 @@ if "token_info" in st.session_state:
         st.session_state["sp"] = initialize_spotify()
 
     sp = st.session_state["sp"]
-
-    # App Welcome Screen
-    if "authenticated" not in st.session_state:
-        st.markdown("""
-        <div style="text-align: center; margin: 20px; font-size: 1.5em; color: white;">
-            <p>Welcome to <strong>WVY 🌊</strong>! Your ultimate Spotify companion.</p>
-            <p>Explore your music insights, uncover trends, and discover new tracks tailored to your mood and preferences.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.session_state["authenticated"] = True
 
     page = st.radio("Navigate to:", ["Liked Songs & Discover New", "Insights & Behavior"])
 
@@ -315,4 +322,4 @@ if "token_info" in st.session_state:
         # Graphs Section
         st.subheader("Graphical Analysis")
         plot_listening_heatmap(behavior_data)
-        plot_repeat_song_frequency(behavior_data)
+        plot_listening_intensity(behavior_data)
