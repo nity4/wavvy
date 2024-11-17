@@ -29,25 +29,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# CSS for Styling
-st.markdown("""
-    <style>
-    body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
-    .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
-    h1, h2, h3, p {color: white !important;}
-    .brand-box {text-align: center; margin: 20px 0;}
-    .brand-logo {font-size: 3.5em; font-weight: bold; color: white;}
-    .persona-card {background: #1a1a1a; color: white; padding: 20px; border-radius: 15px; margin: 20px; text-align: center; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
-    .persona-title {font-size: 2.5em; font-weight: bold; margin-bottom: 10px;}
-    .persona-desc {font-size: 1.2em; line-height: 1.6; color: #cfcfcf;}
-    .insights-box {display: flex; justify-content: space-between; flex-wrap: wrap; background: #333; padding: 20px; border-radius: 15px; margin-top: 20px;}
-    .insight-badge {flex: 1 1 calc(33.333% - 20px); background: #444; color: white; margin: 10px; padding: 20px; border-radius: 15px; text-align: center; font-size: 1.2em; font-weight: bold; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
-    .insight-icon {font-size: 2em; margin-bottom: 10px; display: block;}
-    .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
-    .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
-    </style>
-""", unsafe_allow_html=True)
-
 # Token Refresh Helper
 def refresh_access_token():
     try:
@@ -92,7 +73,6 @@ def fetch_spotify_data(sp_func, *args, **kwargs):
 # Fetch Behavioral Data for the Last Week
 def fetch_behavioral_data(sp):
     today = datetime.today().date()
-    # Calculate the previous Monday and Sunday
     monday = today - timedelta(days=today.weekday())  # Start of the week (Monday)
     sunday = monday + timedelta(days=6)  # End of the week (Sunday)
     
@@ -156,58 +136,6 @@ def display_insights(behavior_data):
         </div>
         """.format(current_streak, listener_type, unique_artists), unsafe_allow_html=True)
 
-# Display Top Songs, Artists, and Genres
-def display_top_data(top_tracks, top_artists, genres):
-    if top_tracks and "items" in top_tracks:
-        st.subheader("Your Top Songs")
-        for track in top_tracks["items"]:
-            st.markdown(
-                f"""
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-small">
-                    <div>
-                        <p><strong>{track['name']}</strong></p>
-                        <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-    if top_artists and "items" in top_artists:
-        st.subheader("Your Top Artists")
-        for artist in top_artists["items"]:
-            st.markdown(
-                f"""
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <img src="{artist['images'][0]['url']}" alt="Artist" class="cover-circle">
-                    <div>
-                        <p><strong>{artist['name']}</strong></p>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-    if genres:
-        st.subheader("Your Top Genres")
-        st.markdown(", ".join(genres[:5]))
-
-# Plot Listening Heatmap
-def plot_listening_heatmap(behavior_data):
-    if not behavior_data.empty:
-        heatmap_data = behavior_data.groupby(["hour", "weekday"]).size().unstack(fill_value=0)
-        plt.figure(figsize=(12, 6))
-        sns.heatmap(heatmap_data, cmap="magma", linewidths=0.5, annot=True, fmt="d")
-        plt.title("Listening Heatmap (Hour vs. Day)", color="white")
-        plt.xlabel("Day", color="white")
-        plt.ylabel("Hour", color="white")
-        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], color="white", rotation=45)
-        plt.yticks(color="white")
-        plt.gca().patch.set_facecolor("black")
-        plt.gcf().set_facecolor("black")
-        st.pyplot(plt)
-
 # Filter liked songs based on mood and intensity
 def filter_songs_by_mood_and_intensity(tracks, mood, intensity):
     mood_keywords = {
@@ -217,14 +145,13 @@ def filter_songs_by_mood_and_intensity(tracks, mood, intensity):
         "Sad": ["sad", "blue", "down", "heartbroken"]
     }
     
-    # Adjust the filtering based on intensity: higher intensity means more energetic songs
     filtered_tracks = []
     keywords = mood_keywords.get(mood, [])
     
     for track in tracks:
         track_name = track["track"]["name"].lower()
+        # Filter based on intensity: Higher intensity means more energetic songs
         if any(keyword in track_name for keyword in keywords):
-            # Filter based on intensity (you can adjust the logic)
             if intensity >= 3 and "fast" in track_name:
                 filtered_tracks.append(track)
             elif intensity < 3 and "chill" in track_name:
