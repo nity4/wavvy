@@ -37,10 +37,6 @@ st.markdown("""
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     h1, h2, h3, p {color: white !important;}
     .brand {position: absolute; top: 20px; left: 20px; font-size: 3.5em; font-weight: bold; color: white;}
-    .tabs-container {display: flex; justify-content: center; gap: 20px; margin-top: 20px; margin-bottom: 30px;}
-    .tab {color: white; padding: 10px 20px; cursor: pointer; border-radius: 10px; border: 2px solid #1DB954;}
-    .tab:hover {background-color: #1DB954; color: black;}
-    .active-tab {background-color: #1DB954; color: black; border: none;}
     .cover-circle {border-radius: 50%; margin: 10px; width: 100px; height: 100px;}
     .fun-insight-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px;}
     .genre-box {display: flex; align-items: center; margin-bottom: 15px;}
@@ -64,24 +60,6 @@ def authenticate_user():
             auth_url = sp_oauth.get_authorize_url()
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>', unsafe_allow_html=True)
     return "token_info" in st.session_state
-
-# Navigation Tabs
-def render_tabs():
-    tabs = ["Liked & Discover", "Top Insights", "Behavior"]
-    if "active_tab" not in st.session_state:
-        st.session_state["active_tab"] = tabs[0]
-
-    html = '<div class="tabs-container">'
-    for tab in tabs:
-        css_class = "tab active-tab" if tab == st.session_state["active_tab"] else "tab"
-        html += f'<div class="{css_class}" onClick="window.location.href=\'?active_tab={tab}\'">{tab}</div>'
-    html += "</div>"
-    st.markdown(html, unsafe_allow_html=True)
-
-    active_tab = st.experimental_get_query_params().get("active_tab", [st.session_state["active_tab"]])[0]
-    st.session_state["active_tab"] = active_tab
-
-    return active_tab
 
 # Data Fetch Functions
 def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
@@ -127,10 +105,10 @@ if authenticate_user():
     # Display Brand Name
     st.markdown('<div class="brand">WVY</div>', unsafe_allow_html=True)
 
-    # Render Tabs
-    active_tab = render_tabs()
+    # Navigation Menu
+    page = st.radio("Navigate to:", ["Liked Songs and Recommendations", "Top Insights", "Behavior"], index=0)
 
-    if active_tab == "Liked & Discover":
+    if page == "Liked Songs and Recommendations":
         st.title("Liked Songs and Recommendations")
         feature = st.radio("What do you want to explore?", ["Liked Songs", "Discover New Songs"])
         if feature == "Liked Songs":
@@ -147,7 +125,7 @@ if authenticate_user():
                     </div>
                 """, unsafe_allow_html=True)
 
-    elif active_tab == "Top Insights":
+    elif page == "Top Insights":
         st.title("Your Top Insights (Last Month)")
         top_tracks, top_artists, genres = fetch_top_data(sp)
 
@@ -176,7 +154,7 @@ if authenticate_user():
                 </div>
             """)
 
-    elif active_tab == "Behavior":
+    elif page == "Behavior":
         st.title("Your Listening Behavior")
         listening_hours, listening_weekdays = fetch_behavioral_data(sp)
 
