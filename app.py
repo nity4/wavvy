@@ -3,10 +3,9 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-from datetime import datetime
 import random
 import time
+from datetime import datetime
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -38,10 +37,10 @@ st.markdown("""
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     .brand {text-align: center; font-size: 4em; font-weight: bold; color: white; margin-top: 10px;}
     .description {text-align: center; font-size: 1.5em; color: white; margin-top: -10px; margin-bottom: 20px;}
-    .tabs-container {display: flex; justify-content: center; gap: 20px; margin-top: 20px; margin-bottom: 30px;}
-    .tab {color: white; padding: 10px 20px; cursor: pointer; border-radius: 10px; border: 2px solid #1DB954;}
-    .tab:hover {background-color: #1DB954; color: black;}
-    .active-tab {background-color: #1DB954; color: black; border: none;}
+    .tabs-container {display: flex; justify-content: center; gap: 20px; margin-top: 20px; margin-bottom: 30px; position: relative;}
+    .tab {color: white; padding: 10px 20px; cursor: pointer; position: relative;}
+    .tab:hover {color: red;}
+    .active-tab::after {content: ""; width: 100%; height: 2px; background: red; position: absolute; bottom: 0; left: 0;}
     .cover-square {width: 80px; height: 80px; border-radius: 10px; margin-right: 10px;}
     .cover-circle {width: 80px; height: 80px; border-radius: 50%; margin-right: 10px;}
     </style>
@@ -194,13 +193,6 @@ if authenticate_user():
             ax.set_title("Hourly Listening Trends")
             ax.set_xlabel("Hour of the Day")
             ax.set_ylabel("Tracks Played")
-            st.pyplot(fig)
-
-            st.header("Genre Affinity")
-            genre_counts = pd.Series(["Pop", "Rock", "Indie", "Electronic", "Hip-Hop"]).value_counts()
-            fig, ax = plt.subplots()
-            genre_counts.plot(kind="pie", ax=ax, autopct="%1.1f%%", startangle=90, colors=["#FF5733", "#33FF57", "#3357FF", "#FFC300", "#C70039"])
-            ax.set_ylabel("")
             st.pyplot(fig)
 
 else:
