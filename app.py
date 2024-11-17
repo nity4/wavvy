@@ -72,6 +72,29 @@ def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
                 st.warning(f"Attempt {attempt + 1} failed. Retrying...")
     return None
 
+# Fetch Liked Songs
+def fetch_liked_songs(sp, mood, intensity):
+    mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
+    valence, energy = [val * intensity / 5 for val in mood_map[mood]]
+    liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=20)
+    return liked_songs
+
+# Fetch Recommendations
+def fetch_recommendations(sp, mood, intensity):
+    mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
+    valence, energy = [val * intensity / 5 for val in mood_map[mood]]
+    seed_tracks = fetch_spotify_data(sp.current_user_saved_tracks, limit=5)
+    if not seed_tracks:
+        return None
+    recommendations = fetch_spotify_data(
+        sp.recommendations,
+        seed_tracks=[item["track"]["id"] for item in seed_tracks["items"]],
+        limit=10,
+        target_valence=valence,
+        target_energy=energy
+    )
+    return recommendations
+
 # Fetch Top Data
 def fetch_top_data(sp):
     top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
@@ -108,9 +131,44 @@ if authenticate_user():
 
     # Sidebar Navigation
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to:", ["Top Songs and Genres", "Behavior and Insights"])
+    page = st.sidebar.radio("Go to:", ["Liked Songs and Discover", "Top Songs and Genres", "Behavior and Insights"])
 
-    if page == "Top Songs and Genres":
+    if page == "Liked Songs and Discover":
+        st.title("Liked Songs and Discover New Recommendations")
+        mood = st.selectbox("Select Mood:", ["Happy", "Calm", "Energetic", "Sad"])
+        intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
+        feature = st.radio("Select an Option:", ["Liked Songs", "Discover New Songs"])
+
+        if feature == "Liked Songs":
+            st.header("Liked Songs")
+            liked_songs = fetch_liked_songs(sp, mood, intensity)
+            if liked_songs:
+                for item in random.sample(liked_songs["items"], min(len(liked_songs["items"]), 10)):
+                    track = item["track"]
+                    st.markdown(f"""
+                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <img src="{track['album']['images'][0]['url']}" alt="Cover" width="80" height="80" class="cover">
+                            <div style="margin-left: 10px;">
+                                <p><b>{track['name']}</b><br><i>{track['artists'][0]['name']}</i></p>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+        elif feature == "Discover New Songs":
+            st.header("Discover New Songs")
+            recommendations = fetch_recommendations(sp, mood, intensity)
+            if recommendations:
+                for track in recommendations["tracks"]:
+                    st.markdown(f"""
+                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <img src="{track['album']['images'][0]['url']}" alt="Cover" width="80" height="80" class="cover">
+                            <div style="margin-left: 10px;">
+                                <p><b>{track['name']}</b><br><i>{track['artists'][0]['name']}</i></p>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+    elif page == "Top Songs and Genres":
         st.title("Top Songs, Artists, and Genres")
         top_tracks, top_artists, genres = fetch_top_data(sp)
 
