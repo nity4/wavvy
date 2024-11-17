@@ -29,6 +29,25 @@ st.set_page_config(
     layout="wide"
 )
 
+# CSS for Styling
+st.markdown("""
+    <style>
+    body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
+    .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
+    h1, h2, h3, p {color: white !important;}
+    .brand-box {text-align: center; margin: 20px 0;}
+    .brand-logo {font-size: 3.5em; font-weight: bold; color: white;}
+    .persona-card {background: #1a1a1a; color: white; padding: 20px; border-radius: 15px; margin: 20px; text-align: center; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
+    .persona-title {font-size: 2.5em; font-weight: bold; margin-bottom: 10px;}
+    .persona-desc {font-size: 1.2em; line-height: 1.6; color: #cfcfcf;}
+    .insights-box {display: flex; justify-content: space-between; flex-wrap: wrap; background: #333; padding: 20px; border-radius: 15px; margin-top: 20px;}
+    .insight-badge {flex: 1 1 calc(33.333% - 20px); background: #444; color: white; margin: 10px; padding: 20px; border-radius: 15px; text-align: center; font-size: 1.2em; font-weight: bold; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
+    .insight-icon {font-size: 2em; margin-bottom: 10px; display: block;}
+    .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
+    .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
+    </style>
+""", unsafe_allow_html=True)
+
 # Token Refresh Helper
 def refresh_access_token():
     try:
@@ -51,26 +70,25 @@ def initialize_spotify():
         return spotipy.Spotify(auth=access_token)
     return None
 
-# Spotify OAuth Login Flow
-def login_spotify():
-    # Check if the user is already authenticated
-    if "token_info" not in st.session_state:
-        auth_url = sp_oauth.get_authorize_url()
-        st.markdown(f"[Login with Spotify]({auth_url})")
-        st.stop()  # Stop execution until the user logs in
-    else:
-        # If authenticated, initialize Spotify client
-        access_token = st.session_state["token_info"]["access_token"]
-        sp = spotipy.Spotify(auth=access_token)
-        return sp
-
-# Handle Redirect after Spotify Login
-def handle_redirect():
-    # Only run this if the redirect URL contains the authorization code
-    if "code" in st.experimental_get_query_params():
-        token_info = sp_oauth.get_access_token(st.experimental_get_query_params()["code"])
-        st.session_state["token_info"] = token_info
-        st.experimental_rerun()  # After handling the redirect, rerun the app
+# Fetch Spotify Data
+def fetch_spotify_data(sp_func, *args, **kwargs):
+    for attempt in range(2):  # Try twice: refresh token if expired
+        try:
+            return sp_func(*args, **kwargs)
+        except spotipy.exceptions.SpotifyException as e:
+            if e.http_status == 401:  # Token expired
+                st.warning("Access token expired. Refreshing...")
+                new_token = refresh_access_token()
+                if new_token:
+                    st.session_state["sp"] = initialize_spotify()
+                else:
+                    st.error("Failed to refresh token. Please log in again.")
+                    return None
+            else:
+                st.error(f"Spotify API error: {e}")
+                return None
+    st.error("Failed to fetch data. Please try again later.")
+    return None
 
 # Fetch Behavioral Data (based on current or last week)
 def fetch_behavioral_data(sp, week_type):
@@ -179,13 +197,61 @@ def display_top_data(top_tracks, top_artists, genres):
         st.subheader("Your Top Genres")
         st.markdown(", ".join(genres[:5]))
 
-# Main Application Logic
-if "code" in st.experimental_get_query_params():
-    # Handle redirect from Spotify login
-    handle_redirect()
-else:
-    # Ensure user is logged in before showing the app
-    sp = login_spotify()
+# Plot Listening Heatmap
+def plot_listening_heatmap(behavior_data):
+    if not behavior_data.empty:
+        heatmap_data = behavior_data.groupby(["hour", "weekday"]).size().unstack(fill_value=0)
+        plt.figure(figsize=(12, 6))
+        sns.heatmap(heatmap_data, cmap="magma", linewidths=0.5, annot=True, fmt="d")
+        plt.title("Listening Heatmap (Hour vs. Day)", color="white")
+        plt.xlabel("Day", color="white")
+        plt.ylabel("Hour", color="white")
+        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], color="white", rotation=45)
+        plt.yticks(color="white")
+        plt.gca().patch.set_facecolor("black")
+        plt.gcf().set_facecolor("black")
+        st.pyplot(plt)
+
+# Plot Mood vs. Intensity Analysis based on real data
+def plot_mood_intensity_chart(behavior_data):
+    # List of common mood-related keywords
+    mood_keywords = {
+        "Happy": ["happy", "joy", "smile", "love"],
+        "Calm": ["calm", "relax", "chill", "soft"],
+        "Energetic": ["energetic", "dance", "party", "upbeat", "fast"],
+        "Sad": ["sad", "blue", "down", "heartbroken"]
+    }
+
+    # Count tracks related to each mood
+    mood_count = {mood: 0 for mood in mood_keywords}
+    
+    for index, row in behavior_data.iterrows():
+        track_name = row["track_name"].lower()
+        for mood, keywords in mood_keywords.items():
+            if any(keyword in track_name for keyword in keywords):
+                mood_count[mood] += 1
+
+    # Create the plot
+    moods = list(mood_count.keys())
+    counts = list(mood_count.values())
+
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x=moods, y=counts, palette="viridis")
+    plt.title("Mood vs. Intensity Analysis", color="white")
+    plt.xlabel("Mood", color="white")
+    plt.ylabel("Track Count", color="white")
+    plt.xticks(color="white", rotation=45)
+    plt.yticks(color="white")
+    plt.gca().patch.set_facecolor("black")
+    plt.gcf().set_facecolor("black")
+    st.pyplot(plt)
+
+# Main Application
+if "token_info" in st.session_state:
+    if "sp" not in st.session_state:
+        st.session_state["sp"] = initialize_spotify()
+
+    sp = st.session_state["sp"]
 
     page = st.radio("Navigate to:", ["Liked Songs & Discover New", "Insights & Behavior"])
 
