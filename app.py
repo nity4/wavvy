@@ -2,7 +2,6 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
-import matplotlib.pyplot as plt
 from datetime import datetime
 import random
 from requests.exceptions import ConnectionError
