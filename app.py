@@ -209,17 +209,29 @@ def plot_listening_heatmap(behavior_data):
 
 # Plot Mood vs. Intensity Analysis based on real data
 def plot_mood_intensity_chart(behavior_data):
-    mood_intensity = {
-        "Happy": behavior_data[behavior_data["track_name"].str.contains("happy", case=False)].shape[0],
-        "Calm": behavior_data[behavior_data["track_name"].str.contains("calm", case=False)].shape[0],
-        "Energetic": behavior_data[behavior_data["track_name"].str.contains("energetic", case=False)].shape[0],
-        "Sad": behavior_data[behavior_data["track_name"].str.contains("sad", case=False)].shape[0]
+    # List of common mood-related keywords
+    mood_keywords = {
+        "Happy": ["happy", "joy", "smile", "love"],
+        "Calm": ["calm", "relax", "chill", "soft"],
+        "Energetic": ["energetic", "dance", "party", "upbeat", "fast"],
+        "Sad": ["sad", "blue", "down", "heartbroken"]
     }
-    moods = list(mood_intensity.keys())
-    intensities = list(mood_intensity.values())
+
+    # Count tracks related to each mood
+    mood_count = {mood: 0 for mood in mood_keywords}
     
+    for index, row in behavior_data.iterrows():
+        track_name = row["track_name"].lower()
+        for mood, keywords in mood_keywords.items():
+            if any(keyword in track_name for keyword in keywords):
+                mood_count[mood] += 1
+
+    # Create the plot
+    moods = list(mood_count.keys())
+    counts = list(mood_count.values())
+
     plt.figure(figsize=(10, 6))
-    sns.barplot(x=moods, y=intensities, palette="viridis")
+    sns.barplot(x=moods, y=counts, palette="viridis")
     plt.title("Mood vs. Intensity Analysis", color="white")
     plt.xlabel("Mood", color="white")
     plt.ylabel("Track Count", color="white")
