@@ -36,10 +36,11 @@ st.markdown("""
     body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     h1, h2, h3, p {color: white !important;}
-    .persona-box {background: linear-gradient(to right, gold, #f0e68c); color: black; padding: 20px; border-radius: 15px; text-align: center; font-size: 2.5em; font-weight: bold; margin: 20px 0; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
-    .persona-desc {background: #333; color: white; padding: 20px; border-radius: 15px; font-size: 1.2em; text-align: center; margin: 20px 0;}
-    .insights-box {display: flex; justify-content: space-between; flex-wrap: wrap; background: #444; padding: 20px; border-radius: 15px; margin-top: 20px;}
-    .insight-badge {flex: 1 1 calc(33.333% - 20px); background: #1DB954; color: black; margin: 10px; padding: 20px; border-radius: 15px; text-align: center; font-size: 1.2em; font-weight: bold; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
+    .persona-card {background: #1a1a1a; color: white; padding: 20px; border-radius: 15px; margin: 20px; text-align: center; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
+    .persona-title {font-size: 2.5em; font-weight: bold; margin-bottom: 10px;}
+    .persona-desc {font-size: 1.2em; line-height: 1.6; color: #cfcfcf;}
+    .insights-box {display: flex; justify-content: space-between; flex-wrap: wrap; background: #333; padding: 20px; border-radius: 15px; margin-top: 20px;}
+    .insight-badge {flex: 1 1 calc(33.333% - 20px); background: #444; color: white; margin: 10px; padding: 20px; border-radius: 15px; text-align: center; font-size: 1.2em; font-weight: bold; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
     .insight-icon {font-size: 2em; margin-bottom: 10px; display: block;}
     .cover-small {border-radius: 10px; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
     .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
@@ -101,8 +102,12 @@ def fetch_behavioral_data(sp):
 def display_persona():
     persona_name = "Rhythm Explorer"
     explanation = "You're a Rhythm Explorer—your playlists are like a map of the beats that move your soul."
-    st.markdown(f"<div class='persona-box'>{persona_name}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='persona-desc'>{explanation}</div>", unsafe_allow_html=True)
+    st.markdown(f"""
+        <div class="persona-card">
+            <div class="persona-title">{persona_name}</div>
+            <div class="persona-desc">{explanation}</div>
+        </div>
+    """, unsafe_allow_html=True)
 
 # Display Insights as Enhanced Badges
 def display_insights(behavior_data):
@@ -148,20 +153,22 @@ def plot_listening_heatmap(behavior_data):
         plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
-# Plot Top 5 Most Played Artists
-def plot_top_artists_chart(behavior_data):
-    if not behavior_data.empty:
-        artist_counts = behavior_data["artist_name"].value_counts().head(5)
-        plt.figure(figsize=(10, 6))
-        artist_counts.plot(kind="bar", color="#1DB954")
-        plt.title("Top 5 Most Played Artists", color="white")
-        plt.xlabel("Artist", color="white")
-        plt.ylabel("Track Count", color="white")
-        plt.xticks(color="white", rotation=45)
-        plt.yticks(color="white")
-        plt.gca().patch.set_facecolor("black")
-        plt.gcf().set_facecolor("black")
-        st.pyplot(plt)
+# Plot Mood vs. Intensity Analysis
+def plot_mood_intensity_chart():
+    data = pd.DataFrame({
+        "Mood": ["Happy", "Calm", "Energetic", "Sad"],
+        "Intensity (1-5)": [random.randint(1, 5) for _ in range(4)]
+    })
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x="Mood", y="Intensity (1-5)", data=data, palette="viridis")
+    plt.title("Mood vs. Intensity Analysis", color="white")
+    plt.xlabel("Mood", color="white")
+    plt.ylabel("Average Intensity", color="white")
+    plt.xticks(color="white", rotation=45)
+    plt.yticks(color="white")
+    plt.gca().patch.set_facecolor("black")
+    plt.gcf().set_facecolor("black")
+    st.pyplot(plt)
 
 # Main Application
 if "token_info" not in st.session_state:
@@ -244,4 +251,4 @@ if "token_info" in st.session_state:
         # Graphs Section
         st.subheader("Graphical Analysis")
         plot_listening_heatmap(behavior_data)
-        plot_top_artists_chart(behavior_data)
+        plot_mood_intensity_chart()
