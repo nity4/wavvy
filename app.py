@@ -32,7 +32,9 @@ st.markdown("""
     body {background: linear-gradient(to right, black, #1DB954); color: white;}
     .header-title {text-align: center; font-size: 3em; font-weight: bold; color: white;}
     .button {background-color: #1DB954; color: white; padding: 10px; border-radius: 5px; font-weight: bold;}
-    .insight-box {background-color: #333; padding: 15px; margin-bottom: 20px; border-radius: 10px;}
+    .insight-box {background-color: #333; padding: 15px; margin-bottom: 20px; border-radius: 10px; color: white;}
+    .genre-text {font-size: 1.2em; color: #1DB954; font-weight: bold; margin-bottom: 10px;}
+    .genre-text:hover {color: #66FF99;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -133,7 +135,7 @@ def display_top_insights(sp):
     # Extract and display top genres
     genres = [artist['genres'][0] for artist in top_artists['items'] if artist['genres']]
     if genres:
-        st.markdown(f"### Top Genres: {', '.join(set(genres))}")
+        st.markdown(f"<div class='genre-text'>Top Genres: {', '.join(set(genres))}</div>", unsafe_allow_html=True)
 
 # Weekly listening pattern
 def display_weekly_patterns(sp):
