@@ -90,6 +90,25 @@ def fetch_spotify_data(sp_func, *args, **kwargs):
     st.error("Failed to fetch data. Please try again later.")
     return None
 
+# Spotify OAuth Login Flow
+def login_spotify():
+    # Check if the user is already authenticated
+    if "token_info" not in st.session_state:
+        auth_url = sp_oauth.get_authorize_url()
+        st.markdown(f"[Login with Spotify]({auth_url})")
+        st.stop()  # Stop execution until the user logs in
+    else:
+        # If authenticated, initialize Spotify client
+        access_token = st.session_state["token_info"]["access_token"]
+        sp = spotipy.Spotify(auth=access_token)
+        return sp
+
+# Handle Redirect after Spotify Login
+def handle_redirect():
+    token_info = sp_oauth.get_access_token(st.experimental_get_query_params()["code"])
+    st.session_state["token_info"] = token_info
+    st.experimental_rerun()  # Reload the page to fetch the data
+
 # Fetch Behavioral Data (based on current or last week)
 def fetch_behavioral_data(sp, week_type):
     today = datetime.today().date()  # Convert to datetime.date for comparison
@@ -197,61 +216,13 @@ def display_top_data(top_tracks, top_artists, genres):
         st.subheader("Your Top Genres")
         st.markdown(", ".join(genres[:5]))
 
-# Plot Listening Heatmap
-def plot_listening_heatmap(behavior_data):
-    if not behavior_data.empty:
-        heatmap_data = behavior_data.groupby(["hour", "weekday"]).size().unstack(fill_value=0)
-        plt.figure(figsize=(12, 6))
-        sns.heatmap(heatmap_data, cmap="magma", linewidths=0.5, annot=True, fmt="d")
-        plt.title("Listening Heatmap (Hour vs. Day)", color="white")
-        plt.xlabel("Day", color="white")
-        plt.ylabel("Hour", color="white")
-        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], color="white", rotation=45)
-        plt.yticks(color="white")
-        plt.gca().patch.set_facecolor("black")
-        plt.gcf().set_facecolor("black")
-        st.pyplot(plt)
-
-# Plot Mood vs. Intensity Analysis based on real data
-def plot_mood_intensity_chart(behavior_data):
-    # List of common mood-related keywords
-    mood_keywords = {
-        "Happy": ["happy", "joy", "smile", "love"],
-        "Calm": ["calm", "relax", "chill", "soft"],
-        "Energetic": ["energetic", "dance", "party", "upbeat", "fast"],
-        "Sad": ["sad", "blue", "down", "heartbroken"]
-    }
-
-    # Count tracks related to each mood
-    mood_count = {mood: 0 for mood in mood_keywords}
-    
-    for index, row in behavior_data.iterrows():
-        track_name = row["track_name"].lower()
-        for mood, keywords in mood_keywords.items():
-            if any(keyword in track_name for keyword in keywords):
-                mood_count[mood] += 1
-
-    # Create the plot
-    moods = list(mood_count.keys())
-    counts = list(mood_count.values())
-
-    plt.figure(figsize=(10, 6))
-    sns.barplot(x=moods, y=counts, palette="viridis")
-    plt.title("Mood vs. Intensity Analysis", color="white")
-    plt.xlabel("Mood", color="white")
-    plt.ylabel("Track Count", color="white")
-    plt.xticks(color="white", rotation=45)
-    plt.yticks(color="white")
-    plt.gca().patch.set_facecolor("black")
-    plt.gcf().set_facecolor("black")
-    st.pyplot(plt)
-
 # Main Application
-if "token_info" in st.session_state:
-    if "sp" not in st.session_state:
-        st.session_state["sp"] = initialize_spotify()
-
-    sp = st.session_state["sp"]
+if "code" in st.experimental_get_query_params():
+    # Handle redirect from Spotify login
+    handle_redirect()
+else:
+    # Ensure user is logged in before showing the app
+    sp = login_spotify()
 
     page = st.radio("Navigate to:", ["Liked Songs & Discover New", "Insights & Behavior"])
 
