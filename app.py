@@ -30,7 +30,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# CSS for Styling
+# CSS for Styling Updates
 st.markdown("""
     <style>
     body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
@@ -41,6 +41,7 @@ st.markdown("""
     .fun-insight-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px; font-size: 1.2em; line-height: 1.5;}
     .personalized-box {background: #444; color: white; padding: 20px; border-radius: 15px; margin-top: 20px; font-size: 1.3em; line-height: 1.6;}
     .gift-box {background: #1DB954; color: black; padding: 20px; border-radius: 15px; margin-top: 20px; font-size: 1.5em; font-weight: bold; text-align: center;}
+    .graph-bg {background-color: black; color: white;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -102,12 +103,13 @@ def authenticate_user():
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>', unsafe_allow_html=True)
     return "token_info" in st.session_state
 
-# Fetch Liked Songs and Recommendations
+# Fetch Liked Songs
 def fetch_liked_songs(sp):
     if "liked_songs" not in st.session_state:
         st.session_state["liked_songs"] = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
     return st.session_state["liked_songs"]
 
+# Fetch Recommendations
 def fetch_recommendations(sp, mood, intensity):
     mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
     valence, energy = [val * intensity / 5 for val in mood_map[mood]]
@@ -132,13 +134,15 @@ def fetch_top_data(sp):
     return st.session_state["top_data"]
 
 # Fetch Behavioral Data
-def fetch_behavioral_data(sp):
-    if "behavior_data" not in st.session_state:
+def fetch_behavioral_data_1month(sp):
+    if "behavior_data_month" not in st.session_state:
         recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
-        hours = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ").hour for item in recent_plays["items"]]
-        weekdays = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ").weekday() for item in recent_plays["items"]]
-        st.session_state["behavior_data"] = (pd.Series(hours).value_counts(), pd.Series(weekdays).value_counts())
-    return st.session_state["behavior_data"]
+        timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
+        df = pd.DataFrame(timestamps, columns=["played_at"])
+        df["hour"] = df["played_at"].dt.hour
+        df["weekday"] = df["played_at"].dt.weekday
+        st.session_state["behavior_data_month"] = df
+    return st.session_state["behavior_data_month"]
 
 # Main App Logic
 if authenticate_user():
@@ -146,10 +150,10 @@ if authenticate_user():
 
     st.markdown('<div class="brand">WVY</div>', unsafe_allow_html=True)
 
-    page = st.radio("Navigate to:", ["Liked Songs and Recommendations", "Top Insights", "Behavior"])
+    page = st.radio("Navigate to:", ["Liked Songs & Discover New", "Insights & Behavior"])
 
-    if page == "Liked Songs and Recommendations":
-        st.title("Liked Songs and Recommendations")
+    if page == "Liked Songs & Discover New":
+        st.title("Liked Songs & Discover New")
         mood = st.selectbox("Choose Mood:", ["Happy", "Calm", "Energetic", "Sad"])
         intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
         feature = st.radio("What do you want to explore?", ["Liked Songs", "Discover New Songs"])
@@ -184,17 +188,19 @@ if authenticate_user():
                         </div>
                     """, unsafe_allow_html=True)
 
-    elif page == "Top Insights":
-        st.title("Your Top Insights")
+    elif page == "Insights & Behavior":
+        st.title("Insights & Behavior")
         top_tracks, top_artists, genres = fetch_top_data(sp)
+        behavior_data = fetch_behavioral_data_1month(sp)
+
         st.header("Your Top Songs")
         for track in top_tracks["items"]:
             st.markdown(f"""
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                     <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-square">
                     <div style="margin-left: 10px;">
-                        <p style="margin: 0;"><strong>{track['name']}</strong></p>
-                        <p style="margin: 0;">by {track['artists'][0]['name']}</p>
+                        <p><strong>{track['name']}</strong></p>
+                        <p>by {track['artists'][0]['name']}</p>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
@@ -205,7 +211,7 @@ if authenticate_user():
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                     <img src="{artist['images'][0]['url']}" alt="Artist Cover" class="cover-square">
                     <div style="margin-left: 10px;">
-                        <p style="margin: 0;"><strong>{artist['name']}</strong></p>
+                        <p><strong>{artist['name']}</strong></p>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
@@ -214,57 +220,40 @@ if authenticate_user():
         st.write(", ".join(genres[:5]))
 
         st.header("Fun Insights")
-        insights = [
-            f"🎧 Your top genre this month is: <strong>{random.choice(genres).capitalize()}</strong>.",
-            f"🎵 You've jammed to <strong>{len(top_tracks['items'])} top songs</strong> this month.",
-            f"🔥 You're vibing with {len(top_artists['items'])} amazing artists!"
+        total_top_songs = len(top_tracks["items"])
+        total_top_artists = len(top_artists["items"])
+        favorite_genre = random.choice(genres).capitalize() if genres else "Unknown"
+
+        fun_insights = [
+            f"🎧 Your top genre this month is: <strong>{favorite_genre}</strong>.",
+            f"🎵 You've vibed with <strong>{total_top_songs} top songs</strong> this month.",
+            f"🔥 You're enjoying <strong>{total_top_artists} amazing artists</strong> recently!"
         ]
-        for insight in insights:
+
+        for insight in fun_insights:
             st.markdown(f"""
                 <div class="fun-insight-box">
                     {insight}
                 </div>
             """)
 
-    elif page == "Behavior":
-        st.title("Your Personalized Music Behavior")
-        listening_hours, listening_weekdays = fetch_behavioral_data(sp)
-
-        st.header("Hourly Listening Trends")
-        fig, ax = plt.subplots()
-        listening_hours.sort_index().plot(kind="bar", ax=ax, color="#1DB954")
-        ax.set_title("Hourly Listening Trends")
-        ax.set_xlabel("Hour of the Day")
-        ax.set_ylabel("Tracks Played")
+        st.header("Listening Trends Over the Month")
+        fig, ax = plt.subplots(facecolor="black")
+        behavior_data["hour"].value_counts().sort_index().plot(kind="bar", ax=ax, color="#1DB954")
+        ax.set_title("Hourly Listening Trends", color="white")
+        ax.set_xlabel("Hour of the Day", color="white")
+        ax.set_ylabel("Tracks Played", color="white")
+        ax.tick_params(colors="white")
         st.pyplot(fig)
 
         st.header("Weekly Listening Trends")
-        fig, ax = plt.subplots()
-        listening_weekdays.sort_index().plot(kind="line", ax=ax, color="#1DB954", marker="o")
-        ax.set_title("Weekly Listening Trends")
-        ax.set_xlabel("Day of the Week (0=Monday, 6=Sunday)")
-        ax.set_ylabel("Tracks Played")
+        fig, ax = plt.subplots(facecolor="black")
+        behavior_data["weekday"].value_counts().sort_index().plot(kind="line", ax=ax, color="#1DB954", marker="o")
+        ax.set_title("Weekly Listening Trends", color="white")
+        ax.set_xlabel("Day of the Week (0=Monday, 6=Sunday)", color="white")
+        ax.set_ylabel("Tracks Played", color="white")
+        ax.tick_params(colors="white")
         st.pyplot(fig)
-
-        peak_hour = listening_hours.idxmax()
-        if peak_hour >= 18:
-            personality = "🎶 Night Owl"
-            description = "You thrive in the nighttime melodies and vibe when the world sleeps."
-        elif peak_hour < 12:
-            personality = "☀️ Morning Melodist"
-            description = "Your mornings are powered by rhythms, fueling your energy for the day."
-        else:
-            personality = "🌇 Daytime Dreamer"
-            description = "You groove during the day, making every moment a music video."
-
-        st.markdown(f"""
-            <div class="gift-box">
-                Your Music Personality: {personality}
-            </div>
-            <div class="personalized-box">
-                {description}
-            </div>
-        """)
 
 else:
     st.write("Please log in to access your Spotify data.")
