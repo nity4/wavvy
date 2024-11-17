@@ -84,8 +84,17 @@ def fetch_spotify_data(sp_func, *args, **kwargs):
     st.error("Failed to fetch data. Please try again later.")
     return None
 
-# Fetch Behavioral Data (Last Week)
-def fetch_behavioral_data(sp):
+# Fetch Behavioral Data (based on current or last week)
+def fetch_behavioral_data(sp, week_type):
+    today = datetime.today()
+    if week_type == "current":
+        # For current week (Thursday-Sunday): Get this week's data
+        start_date = today - timedelta(days=today.weekday())  # Start of the week
+    else:
+        # For last week (Mon-Wed): Get last week's data
+        start_date = today - timedelta(days=today.weekday() + 7)  # Start of last week
+    
+    # Fetch data for the week (dummy logic here, replace with actual data logic)
     recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
     if recent_plays:
         timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
@@ -95,7 +104,7 @@ def fetch_behavioral_data(sp):
         df["date"] = df["played_at"].dt.date
         df["hour"] = df["played_at"].dt.hour
         df["weekday"] = df["played_at"].dt.weekday
-        return df
+        return df[df["date"] >= start_date]
     return pd.DataFrame()
 
 # Fetch Top Data
@@ -282,8 +291,11 @@ if "token_info" in st.session_state:
                     )
 
     elif page == "Insights & Behavior":
-        st.header("Insights & Behavior (Last Week)")
-        behavior_data = fetch_behavioral_data(sp)
+        today = datetime.today()
+        week_type = "current" if today.weekday() > 2 else "last"  # Check if today is after Wednesday
+        st.header(f"Insights & Behavior ({'Current Week' if week_type == 'current' else 'Last Week'})")
+        
+        behavior_data = fetch_behavioral_data(sp, week_type)
         top_tracks, top_artists, genres = fetch_top_data(sp)
 
         # Persona Section
