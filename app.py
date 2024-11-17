@@ -61,7 +61,7 @@ def refresh_token():
     if "token_info" in st.session_state and sp_oauth.is_token_expired(st.session_state["token_info"]):
         st.session_state["token_info"] = sp_oauth.refresh_access_token(st.session_state["token_info"]["refresh_token"])
 
-# Function to fetch user's Spotify data with error handling
+# Function to fetch Spotify data with error handling
 def fetch_spotify_data(sp_func, *args, retries=5, **kwargs):
     for attempt in range(retries):
         try:
@@ -82,8 +82,9 @@ def fetch_audio_features(sp, track_id, retries=3):
             if features and isinstance(features, list) and features[0]:
                 return features[0]
         except Exception as e:
-            st.warning(f"Retry {attempt + 1}: Failed to fetch features for track {track_id}")
+            st.warning(f"Retry {attempt + 1}: Failed to fetch features for track {track_id}. Error: {e}")
         time.sleep(2 ** attempt)  # Exponential backoff
+    st.error(f"Exhausted retries for track {track_id}. Skipping.")
     return None
 
 # Function to get liked songs
@@ -95,32 +96,34 @@ def get_liked_songs(sp):
             break
         for item in results["items"]:
             track = item["track"]
-            # Ensure the track has an ID and is not None
             track_id = track.get("id")
+            track_name = track.get("name", "Unknown Track")
+            track_artist = track["artists"][0]["name"] if track["artists"] else "Unknown Artist"
+
             if not track_id:
-                st.warning(f"Skipping track without valid ID: {track['name']}")
+                st.warning(f"Skipping track without valid ID: {track_name} by {track_artist}")
                 continue
 
-            # Fetch audio features safely
             features = fetch_audio_features(sp, track_id)
             if features:
                 songs.append({
-                    "Name": track["name"],
-                    "Artist": track["artists"][0]["name"],
-                    "Energy": features.get("energy", None),
-                    "Valence": features.get("valence", None),
-                    "Popularity": track.get("popularity", None)
+                    "Name": track_name,
+                    "Artist": track_artist,
+                    "Energy": features.get("energy"),
+                    "Valence": features.get("valence"),
+                    "Popularity": track.get("popularity")
                 })
             else:
-                st.warning(f"Could not fetch audio features for track: {track['name']} by {track['artists'][0]['name']}")
+                st.warning(f"Could not fetch audio features for track: {track_name} by {track_artist}")
         offset += 50
     return pd.DataFrame(songs)
 
-# Function to display insights
+# Display insights from liked songs
 def display_insights(df):
     if df.empty:
         st.write("No data available.")
         return
+
     avg_energy = df["Energy"].mean()
     avg_valence = df["Valence"].mean()
     avg_popularity = df["Popularity"].mean()
@@ -137,7 +140,7 @@ def display_insights(df):
     ax.set_title("Energy vs Valence")
     st.pyplot(fig)
 
-# Function to recommend songs
+# Recommend songs based on mood and intensity
 def recommend_songs(sp, mood, intensity):
     top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=10)
     if not top_tracks or not top_tracks["items"]:
