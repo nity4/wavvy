@@ -200,9 +200,12 @@ if authenticate_user():
 
     elif page == "Behavior":
         st.title("Your Listening Behavior")
+
+        # Behavioral Insights Data
         listening_hours, listening_weekdays = fetch_behavioral_data(sp)
 
-        st.header("Your Listening Hours")
+        # Listening Hours Chart
+        st.header("Hourly Listening Trends")
         fig, ax = plt.subplots()
         listening_hours.sort_index().plot(kind="bar", ax=ax, color="#1DB954")
         ax.set_title("Hourly Listening Trends")
@@ -210,5 +213,22 @@ if authenticate_user():
         ax.set_ylabel("Tracks Played")
         st.pyplot(fig)
 
+        # Weekly Listening Trends
+        st.header("Weekly Listening Trends")
+        fig, ax = plt.subplots()
+        listening_weekdays.sort_index().plot(kind="bar", ax=ax, color="#1DB954")
+        ax.set_title("Weekly Listening Trends")
+        ax.set_xlabel("Day of the Week (0=Monday, 6=Sunday)")
+        ax.set_ylabel("Tracks Played")
+        st.pyplot(fig)
+
+        # Personality Insights
+        st.header("Your Music Personality")
+        if listening_hours.idxmax() >= 18:
+            st.write("🎶 Night Owl: You love vibing late into the night!")
+        elif listening_hours.idxmax() < 12:
+            st.write("☀️ Morning Melodist: Your mornings are filled with rhythm!")
+        else:
+            st.write("🌇 Daytime Dreamer: You jam the most during the day.")
 else:
     st.write("Please log in to access your Spotify data.")
