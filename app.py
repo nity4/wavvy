@@ -74,9 +74,8 @@ def authenticate_user():
 def render_tabs():
     tabs = ["Liked Songs and Recommendations", "Top Insights", "Behavior"]
     for tab in tabs:
-        if st.button(tab, key=tab, help=f"Navigate to {tab}"):
+        if st.button(tab, key=tab):
             st.session_state["active_tab"] = tab
-            st.experimental_rerun()
 
 # Data Fetching Functions
 def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
