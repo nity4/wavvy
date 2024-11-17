@@ -51,11 +51,16 @@ st.markdown("""
 # Token Refresh Helper
 def refresh_access_token():
     try:
-        token_info = sp_oauth.refresh_access_token(st.session_state["token_info"]["refresh_token"])
-        st.session_state["token_info"] = token_info
-        return token_info["access_token"]
+        # Check if we have the refresh token saved
+        if "token_info" in st.session_state and "refresh_token" in st.session_state["token_info"]:
+            token_info = sp_oauth.refresh_access_token(st.session_state["token_info"]["refresh_token"])
+            st.session_state["token_info"] = token_info
+            return token_info["access_token"]
+        else:
+            st.error("No refresh token available. Please log in again.")
+            return None
     except Exception as e:
-        st.error(f"Token refresh failed: {e}")
+        st.error(f"Failed to refresh token: {e}")
         return None
 
 # Initialize Spotify Client
