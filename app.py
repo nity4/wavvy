@@ -7,15 +7,15 @@ from datetime import datetime
 import random
 import time
 
-# Spotify API credentials from Streamlit Secrets
+# Spotify API credentials
 CLIENT_ID = st.secrets["spotify"]["client_id"]
 CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 
-# Define the required scope for Spotify access
+# Spotify OAuth Scope
 scope = "user-library-read user-top-read playlist-read-private user-read-recently-played"
 
-# Initialize Spotify OAuth
+# Spotify OAuth Setup
 sp_oauth = SpotifyOAuth(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
@@ -23,14 +23,14 @@ sp_oauth = SpotifyOAuth(
     scope=scope
 )
 
-# Set up Streamlit app
+# Streamlit Page Configuration
 st.set_page_config(
     page_title="WVY - Your Spotify Companion",
     page_icon="🌊",
     layout="wide"
 )
 
-# Custom CSS for Styling
+# CSS for Styling
 st.markdown("""
     <style>
     body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
@@ -40,9 +40,6 @@ st.markdown("""
     .cover-circle {border-radius: 50%; margin: 10px; width: 100px; height: 100px;}
     .cover-square {border-radius: 10px; margin: 10px; width: 100px; height: 100px;}
     .fun-insight-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px;}
-    .genre-box {display: flex; align-items: center; margin-bottom: 15px;}
-    .genre-cover {border-radius: 10px; width: 80px; height: 80px; margin-right: 15px;}
-    .chart-title {color: white; font-size: 1.5em; margin-top: 20px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -76,12 +73,12 @@ def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
     return None
 
 def fetch_liked_songs(sp):
-    return fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
+    return fetch_spotify_data(sp.current_user_saved_tracks, limit=200)
 
 def fetch_recommendations(sp, mood, intensity):
     mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
     valence, energy = [val * intensity / 5 for val in mood_map[mood]]
-    seed_tracks = fetch_spotify_data(sp.current_user_saved_tracks, limit=5)
+    seed_tracks = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
     if not seed_tracks:
         return None
     return fetch_spotify_data(
@@ -108,11 +105,11 @@ def fetch_behavioral_data(sp):
 if authenticate_user():
     sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
 
-    # Display Brand Name
+    # Brand Name
     st.markdown('<div class="brand">WVY</div>', unsafe_allow_html=True)
 
     # Navigation Menu
-    page = st.radio("", ["Liked Songs and Recommendations", "Top Insights", "Behavior"], index=0, label_visibility="collapsed")
+    page = st.radio("Navigate to:", ["Liked Songs and Recommendations", "Top Insights", "Behavior"])
 
     if page == "Liked Songs and Recommendations":
         st.title("Liked Songs and Recommendations")
