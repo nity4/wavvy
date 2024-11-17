@@ -30,6 +30,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Custom CSS for styling
+st.markdown("""
+    <style>
+    body {background: linear-gradient(to right, black, #1DB954) !important;}
+    .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
+    h1, h2, h3 {color: white !important;}
+    </style>
+""", unsafe_allow_html=True)
+
 # Function to authenticate user
 def authenticate_user():
     if "token_info" not in st.session_state:
@@ -57,20 +66,15 @@ def fetch_spotify_data(sp_func, *args, retries=5, **kwargs):
     for attempt in range(retries):
         try:
             return sp_func(*args, **kwargs)
-        except spotipy.exceptions.SpotifyException as e:
-            if e.http_status == 429:  # Rate limit
-                retry_after = int(e.headers.get("Retry-After", 1)) if e.headers and "Retry-After" in e.headers else 1
-                st.warning(f"Rate limit reached. Retrying after {retry_after} seconds.")
+        except (spotipy.exceptions.SpotifyException, ReadTimeout) as e:
+            if isinstance(e, spotipy.exceptions.SpotifyException) and e.http_status == 429:
+                retry_after = int(e.headers.get("Retry-After", 1))
                 time.sleep(retry_after)
             else:
-                st.warning(f"Attempt {attempt + 1} failed: {e}")
-        except ReadTimeout:
-            st.warning(f"Attempt {attempt + 1}: Timeout occurred. Retrying...")
-        time.sleep(2 ** attempt)  # Exponential backoff for other errors
-    st.error("Max retries reached. Skipping request.")
+                time.sleep(2 ** attempt)
     return None
 
-# Function to fetch audio features with retries
+# Retry logic for fetching audio features
 def fetch_audio_features(sp, track_id, retries=3):
     for attempt in range(retries):
         try:
@@ -79,11 +83,11 @@ def fetch_audio_features(sp, track_id, retries=3):
                 return features[0]
         except Exception as e:
             st.warning(f"Retry {attempt + 1}: Failed to fetch features for track {track_id}. Error: {e}")
-        time.sleep(2 ** attempt)
-    st.error(f"Max retries reached for track {track_id}. Skipping.")
-    return {"energy": None, "valence": None, "tempo": None}
+        time.sleep(2 ** attempt)  # Exponential backoff
+    st.error(f"Exhausted retries for track {track_id}. Skipping.")
+    return None
 
-# Function to fetch liked songs with features
+# Function to get liked songs
 def get_liked_songs(sp):
     songs, offset = [], 0
     while True:
@@ -107,14 +111,14 @@ def get_liked_songs(sp):
                     "Artist": track_artist,
                     "Energy": features.get("energy"),
                     "Valence": features.get("valence"),
-                    "Popularity": track.get("popularity", None)
+                    "Popularity": track.get("popularity")
                 })
             else:
-                st.warning(f"Skipping track: {track_name} by {track_artist}")
+                st.warning(f"Could not fetch audio features for track: {track_name} by {track_artist}")
         offset += 50
     return pd.DataFrame(songs)
 
-# Function to display insights
+# Display insights from liked songs
 def display_insights(df):
     if df.empty:
         st.write("No data available.")
@@ -136,17 +140,46 @@ def display_insights(df):
     ax.set_title("Energy vs Valence")
     st.pyplot(fig)
 
+# Recommend songs based on mood and intensity
+def recommend_songs(sp, mood, intensity):
+    top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=10)
+    if not top_tracks or not top_tracks["items"]:
+        st.write("No sufficient data for recommendations.")
+        return
+    seed_tracks = [track["id"] for track in top_tracks["items"][:5]]
+    mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
+    valence, energy = [val * intensity / 5 for val in mood_map.get(mood, (0.5, 0.5))]
+
+    recommendations = fetch_spotify_data(
+        sp.recommendations,
+        seed_tracks=seed_tracks,
+        limit=10,
+        target_valence=valence,
+        target_energy=energy
+    )
+    if not recommendations or not recommendations["tracks"]:
+        st.write("No recommendations available.")
+        return
+    st.write("### Recommended Songs")
+    for rec in recommendations["tracks"]:
+        st.write(f"**{rec['name']}** by {rec['artists'][0]['name']}")
+
 # Main App Logic
 if authenticate_user():
     refresh_token()
     sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
     st.title("〰 Wvvy - Your Music Insights")
 
-    tab1, _ = st.tabs(["Liked Songs Analysis", "Discover New Music"])
+    tab1, tab2 = st.tabs(["Liked Songs Analysis", "Discover New Music"])
     with tab1:
         liked_songs_df = get_liked_songs(sp)
         if st.checkbox("Show Raw Data"):
             st.dataframe(liked_songs_df)
         display_insights(liked_songs_df)
+
+    with tab2:
+        mood = st.selectbox("Select Mood", ["Happy", "Calm", "Energetic", "Sad"])
+        intensity = st.slider("Intensity", 1, 5, 3)
+        recommend_songs(sp, mood, intensity)
 else:
     st.write("Please log in to access your Spotify data.")
