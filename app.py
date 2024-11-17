@@ -86,14 +86,19 @@ def get_liked_songs(sp):
             break
         for item in results["items"]:
             track = item["track"]
-            features = fetch_spotify_data(sp.audio_features, track["id"])[0]
-            songs.append({
-                "Name": track["name"],
-                "Artist": track["artists"][0]["name"],
-                "Energy": features["energy"],
-                "Valence": features["valence"],
-                "Popularity": track["popularity"]
-            })
+            # Fetch audio features safely
+            features = fetch_spotify_data(sp.audio_features, [track["id"]])
+            if features and isinstance(features, list) and features[0]:  # Ensure features[0] exists
+                songs.append({
+                    "Name": track["name"],
+                    "Artist": track["artists"][0]["name"],
+                    "Energy": features[0]["energy"],
+                    "Valence": features[0]["valence"],
+                    "Popularity": track["popularity"]
+                })
+            else:
+                # Log or handle the missing feature case
+                st.warning(f"Could not fetch audio features for track: {track['name']} by {track['artists'][0]['name']}")
         offset += 50
     return pd.DataFrame(songs)
 
