@@ -70,35 +70,24 @@ def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
                 st.warning(f"Attempt {attempt + 1} failed. Retrying...")
     return None
 
-# Fetch Liked Songs
-def fetch_liked_songs(sp, mood, intensity):
-    mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
-    valence, energy = [val * intensity / 5 for val in mood_map[mood]]
-    liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=20)
-    return liked_songs
-
-# Fetch Recommendations
-def fetch_recommendations(sp, mood, intensity):
-    mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
-    valence, energy = [val * intensity / 5 for val in mood_map[mood]]
-    seed_tracks = fetch_spotify_data(sp.current_user_saved_tracks, limit=5)
-    if not seed_tracks:
-        return None
-    recommendations = fetch_spotify_data(
-        sp.recommendations,
-        seed_tracks=[item["track"]["id"] for item in seed_tracks["items"]],
-        limit=10,
-        target_valence=valence,
-        target_energy=energy
-    )
-    return recommendations
-
 # Fetch Top Data
 def fetch_top_data(sp):
     top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
     top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=5, time_range="short_term")
     genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])]
     return top_tracks, top_artists, genres
+
+# Generate Fun Insights
+def generate_funny_insights(top_artists, genres):
+    artist_names = [artist["name"] for artist in top_artists["items"]]
+    return f"""Your top artist is **{artist_names[0]}**—basically your soulmate.
+               With genres like **{genres[0]}** and **{genres[1]}**, you're definitely out here making the cool kids jealous."""
+
+# Fetch Behavioral Data
+def fetch_behavioral_data(sp):
+    recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
+    hours = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ").hour for item in recent_plays["items"]]
+    return pd.Series(hours).value_counts()
 
 # Fun Personality Label
 def get_personality_label(peak_hour):
@@ -111,28 +100,24 @@ def get_personality_label(peak_hour):
     else:
         return "Evening Relaxer", "Unwinding with chill vibes."
 
-# Generate Funny Insights
-def generate_funny_insights(top_artists, genres):
-    artist_names = [artist["name"] for artist in top_artists["items"]]
-    return f"Your top artist is {artist_names[0]}—basically your bestie. Also, with genres like {genres[0]} and {genres[1]}, you're clearly cooler than 99% of people."
-
 # Main App Logic
 if authenticate_user():
     sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
 
-    st.title("Wvvy - Your Personalized Music Insights")
+    # Sidebar Navigation
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio("Go to:", ["Liked Songs and Discover", "Top Songs and Genres", "Behavior and Insights"])
 
-    # Option to Select Feature
-    feature = st.radio("Choose an Option:", ["Liked Songs", "Discover New Songs", "Top Songs and Genres"])
+    if page == "Liked Songs and Discover":
+        st.title("Liked Songs and Discover New Recommendations")
+        # Mood and Intensity Filter
+        mood = st.selectbox("Select Mood:", ["Happy", "Calm", "Energetic", "Sad"])
+        intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
 
-    # Mood and Intensity Filter
-    mood = st.selectbox("Select Mood:", ["Happy", "Calm", "Energetic", "Sad"])
-    intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
-
-    if feature == "Liked Songs":
-        liked_songs = fetch_liked_songs(sp, mood, intensity)
+        # Liked Songs
+        st.header("Liked Songs")
+        liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=20)
         if liked_songs:
-            st.write(f"### Liked Songs for Your {mood} Mood:")
             for item in random.sample(liked_songs["items"], min(len(liked_songs["items"]), 10)):
                 track = item["track"]
                 st.markdown(f"""
@@ -144,10 +129,14 @@ if authenticate_user():
                     </div>
                 """, unsafe_allow_html=True)
 
-    elif feature == "Discover New Songs":
-        recommendations = fetch_recommendations(sp, mood, intensity)
+        # Discover New Songs
+        st.header("Discover New Songs")
+        recommendations = fetch_spotify_data(
+            sp.recommendations,
+            seed_tracks=[item["track"]["id"] for item in liked_songs["items"][:5]],
+            limit=10
+        )
         if recommendations:
-            st.write("### Fresh Recommendations:")
             for track in recommendations["tracks"]:
                 st.markdown(f"""
                     <div style="display: flex; align-items: center; margin-bottom: 10px;">
@@ -158,45 +147,58 @@ if authenticate_user():
                     </div>
                 """, unsafe_allow_html=True)
 
-    elif feature == "Top Songs and Genres":
+    elif page == "Top Songs and Genres":
+        st.title("Top Songs, Artists, and Genres")
         top_tracks, top_artists, genres = fetch_top_data(sp)
-        st.write("### Top Tracks:")
+
+        # Top Tracks
+        st.header("Top Tracks")
         for track in top_tracks["items"]:
             st.write(f"**{track['name']}** by {track['artists'][0]['name']}")
-        st.write("### Top Artists:")
+
+        # Top Artists
+        st.header("Top Artists")
         for artist in top_artists["items"]:
             st.write(f"**{artist['name']}**")
-        st.write("### Top Genres:")
+
+        # Top Genres
+        st.header("Top Genres")
         st.write(", ".join(set(genres[:5])))
 
         # Fun Insights
-        st.write("### Fun Insights:")
+        st.header("Fun Insights")
         st.markdown(f"""
             <div class="fun-insight-box">
                 {generate_funny_insights(top_artists, genres)}
             </div>
         """, unsafe_allow_html=True)
 
-    # Listening Behavior
-    st.header("Your Listening Behavior")
-    recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
-    hours = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ").hour for item in recent_plays["items"]]
-    listening_hours = pd.Series(hours).value_counts()
+    elif page == "Behavior and Insights":
+        st.title("Your Listening Behavior and Fun Insights")
+        listening_hours = fetch_behavioral_data(sp)
 
-    # Plot Listening Patterns
-    st.write("### Listening Patterns Throughout the Day")
-    fig, ax = plt.subplots()
-    listening_hours.sort_index().plot(kind="bar", ax=ax, color="#1DB954")
-    ax.set_title("Listening Behavior")
-    ax.set_xlabel("Hour of Day")
-    ax.set_ylabel("Tracks Played")
-    st.pyplot(fig)
+        # Plot Listening Patterns
+        st.header("Listening Patterns Throughout the Day")
+        fig, ax = plt.subplots()
+        listening_hours.sort_index().plot(kind="bar", ax=ax, color="#1DB954")
+        ax.set_title("Listening Behavior")
+        ax.set_xlabel("Hour of Day")
+        ax.set_ylabel("Tracks Played")
+        st.pyplot(fig)
 
-    # Personality Insight
-    peak_hour = listening_hours.idxmax()
-    personality, description = get_personality_label(peak_hour)
-    st.write("### Your Music Personality")
-    st.success(f"**{personality}:** {description}")
+        # Personality Insight
+        peak_hour = listening_hours.idxmax()
+        personality, description = get_personality_label(peak_hour)
+        st.header("Your Music Personality")
+        st.success(f"**{personality}:** {description}")
+
+        # Additional Fun Insight
+        st.header("Additional Insight")
+        st.markdown(f"""
+            <div class="fun-insight-box">
+                You're listening more during the {personality} hours. Keep it up, music genius!
+            </div>
+        """, unsafe_allow_html=True)
 
 else:
     st.write("Please log in to access your Spotify data.")
