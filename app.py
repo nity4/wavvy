@@ -26,11 +26,10 @@ sp_oauth = SpotifyOAuth(
 st.set_page_config(
     page_title="WVY - Your Spotify Companion",
     page_icon="🌊",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# Custom CSS for Theme
+# Custom CSS for Styling
 st.markdown("""
     <style>
     body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
@@ -38,13 +37,12 @@ st.markdown("""
     h1, h2, h3, p {color: white !important;}
     .cover {border-radius: 15px; margin: 5px;}
     .fun-insight-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px;}
-    .insight-header {font-size: 1.2em; margin-top: 15px;}
     .artist-box {display: flex; align-items: center; margin-bottom: 15px;}
     .artist-img {margin-right: 10px; border-radius: 50%; width: 60px; height: 60px;}
     .tabs-container {display: flex; justify-content: center; gap: 20px; margin-top: 10px; margin-bottom: 20px;}
-    .tab {color: white; padding: 10px 15px; cursor: pointer; border-radius: 5px;}
-    .tab:hover {background-color: #1DB954;}
-    .active-tab {background-color: #1DB954;}
+    .tab {color: white; padding: 10px 15px; cursor: pointer; border-radius: 5px; border: 1px solid #1DB954;}
+    .tab:hover {background-color: #1DB954; color: black;}
+    .active-tab {background-color: #1DB954; color: black; border: none;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -64,6 +62,24 @@ def authenticate_user():
             auth_url = sp_oauth.get_authorize_url()
             st.markdown(f'<a href="{auth_url}" target="_self" style="color: white; text-decoration: none; background-color: #1DB954; padding: 10px 20px; border-radius: 5px;">Login with Spotify</a>', unsafe_allow_html=True)
     return "token_info" in st.session_state
+
+# Page Management
+def render_tabs():
+    tabs = ["Liked & Discover", "Top Insights", "Behavior"]
+    if "active_tab" not in st.session_state:
+        st.session_state["active_tab"] = tabs[0]
+
+    selected_tab = st.session_state["active_tab"]
+
+    html = '<div class="tabs-container">'
+    for tab in tabs:
+        css_class = "tab active-tab" if tab == selected_tab else "tab"
+        tab_action = f"st.session_state.active_tab = '{tab}'"
+        html += f'<span class="{css_class}" onClick="{tab_action}">{tab}</span>'
+    html += "</div>"
+    st.markdown(html, unsafe_allow_html=True)
+
+    return selected_tab
 
 # Data Fetch Functions
 def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
@@ -102,27 +118,12 @@ def fetch_behavioral_data(sp):
     weekdays = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ").weekday() for item in recent_plays["items"]]
     return pd.Series(hours).value_counts(), pd.Series(weekdays).value_counts()
 
-# Helper Functions
-def render_tabs(selected_tab):
-    tabs = ["Liked & Discover", "Top Insights", "Behavior"]
-    html = '<div class="tabs-container">'
-    for tab in tabs:
-        css_class = "tab active-tab" if tab == selected_tab else "tab"
-        html += f'<span class="{css_class}">{tab}</span>'
-    html += "</div>"
-    st.markdown(html, unsafe_allow_html=True)
-    return st.session_state.get("active_tab", tabs[0])
-
-# Active Tab State
-if "active_tab" not in st.session_state:
-    st.session_state["active_tab"] = "Liked & Discover"
-
 # Main App Logic
 if authenticate_user():
     sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
 
-    # Top Tabs
-    active_tab = render_tabs(st.session_state["active_tab"])
+    # Render Tabs and Get Active Page
+    active_tab = render_tabs()
 
     if active_tab == "Liked & Discover":
         st.title("Liked Songs and Recommendations")
@@ -170,19 +171,6 @@ if authenticate_user():
         st.header("Genres You Vibe With")
         st.write(", ".join(genres[:5]))
 
-        st.header("Some Fun Thoughts on Your Taste")
-        insights = [
-            "You're like the curator of vibes.",
-            "You have the audacity to listen to amazing music, but no one's watching.",
-            "Your playlist might be cooler than 90% of people... or so we think."
-        ]
-        for insight in insights:
-            st.markdown(f"""
-                <div class="fun-insight-box">
-                    {insight}
-                </div>
-            """)
-
     elif active_tab == "Behavior":
         st.title("Your Listening Behavior")
         listening_hours, listening_weekdays = fetch_behavioral_data(sp)
@@ -193,13 +181,6 @@ if authenticate_user():
         ax.set_title("Hourly Listening Trends")
         ax.set_xlabel("Hour of the Day")
         ax.set_ylabel("Tracks Played")
-        st.pyplot(fig)
-
-        st.header("Genres You Lean Toward")
-        genre_counts = pd.Series(["Pop", "Rock", "Indie", "Electronic"]).sample(frac=1).reset_index(drop=True)
-        fig, ax = plt.subplots()
-        genre_counts.plot(kind="pie", autopct="%1.1f%%", ax=ax, colors=["#FF5733", "#33FF57", "#3357FF", "#FF33A1"])
-        ax.set_title("Genre Distribution")
         st.pyplot(fig)
 
 else:
