@@ -4,7 +4,6 @@ from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 from datetime import datetime
 import random
-from requests.exceptions import ConnectionError
 
 # Spotify API credentials
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -24,7 +23,7 @@ sp_oauth = SpotifyOAuth(
 
 # Streamlit Page Configuration
 st.set_page_config(
-    page_title="WVY - Your Spotify Companion",
+    page_title="WVY - Your Spotify Insights",
     page_icon="🎧",
     layout="wide"
 )
@@ -35,22 +34,19 @@ st.markdown("""
     body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     h1, h2, h3, p {color: white !important;}
-    .brand {font-size: 3.5em; font-weight: bold; color: white; text-align: center;}
-    .title-box {background: linear-gradient(to right, #1DB954, black); padding: 20px; border-radius: 15px; text-align: center; color: white; font-size: 2em;}
-    .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px;}
-    .cover-square {border-radius: 10px; margin: 10px; width: 120px; height: 120px;}
-    .fun-insight-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px; font-size: 1.2em; line-height: 1.5; text-align: center;}
+    .title-box {background: linear-gradient(to right, #1DB954, black); padding: 20px; border-radius: 15px; text-align: center; color: white; font-size: 2em; font-weight: bold;}
+    .cover-circle {border-radius: 50%; margin: 10px; width: 80px; height: 80px; object-fit: cover;}
+    .cover-square {border-radius: 10px; margin: 10px; width: 120px; height: 120px; object-fit: cover;}
+    .data-box {background: #333; color: white; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center;}
+    .header {font-size: 1.5em; font-weight: bold; margin-bottom: 10px;}
     </style>
 """, unsafe_allow_html=True)
 
 # Helper Functions
 def fetch_spotify_data(sp_func, *args, **kwargs):
-    """Fetch Spotify data with retry logic and error handling."""
+    """Fetch Spotify data with error handling."""
     try:
         return sp_func(*args, **kwargs)
-    except ConnectionError:
-        st.error("Connection error. Please check your internet connection.")
-        return None
     except spotipy.exceptions.SpotifyException as e:
         st.error(f"Spotify API error: {e}")
         return None
@@ -60,7 +56,7 @@ def fetch_liked_songs(sp):
     return fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
 
 def fetch_recommendations(sp, mood, intensity):
-    """Fetch song recommendations based on mood and intensity."""
+    """Fetch recommendations based on mood and intensity."""
     mood_map = {"Happy": (0.8, 0.7), "Calm": (0.3, 0.4), "Energetic": (0.9, 0.8), "Sad": (0.2, 0.3)}
     valence, energy = [val * intensity / 5 for val in mood_map[mood]]
     seed_tracks = fetch_spotify_data(sp.current_user_saved_tracks, limit=5)
@@ -76,13 +72,13 @@ def fetch_recommendations(sp, mood, intensity):
     return None
 
 def fetch_top_tracks_artists(sp):
-    """Fetch user's top tracks and artists for the past month."""
+    """Fetch user's top tracks and artists."""
     top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
     top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=5, time_range="short_term")
     return top_tracks, top_artists
 
 def fetch_behavioral_data(sp):
-    """Fetch user's recently played tracks and analyze behavioral trends."""
+    """Fetch and analyze user's recently played tracks."""
     recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
     if recent_plays:
         timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
@@ -115,13 +111,13 @@ if "token_info" in st.session_state:
 
     # Page 1: Liked Songs & Discover New
     if page == "Liked Songs & Discover New":
-        st.title("🎵 Liked Songs & Discover New")
-        mood = st.selectbox("Choose Mood:", ["Happy", "Calm", "Energetic", "Sad"])
+        st.title("Liked Songs & Discover New")
+        mood = st.selectbox("Choose a Mood:", ["Happy", "Calm", "Energetic", "Sad"])
         intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
-        feature = st.radio("What do you want to explore?", ["Liked Songs", "Discover New Songs"])
+        feature = st.radio("Explore:", ["Liked Songs", "Discover New Songs"])
 
         if feature == "Liked Songs":
-            st.header("❤️ Your Liked Songs")
+            st.header("Your Liked Songs")
             liked_songs = fetch_liked_songs(sp)
             if liked_songs and "items" in liked_songs:
                 for item in liked_songs["items"][:10]:
@@ -137,7 +133,7 @@ if "token_info" in st.session_state:
                     """, unsafe_allow_html=True)
 
         elif feature == "Discover New Songs":
-            st.header("🔍 Discover New Songs")
+            st.header("Discover New Songs")
             recommendations = fetch_recommendations(sp, mood, intensity)
             if recommendations and "tracks" in recommendations:
                 for track in recommendations["tracks"]:
@@ -153,19 +149,23 @@ if "token_info" in st.session_state:
 
     # Page 2: Insights & Behavior
     elif page == "Insights & Behavior":
-        st.title("🎧 Insights & Behavior (Last Month)")
+        st.title("Insights & Behavior (Last Month)")
+
+        # Fetch Data
+        top_tracks, top_artists = fetch_top_tracks_artists(sp)
+        persona_name = random.choice(["Melody Master", "Rhythm Explorer", "Beat Connoisseur", "Vibe Enthusiast"])
+        persona_desc = "Your listening habits this month earned you this unique persona. You explore music with style and purpose."
 
         # Persona
-        top_tracks, top_artists = fetch_top_tracks_artists(sp)
-        persona_name = random.choice(["Melody Magician", "Rhythm Rebel", "Beat Explorer", "Vibe Dealer"])
         st.markdown(f"""
             <div class="title-box">
-                🌟 Your Monthly Persona: <strong>{persona_name}</strong> 🌟
+                Your Monthly Persona: <strong>{persona_name}</strong>
             </div>
         """)
+        st.write(persona_desc)
 
         # Top Songs Section
-        st.header("🎵 Your Top Songs")
+        st.header("Your Top Songs")
         if top_tracks and "items" in top_tracks:
             for track in top_tracks["items"]:
                 st.markdown(f"""
@@ -179,7 +179,7 @@ if "token_info" in st.session_state:
                 """)
 
         # Top Artists Section
-        st.header("🎨 Your Top Artists")
+        st.header("Your Top Artists")
         if top_artists and "items" in top_artists:
             for artist in top_artists["items"]:
                 st.markdown(f"""
@@ -192,26 +192,22 @@ if "token_info" in st.session_state:
                 """)
 
         # Fun Insights
-        st.header("😂 Fun Insights from Your Month")
+        st.header("Listening Insights")
         behavior_data = fetch_behavioral_data(sp)
         if behavior_data.empty:
             st.warning("No recent play data available.")
         else:
             peak_hour = behavior_data["hour"].mode()[0]
-            weekday = behavior_data["weekday"].mode()[0]
-            day_name = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][weekday]
             total_tracks = len(behavior_data)
 
-            fun_insights = [
-                f"🎤 You vibe the most at {peak_hour}:00. Peak hours, peak feels!",
-                f"🌙 Your favorite day to jam is {day_name}. Ultimate vibe day?",
-                f"🔥 You played {total_tracks} tracks this month. Music marathon much?"
+            insights = [
+                f"Your favorite time to listen is {peak_hour}:00.",
+                f"You played {total_tracks} tracks this month.",
             ]
 
-            for insight in fun_insights:
+            for insight in insights:
                 st.markdown(f"""
-                    <div class="fun-insight-box">
+                    <div class="data-box">
                         {insight}
                     </div>
                 """)
-
