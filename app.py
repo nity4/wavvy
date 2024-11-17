@@ -5,6 +5,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 import random
+import logging
+from requests.exceptions import ConnectionError
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # Spotify API credentials
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -83,10 +88,14 @@ def authenticate_user():
 
 # Fetch Spotify Data Function
 def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
-    delay = 1
     for attempt in range(retries):
         try:
+            logging.info(f"Attempt {attempt + 1}: Fetching data from Spotify.")
             return sp_func(*args, **kwargs)
+        except ConnectionError as e:
+            st.error("Connection error occurred. Please check your internet connection.")
+            logging.error(f"Connection error: {e}")
+            return None
         except spotipy.exceptions.SpotifyException as e:
             if e.http_status == 401:  # Token expired
                 st.warning("Access token expired. Attempting to refresh...")
@@ -98,6 +107,7 @@ def fetch_spotify_data(sp_func, *args, retries=3, **kwargs):
                     return None
             else:
                 st.error(f"Spotify API error: {e}")
+                logging.error(f"Spotify API error: {e}")
                 return None
     st.error("Failed to fetch data after multiple retries. Please try again later.")
     return None
@@ -114,6 +124,9 @@ def fetch_top_data_month(sp):
 
 def fetch_behavioral_data_1month(sp):
     recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
+    if not recent_plays:
+        st.warning("No recent plays data available. Try again later.")
+        return pd.DataFrame()  # Return an empty DataFrame to avoid errors
     timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
     df = pd.DataFrame(timestamps, columns=["played_at"])
     df["hour"] = df["played_at"].dt.hour
@@ -152,18 +165,19 @@ if authenticate_user():
 
         # Fun Music Personality
         behavior_data = fetch_behavioral_data_1month(sp)
-        peak_hour = behavior_data["hour"].mode()[0]
-        personality_name = random.choice(["Vibe Dealer", "Groove Goblin", "Harmony Hustler"])
-        personality_desc = f"You vibe hardest at {peak_hour}:00 hrs. Iconic!"
+        if not behavior_data.empty:
+            peak_hour = behavior_data["hour"].mode()[0]
+            personality_name = random.choice(["Vibe Dealer", "Groove Goblin", "Harmony Hustler"])
+            personality_desc = f"You vibe hardest at {peak_hour}:00 hrs. Iconic!"
 
-        st.markdown(f"""
-            <div class="dramatic-box">
-                Welcome, {personality_name}!
-            </div>
-            <div class="personalized-box">
-                {personality_desc}
-            </div>
-        """, unsafe_allow_html=True)
+            st.markdown(f"""
+                <div class="dramatic-box">
+                    Welcome, {personality_name}!
+                </div>
+                <div class="personalized-box">
+                    {personality_desc}
+                </div>
+            """, unsafe_allow_html=True)
 
         # Top Songs Section
         top_tracks, top_artists, genres = fetch_top_data_month(sp)
@@ -194,14 +208,15 @@ if authenticate_user():
             """, unsafe_allow_html=True)
 
         # Behavioral Trends Heatmap
-        st.header("Listening Trends: When You’re the Main Character 🎭")
-        heatmap_data = behavior_data.groupby(['hour', 'weekday']).size().unstack(fill_value=0)
-        fig, ax = plt.subplots(figsize=(10, 6))
-        im = ax.imshow(heatmap_data, cmap='viridis')
-        ax.set_title("Your Listening Hours Heatmap 🌈")
-        ax.set_xlabel("Day of the Week")
-        ax.set_ylabel("Hour (24hr)")
-        plt.colorbar(im, orientation='vertical', ax=ax, label="Songs Played")
-        st.pyplot(fig)
+        if not behavior_data.empty:
+            st.header("Listening Trends: When You’re the Main Character 🎭")
+            heatmap_data = behavior_data.groupby(['hour', 'weekday']).size().unstack(fill_value=0)
+            fig, ax = plt.subplots(figsize=(10, 6))
+            im = ax.imshow(heatmap_data, cmap='viridis')
+            ax.set_title("Your Listening Hours Heatmap 🌈")
+            ax.set_xlabel("Day of the Week")
+            ax.set_ylabel("Hour (24hr)")
+            plt.colorbar(im, orientation='vertical', ax=ax, label="Songs Played")
+            st.pyplot(fig)
 else:
     st.write("Please log in to access your Spotify data.")
