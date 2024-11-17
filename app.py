@@ -209,9 +209,8 @@ def plot_listening_heatmap(behavior_data):
         plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
-# Plot Mood vs. Intensity Analysis based on real data
-def plot_mood_intensity_chart(behavior_data):
-    # Define the mood keywords here
+# Filter function for mood
+def filter_songs_by_mood(tracks, mood):
     mood_keywords = {
         "Happy": ["happy", "joy", "smile", "love"],
         "Calm": ["calm", "relax", "chill", "soft"],
@@ -219,28 +218,15 @@ def plot_mood_intensity_chart(behavior_data):
         "Sad": ["sad", "blue", "down", "heartbroken"]
     }
 
-    # Count tracks related to each mood
-    mood_count = {mood: 0 for mood in mood_keywords}
+    filtered_tracks = []
+    keywords = mood_keywords.get(mood, [])
     
-    for index, row in behavior_data.iterrows():
-        track_name = row["track_name"].lower()
-        for mood, keywords in mood_keywords.items():
-            if any(keyword in track_name for keyword in keywords):
-                mood_count[mood] += 1
-
-    moods = list(mood_count.keys())
-    counts = list(mood_count.values())
-
-    plt.figure(figsize=(10, 6))
-    sns.barplot(x=moods, y=counts, palette="viridis")
-    plt.title("Mood vs. Intensity Analysis", color="white")
-    plt.xlabel("Mood", color="white")
-    plt.ylabel("Track Count", color="white")
-    plt.xticks(color="white", rotation=45)
-    plt.yticks(color="white")
-    plt.gca().patch.set_facecolor("black")
-    plt.gcf().set_facecolor("black")
-    st.pyplot(plt)
+    for track in tracks:
+        track_name = track["track"]["name"].lower()
+        if any(keyword in track_name for keyword in keywords):
+            filtered_tracks.append(track)
+    
+    return filtered_tracks
 
 # Main Application
 if "token_info" in st.session_state:
@@ -260,24 +246,21 @@ if "token_info" in st.session_state:
         if feature == "Liked Songs":
             liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
             if liked_songs and "items" in liked_songs:
-                for item in liked_songs["items"][:10]:
+                filtered_songs = filter_songs_by_mood(liked_songs["items"], mood)
+                for item in filtered_songs[:10]:
                     track = item["track"]
-                    track_name = track["name"].lower()
-
-                    # Filter liked songs based on mood
-                    if any(keyword in track_name for keyword in mood_keywords[mood]):
-                        st.markdown(
-                            f"""
-                            <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                                <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-small">
-                                <div>
-                                    <p><strong>{track['name']}</strong></p>
-                                    <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
-                                </div>
+                    st.markdown(
+                        f"""
+                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <img src="{track['album']['images'][0]['url']}" alt="Cover" class="cover-small">
+                            <div>
+                                <p><strong>{track['name']}</strong></p>
+                                <p>by {', '.join(artist['name'] for artist in track['artists'])}</p>
                             </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
         elif feature == "Discover New Songs":
             recommendations = fetch_spotify_data(sp.recommendations, seed_genres=["pop", "rock"], limit=10)
