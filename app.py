@@ -37,7 +37,6 @@ st.markdown("""
     h1, h2, h3, p {color: white !important;}
     .brand-box {text-align: center; margin: 20px 0;}
     .brand-logo {font-size: 3.5em; font-weight: bold; color: white;}
-    .brand-name {font-size: 2.5em; font-weight: bold; color: white; margin-top: 10px;}
     .persona-card {background: #1a1a1a; color: white; padding: 20px; border-radius: 15px; margin: 20px; text-align: center; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
     .persona-title {font-size: 2.5em; font-weight: bold; margin-bottom: 10px;}
     .persona-desc {font-size: 1.2em; line-height: 1.6; color: #cfcfcf;}
@@ -198,54 +197,18 @@ def display_top_data(top_tracks, top_artists, genres):
         st.subheader("Your Top Genres")
         st.markdown(", ".join(genres[:5]))
 
-# Plot Listening Heatmap
-def plot_listening_heatmap(behavior_data):
-    if not behavior_data.empty:
-        heatmap_data = behavior_data.groupby(["hour", "weekday"]).size().unstack(fill_value=0)
-        plt.figure(figsize=(12, 6))
-        sns.heatmap(heatmap_data, cmap="magma", linewidths=0.5, annot=True, fmt="d")
-        plt.title("Listening Heatmap (Hour vs. Day)", color="white")
-        plt.xlabel("Day", color="white")
-        plt.ylabel("Hour", color="white")
-        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], color="white", rotation=45)
-        plt.yticks(color="white")
-        plt.gca().patch.set_facecolor("black")
-        plt.gcf().set_facecolor("black")
-        st.pyplot(plt)
-
-# Plot Mood vs. Intensity Analysis based on real data
-def plot_mood_intensity_chart(behavior_data):
-    # List of common mood-related keywords
-    mood_keywords = {
-        "Happy": ["happy", "joy", "smile", "love"],
-        "Calm": ["calm", "relax", "chill", "soft"],
-        "Energetic": ["energetic", "dance", "party", "upbeat", "fast"],
-        "Sad": ["sad", "blue", "down", "heartbroken"]
-    }
-
-    # Count tracks related to each mood
-    mood_count = {mood: 0 for mood in mood_keywords}
+# Fetch Liked Songs and Filter Based on Mood and Intensity
+def fetch_liked_songs_based_on_mood(sp, mood, intensity):
+    liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
+    filtered_songs = []
     
-    for index, row in behavior_data.iterrows():
-        track_name = row["track_name"].lower()
-        for mood, keywords in mood_keywords.items():
-            if any(keyword in track_name for keyword in keywords):
-                mood_count[mood] += 1
-
-    # Create the plot
-    moods = list(mood_count.keys())
-    counts = list(mood_count.values())
-
-    plt.figure(figsize=(10, 6))
-    sns.barplot(x=moods, y=counts, palette="viridis")
-    plt.title("Mood vs. Intensity Analysis", color="white")
-    plt.xlabel("Mood", color="white")
-    plt.ylabel("Track Count", color="white")
-    plt.xticks(color="white", rotation=45)
-    plt.yticks(color="white")
-    plt.gca().patch.set_facecolor("black")
-    plt.gcf().set_facecolor("black")
-    st.pyplot(plt)
+    if liked_songs and "items" in liked_songs:
+        for item in liked_songs["items"]:
+            track = item["track"]
+            if mood.lower() in track["name"].lower() and intensity in track["name"].lower():  # Check based on mood and intensity
+                filtered_songs.append(track)
+    
+    return filtered_songs
 
 # Main Application
 if "token_info" in st.session_state:
@@ -253,8 +216,6 @@ if "token_info" in st.session_state:
         st.session_state["sp"] = initialize_spotify()
 
     sp = st.session_state["sp"]
-
-    st.markdown('<div class="brand-box"><div class="brand-logo">WVY 🌊</div><div class="brand-name">WVY - Your Spotify Companion</div></div>', unsafe_allow_html=True)
 
     page = st.radio("Navigate to:", ["Liked Songs & Discover New", "Insights & Behavior"])
 
@@ -265,10 +226,9 @@ if "token_info" in st.session_state:
         feature = st.radio("Explore:", ["Liked Songs", "Discover New Songs"])
 
         if feature == "Liked Songs":
-            liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
-            if liked_songs and "items" in liked_songs:
-                for item in liked_songs["items"][:10]:
-                    track = item["track"]
+            filtered_songs = fetch_liked_songs_based_on_mood(sp, mood, intensity)
+            if filtered_songs:
+                for track in filtered_songs[:10]:  # Display top 10 filtered songs
                     st.markdown(
                         f"""
                         <div style="display: flex; align-items: center; margin-bottom: 10px;">
