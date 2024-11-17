@@ -89,15 +89,14 @@ def fetch_spotify_data(sp_func, *args, **kwargs):
     st.error("Failed to fetch data. Please try again later.")
     return None
 
-# Fetch Behavioral Data for the Current Month
-def fetch_behavioral_data(sp, month_type):
-    today = datetime.today().date()  # Convert to datetime.date for comparison
-    if month_type == "current":
-        start_date = today.replace(day=1)  # Start of the current month
-    else:
-        start_date = (today.replace(month=today.month-1) if today.month > 1 else today.replace(year=today.year-1, month=12)).replace(day=1)
-
-    # Fetch recent plays (dummy logic here, replace with actual logic)
+# Fetch Behavioral Data for the Last Week
+def fetch_behavioral_data(sp):
+    today = datetime.today().date()
+    # Calculate the previous Monday and Sunday
+    monday = today - timedelta(days=today.weekday())  # Start of the week (Monday)
+    sunday = monday + timedelta(days=6)  # End of the week (Sunday)
+    
+    # Fetch recent plays from last week
     recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
     if recent_plays:
         timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
@@ -107,7 +106,7 @@ def fetch_behavioral_data(sp, month_type):
         df["date"] = df["played_at"].dt.date
         df["hour"] = df["played_at"].dt.hour
         df["weekday"] = df["played_at"].dt.weekday
-        return df[df["date"] >= start_date]
+        return df[(df["date"] >= monday) & (df["date"] <= sunday)]
     return pd.DataFrame()
 
 # Fetch Top Data
@@ -203,28 +202,33 @@ def plot_listening_heatmap(behavior_data):
         plt.title("Listening Heatmap (Hour vs. Day)", color="white")
         plt.xlabel("Day", color="white")
         plt.ylabel("Hour", color="white")
-        plt.xticks(ticks=range(7), labels=["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"], color="white", rotation=45)
+        plt.xticks(ticks=range(7), labels=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], color="white", rotation=45)
         plt.yticks(color="white")
         plt.gca().patch.set_facecolor("black")
         plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
-# Filter function for mood
-def filter_songs_by_mood(tracks, mood):
+# Filter liked songs based on mood and intensity
+def filter_songs_by_mood_and_intensity(tracks, mood, intensity):
     mood_keywords = {
         "Happy": ["happy", "joy", "smile", "love"],
         "Calm": ["calm", "relax", "chill", "soft"],
         "Energetic": ["energetic", "dance", "party", "upbeat", "fast"],
         "Sad": ["sad", "blue", "down", "heartbroken"]
     }
-
+    
+    # Adjust the filtering based on intensity: higher intensity means more energetic songs
     filtered_tracks = []
     keywords = mood_keywords.get(mood, [])
     
     for track in tracks:
         track_name = track["track"]["name"].lower()
         if any(keyword in track_name for keyword in keywords):
-            filtered_tracks.append(track)
+            # Filter based on intensity (you can adjust the logic)
+            if intensity >= 3 and "fast" in track_name:
+                filtered_tracks.append(track)
+            elif intensity < 3 and "chill" in track_name:
+                filtered_tracks.append(track)
     
     return filtered_tracks
 
@@ -246,7 +250,7 @@ if "token_info" in st.session_state:
         if feature == "Liked Songs":
             liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
             if liked_songs and "items" in liked_songs:
-                filtered_songs = filter_songs_by_mood(liked_songs["items"], mood)
+                filtered_songs = filter_songs_by_mood_and_intensity(liked_songs["items"], mood, intensity)
                 for item in filtered_songs[:10]:
                     track = item["track"]
                     st.markdown(
@@ -280,11 +284,9 @@ if "token_info" in st.session_state:
                     )
 
     elif page == "Insights & Behavior":
-        today = datetime.today().date()
-        month_type = "current" if today.month == datetime.today().month else "last"  # Check current month
-        st.header(f"Insights & Behavior ({'Current Month' if month_type == 'current' else 'Last Month'})")
-        
-        behavior_data = fetch_behavioral_data(sp, month_type)
+        st.header("Insights & Behavior (Last Week)")
+
+        behavior_data = fetch_behavioral_data(sp)
         top_tracks, top_artists, genres = fetch_top_data(sp)
 
         # Persona Section
@@ -300,4 +302,3 @@ if "token_info" in st.session_state:
         # Graphs Section
         st.subheader("Graphical Analysis")
         plot_listening_heatmap(behavior_data)
-        plot_mood_intensity_chart(behavior_data)
