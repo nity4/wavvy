@@ -5,7 +5,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import seaborn as sns
-import random
 
 # Spotify API credentials
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -36,6 +35,8 @@ st.markdown("""
     body {background: linear-gradient(to right, black, #1DB954) !important; color: white;}
     .stApp {background: linear-gradient(to right, black, #1DB954) !important;}
     h1, h2, h3, p {color: white !important;}
+    .brand-box {text-align: center; margin: 20px 0;}
+    .brand-logo {font-size: 3.5em; font-weight: bold; color: white;}
     .persona-card {background: #1a1a1a; color: white; padding: 20px; border-radius: 15px; margin: 20px; text-align: center; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);}
     .persona-title {font-size: 2.5em; font-weight: bold; margin-bottom: 10px;}
     .persona-desc {font-size: 1.2em; line-height: 1.6; color: #cfcfcf;}
@@ -206,17 +207,22 @@ def plot_listening_heatmap(behavior_data):
         plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
-# Plot Mood vs. Intensity Analysis
-def plot_mood_intensity_chart():
-    data = pd.DataFrame({
-        "Mood": ["Happy", "Calm", "Energetic", "Sad"],
-        "Intensity (1-5)": [random.randint(1, 5) for _ in range(4)]
-    })
+# Plot Mood vs. Intensity Analysis based on real data
+def plot_mood_intensity_chart(behavior_data):
+    mood_intensity = {
+        "Happy": behavior_data[behavior_data["track_name"].str.contains("happy", case=False)].shape[0],
+        "Calm": behavior_data[behavior_data["track_name"].str.contains("calm", case=False)].shape[0],
+        "Energetic": behavior_data[behavior_data["track_name"].str.contains("energetic", case=False)].shape[0],
+        "Sad": behavior_data[behavior_data["track_name"].str.contains("sad", case=False)].shape[0]
+    }
+    moods = list(mood_intensity.keys())
+    intensities = list(mood_intensity.values())
+    
     plt.figure(figsize=(10, 6))
-    sns.barplot(x="Mood", y="Intensity (1-5)", data=data, palette="viridis")
+    sns.barplot(x=moods, y=intensities, palette="viridis")
     plt.title("Mood vs. Intensity Analysis", color="white")
     plt.xlabel("Mood", color="white")
-    plt.ylabel("Average Intensity", color="white")
+    plt.ylabel("Track Count", color="white")
     plt.xticks(color="white", rotation=45)
     plt.yticks(color="white")
     plt.gca().patch.set_facecolor("black")
@@ -294,4 +300,4 @@ if "token_info" in st.session_state:
         # Graphs Section
         st.subheader("Graphical Analysis")
         plot_listening_heatmap(behavior_data)
-        plot_mood_intensity_chart()
+        plot_mood_intensity_chart(behavior_data)
