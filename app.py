@@ -38,9 +38,8 @@ st.markdown("""
     .brand {text-align: center; font-size: 4em; font-weight: bold; color: white; margin-top: 10px;}
     .description {text-align: center; font-size: 1.5em; color: white; margin-top: -10px; margin-bottom: 20px;}
     .tabs-container {display: flex; justify-content: center; gap: 20px; margin-top: 20px; margin-bottom: 30px; position: relative;}
-    .tab {color: white; padding: 10px 20px; cursor: pointer; position: relative; font-size: 1.2em;}
+    .tab {color: white; padding: 10px 20px; cursor: pointer; position: relative;}
     .tab:hover {color: red;}
-    .active-tab {color: red;}
     .active-tab::after {content: ""; width: 100%; height: 2px; background: red; position: absolute; bottom: 0; left: 0;}
     .cover-square {width: 80px; height: 80px; border-radius: 10px; margin-right: 10px;}
     .cover-circle {width: 80px; height: 80px; border-radius: 50%; margin-right: 10px;}
@@ -77,15 +76,12 @@ def render_tabs():
     html = '<div class="tabs-container">'
     for tab in tabs:
         css_class = "tab active-tab" if tab == selected_tab else "tab"
-        if tab != selected_tab:
-            action = f"window.location.href='?active_tab={tab}'"
-            html += f'<div class="{css_class}" onClick="{action}">{tab}</div>'
-        else:
-            html += f'<div class="{css_class}">{tab}</div>'
+        action = f"window.location.href='?active_tab={tab}'"
+        html += f'<div class="{css_class}" onClick="{action}">{tab}</div>'
     html += "</div>"
     st.markdown(html, unsafe_allow_html=True)
 
-    # Update the active tab based on the query params
+    # Read active tab from query params
     active_tab = st.experimental_get_query_params().get("active_tab", [st.session_state["active_tab"]])[0]
     st.session_state["active_tab"] = active_tab
 
