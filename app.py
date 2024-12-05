@@ -45,24 +45,20 @@ def login_with_spotify():
         scope=scope,
         show_dialog=True
     )
-    token_info = auth_manager.get_access_token(as_dict=True)
-    st.session_state["token_info"] = token_info
-    st.session_state["sp"] = spotipy.Spotify(auth=token_info["access_token"])
+    token = auth_manager.get_access_token()
+    st.session_state["sp"] = spotipy.Spotify(auth=token)
 
 def refresh_access_token():
     try:
-        if "token_info" in st.session_state:
+        if "sp" in st.session_state:
             auth_manager = SpotifyOAuth(
                 client_id=CLIENT_ID,
                 client_secret=CLIENT_SECRET,
                 redirect_uri=REDIRECT_URI,
                 scope=scope
             )
-            token_info = auth_manager.refresh_access_token(
-                st.session_state["token_info"]["refresh_token"]
-            )
-            st.session_state["token_info"] = token_info
-            st.session_state["sp"] = spotipy.Spotify(auth=token_info["access_token"])
+            token = auth_manager.get_access_token()
+            st.session_state["sp"] = spotipy.Spotify(auth=token)
     except Exception as e:
         st.error(f"Failed to refresh token: {e}")
 
@@ -140,7 +136,7 @@ def fetch_behavior_data(sp):
     return pd.DataFrame()
 
 # Main App
-if "token_info" not in st.session_state:
+if "sp" not in st.session_state:
     st.title("Welcome to WVY - Spotify Insights 🌊")
     if st.button("Log in with Spotify"):
         login_with_spotify()
