@@ -66,13 +66,6 @@ def refresh_access_token():
     except Exception as e:
         st.error(f"Failed to refresh token: {e}")
 
-# Initialize Spotify Client
-def initialize_spotify():
-    if "token_info" in st.session_state:
-        access_token = st.session_state["token_info"]["access_token"]
-        return spotipy.Spotify(auth=access_token)
-    return None
-
 # Fetch Spotify Data
 def fetch_spotify_data(sp_func, *args, **kwargs):
     try:
@@ -81,55 +74,9 @@ def fetch_spotify_data(sp_func, *args, **kwargs):
         st.error(f"Error fetching Spotify data: {e}")
         return None
 
-# Fetch Behavioral Data
-def fetch_behavioral_data(sp, week_type):
-    today = datetime.today().date()
-    if week_type == "current":
-        start_date = today - timedelta(days=today.weekday())
-    else:
-        start_date = today - timedelta(days=today.weekday() + 7)
-
-    recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
-    if recent_plays:
-        timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
-        track_names = [item["track"]["name"] for item in recent_plays["items"]]
-        artist_names = [item["track"]["artists"][0]["name"] for item in recent_plays["items"]]
-        df = pd.DataFrame({"played_at": timestamps, "track_name": track_names, "artist_name": artist_names})
-        df["date"] = df["played_at"].dt.date
-        df["hour"] = df["played_at"].dt.hour
-        df["weekday"] = df["played_at"].dt.weekday
-        return df[df["date"] >= start_date]
-    return pd.DataFrame()
-
-# Fetch Top Tracks and Artists
-def fetch_top_data(sp):
-    top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=5, time_range="short_term")
-    top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=5, time_range="short_term")
-    genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])] if top_artists else []
-    return top_tracks, top_artists, genres
-
-# Display Persona and Insights
-def display_persona_and_insights(behavior_data, streak, style, artists):
-    st.markdown(f"""
-        <div class="persona-box">
-            <div class="persona-card">
-                <div class="persona-title">🔥 Listening Streak</div>
-                <div class="persona-value">{streak} days</div>
-            </div>
-            <div class="persona-card">
-                <div class="persona-title">☀️🌙 Listening Style</div>
-                <div class="persona-value">{style}</div>
-            </div>
-            <div class="persona-card">
-                <div class="persona-title">🎨 Unique Artists</div>
-                <div class="persona-value">{artists}</div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-# Display Top Data
-def display_top_data(top_tracks, top_artists, genres):
-    st.subheader("Your Top Songs")
+# Display Top Songs and Artists
+def display_top_data(top_tracks, top_artists):
+    st.subheader("🎵 Your Top Songs")
     if top_tracks:
         for track in top_tracks["items"]:
             st.markdown(
@@ -145,7 +92,7 @@ def display_top_data(top_tracks, top_artists, genres):
                 unsafe_allow_html=True
             )
 
-    st.subheader("Your Top Artists")
+    st.subheader("🎤 Your Top Artists")
     if top_artists:
         for artist in top_artists["items"]:
             st.markdown(
@@ -160,11 +107,7 @@ def display_top_data(top_tracks, top_artists, genres):
                 unsafe_allow_html=True
             )
 
-    st.subheader("Your Top Genres")
-    if genres:
-        st.write(", ".join(genres[:5]))
-
-# Plot Listening Heatmap
+# Display Listening Heatmap
 def plot_listening_heatmap(behavior_data):
     if not behavior_data.empty:
         heatmap_data = behavior_data.groupby(["hour", "weekday"]).size().unstack(fill_value=0)
@@ -194,6 +137,7 @@ else:
         st.title("Liked Songs & Discover New")
         mood = st.selectbox("Choose a Mood:", ["Happy", "Calm", "Energetic", "Sad"])
         intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
+
         feature = st.radio("Explore:", ["Liked Songs", "Discover New Songs"])
 
         if feature == "Liked Songs":
@@ -232,15 +176,7 @@ else:
 
     elif page == "Insights & Behavior":
         st.title("Insights & Behavior")
-        week_type = "current" if datetime.today().weekday() > 2 else "last"
-        behavior_data = fetch_behavioral_data(sp, week_type)
-        top_tracks, top_artists, genres = fetch_top_data(sp)
+        top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=10, time_range="short_term")
+        top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=10, time_range="short_term")
 
-        display_persona_and_insights(
-            behavior_data,
-            streak=5,  # Example streak
-            style="Day Explorer",
-            artists=29  # Example unique artist count
-        )
-        display_top_data(top_tracks, top_artists, genres)
-        plot_listening_heatmap(behavior_data)
+        display_top_data(top_tracks, top_artists)
