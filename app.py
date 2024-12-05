@@ -135,6 +135,25 @@ def fetch_behavior_data(sp):
         return df
     return pd.DataFrame()
 
+# Display Insights
+def display_insights(data):
+    st.subheader("📈 Fun Insights")
+    unique_artists = data["artist_name"].nunique()
+    most_played_track = data["track_name"].value_counts().idxmax()
+    st.write(f"- You listened to **{unique_artists} unique artists** this week!")
+    st.write(f"- Your most-played track is **{most_played_track}**.")
+
+    # Chart: Play Count by Artist
+    artist_counts = data["artist_name"].value_counts().head(5)
+    fig, ax = plt.subplots(figsize=(10, 5))
+    artist_counts.plot(kind="bar", ax=ax)
+    ax.set_title("Top 5 Artists by Play Count", color="white")
+    ax.set_ylabel("Plays", color="white")
+    ax.set_xlabel("Artist", color="white")
+    ax.tick_params(colors="white")
+    ax.set_facecolor("black")
+    st.pyplot(fig)
+
 # Main App
 if "sp" not in st.session_state:
     st.title("Welcome to WVY - Spotify Insights 🌊")
@@ -195,3 +214,5 @@ else:
 
         display_top_data(top_tracks, top_artists, genres)
         plot_listening_heatmap(behavior_data)
+        if not behavior_data.empty:
+            display_insights(behavior_data)
