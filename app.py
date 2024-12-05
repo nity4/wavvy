@@ -75,7 +75,7 @@ def fetch_spotify_data(sp_func, *args, **kwargs):
         return None
 
 # Display Top Songs and Artists
-def display_top_data(top_tracks, top_artists):
+def display_top_data(top_tracks, top_artists, genres):
     st.subheader("🎵 Your Top Songs")
     if top_tracks:
         for track in top_tracks["items"]:
@@ -107,7 +107,11 @@ def display_top_data(top_tracks, top_artists):
                 unsafe_allow_html=True
             )
 
-# Display Listening Heatmap
+    st.subheader("🎧 Your Top Genres")
+    if genres:
+        st.write(", ".join(genres[:5]))
+
+# Listening Heatmap
 def plot_listening_heatmap(behavior_data):
     if not behavior_data.empty:
         heatmap_data = behavior_data.groupby(["hour", "weekday"]).size().unstack(fill_value=0)
@@ -122,7 +126,20 @@ def plot_listening_heatmap(behavior_data):
         plt.gcf().set_facecolor("black")
         st.pyplot(plt)
 
-# Main App Logic
+# Fetch Listening Data
+def fetch_behavior_data(sp):
+    recent_plays = fetch_spotify_data(sp.current_user_recently_played, limit=50)
+    if recent_plays:
+        timestamps = [datetime.strptime(item["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ") for item in recent_plays["items"]]
+        track_names = [item["track"]["name"] for item in recent_plays["items"]]
+        artist_names = [item["track"]["artists"][0]["name"] for item in recent_plays["items"]]
+        df = pd.DataFrame({"played_at": timestamps, "track_name": track_names, "artist_name": artist_names})
+        df["hour"] = df["played_at"].dt.hour
+        df["weekday"] = df["played_at"].dt.weekday
+        return df
+    return pd.DataFrame()
+
+# Main App
 if "token_info" not in st.session_state:
     st.title("Welcome to WVY - Spotify Insights 🌊")
     if st.button("Log in with Spotify"):
@@ -131,13 +148,12 @@ else:
     refresh_access_token()
     sp = st.session_state["sp"]
 
-    page = st.radio("Navigate to:", ["Liked Songs & Discover New", "Insights & Behavior"])
+    page = st.radio("Navigate to:", ["Discover New & Liked Songs", "Insights & Analytics"])
 
-    if page == "Liked Songs & Discover New":
-        st.title("Liked Songs & Discover New")
-        mood = st.selectbox("Choose a Mood:", ["Happy", "Calm", "Energetic", "Sad"])
-        intensity = st.slider("Select Intensity (1-5):", 1, 5, 3)
-
+    if page == "Discover New & Liked Songs":
+        st.title("🎧 Discover New & Liked Songs")
+        mood = st.selectbox("Choose a Mood:", ["Happy", "Energetic", "Calm", "Sad"])
+        intensity = st.slider("Intensity (1-5):", 1, 5, 3)
         feature = st.radio("Explore:", ["Liked Songs", "Discover New Songs"])
 
         if feature == "Liked Songs":
@@ -174,9 +190,12 @@ else:
                         unsafe_allow_html=True
                     )
 
-    elif page == "Insights & Behavior":
-        st.title("Insights & Behavior")
+    elif page == "Insights & Analytics":
+        st.title("📊 Insights & Analytics")
         top_tracks = fetch_spotify_data(sp.current_user_top_tracks, limit=10, time_range="short_term")
         top_artists = fetch_spotify_data(sp.current_user_top_artists, limit=10, time_range="short_term")
+        genres = [genre for artist in top_artists["items"] for genre in artist.get("genres", [])] if top_artists else []
+        behavior_data = fetch_behavior_data(sp)
 
-        display_top_data(top_tracks, top_artists)
+        display_top_data(top_tracks, top_artists, genres)
+        plot_listening_heatmap(behavior_data)
