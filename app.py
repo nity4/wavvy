@@ -4,155 +4,132 @@ from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from datetime import datetime
 
-# Spotify API Credentials
+# --- Spotify API Credentials ---
 CLIENT_ID = st.secrets["spotify"]["client_id"]
 CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 SCOPE = "user-library-read user-top-read playlist-read-private user-read-recently-played"
 
-# Streamlit Page Config
-st.set_page_config(page_title="Moodify 🎵", page_icon="🎵", layout="wide")
+# --- Streamlit Page Config ---
+st.set_page_config(page_title="MusoMood - Music Meets Mood", page_icon="🎼", layout="wide")
 
-# Custom CSS
+# --- Custom CSS ---
 st.markdown("""
     <style>
-        body {background: linear-gradient(to right, #1a1a1a, #1DB954); color: white;}
+        body {background: linear-gradient(to right, #1a1a1a, #1DB954);}
         .stApp {background: linear-gradient(to right, #1a1a1a, #1DB954);}
-        h1, h2, h3, p {color: white !important;}
-        .card {background-color: #333; padding: 15px; border-radius: 15px; margin: 10px; text-align: center;}
-        img {border-radius: 10px;}
+        h1, h2, h3, p {color: white;}
+        .card {background-color: #333; padding: 15px; border-radius: 10px; margin: 10px;}
     </style>
 """, unsafe_allow_html=True)
 
-# Authentication
+# --- Spotify Authentication ---
 def authenticate_spotify():
-    """
-    Authenticate user with Spotify and set up session.
-    """
-    auth_manager = SpotifyOAuth(client_id=CLIENT_ID,
-                                client_secret=CLIENT_SECRET,
-                                redirect_uri=REDIRECT_URI,
-                                scope=SCOPE)
-    st.session_state["sp"] = spotipy.Spotify(auth_manager=auth_manager)
+    if "sp" not in st.session_state:
+        auth_manager = SpotifyOAuth(client_id=CLIENT_ID, client_secret=CLIENT_SECRET,
+                                    redirect_uri=REDIRECT_URI, scope=SCOPE)
+        st.session_state["sp"] = spotipy.Spotify(auth_manager=auth_manager)
 
+# --- Fetch Data ---
 def fetch_liked_songs(sp):
-    """
-    Fetch user's liked songs and analyze their audio features.
-    """
     results = sp.current_user_saved_tracks(limit=50)
     songs = []
-    for item in results["items"]:
-        track = item["track"]
-        features = sp.audio_features(track["id"])[0]
+    for item in results['items']:
+        track = item['track']
+        features = sp.audio_features(track['id'])[0]
         songs.append({
-            "name": track["name"],
-            "artist": ", ".join(artist["name"] for artist in track["artists"]),
-            "image": track["album"]["images"][0]["url"],
-            "valence": features["valence"],
-            "energy": features["energy"]
+            "name": track['name'],
+            "artist": ", ".join(artist['name'] for artist in track['artists']),
+            "image": track['album']['images'][0]['url'],
+            "valence": features['valence'],
+            "energy": features['energy'],
+            "danceability": features['danceability']
         })
     return pd.DataFrame(songs)
 
-def filter_songs_by_mood(data, mood, intensity):
-    """
-    Filter songs based on mood and intensity.
-    """
-    conditions = {
-        "Happy": (data["valence"] > 0.6) & (data["energy"] >= intensity / 5),
-        "Calm": (data["valence"] < 0.5) & (data["energy"] <= intensity / 5),
-        "Energetic": (data["energy"] > 0.7),
-        "Sad": (data["valence"] < 0.3)
+def fetch_recently_played(sp):
+    results = sp.current_user_recently_played(limit=50)
+    songs = []
+    for item in results['items']:
+        track = item['track']
+        features = sp.audio_features(track['id'])[0]
+        songs.append({
+            "name": track['name'],
+            "artist": ", ".join(artist['name'] for artist in track['artists']),
+            "played_at": item['played_at'],
+            "valence": features['valence'],
+            "energy": features['energy'],
+            "danceability": features['danceability']
+        })
+    return pd.DataFrame(songs)
+
+# --- Mood Analysis ---
+def analyze_mood(data):
+    st.subheader("Mood Analysis")
+    mood_bins = {
+        "Happy": (data['valence'] > 0.6) & (data['energy'] > 0.6),
+        "Calm": (data['valence'] < 0.5) & (data['energy'] < 0.5),
+        "Energetic": (data['energy'] > 0.7),
+        "Sad": (data['valence'] < 0.3)
     }
-    return data[conditions.get(mood, pd.Series([True] * len(data)))]
+    data['mood'] = 'Neutral'
+    for mood, condition in mood_bins.items():
+        data.loc[condition, 'mood'] = mood
+    
+    mood_count = data['mood'].value_counts()
+    fig, ax = plt.subplots(figsize=(8, 5))
+    mood_count.plot(kind='bar', color=["#FFD700", "#FF4500", "#1E90FF", "#4B0082"], ax=ax)
+    plt.title("Mood Distribution of Your Songs", color="white")
+    plt.xticks(color="white")
+    plt.yticks(color="white")
+    st.pyplot(fig)
 
-def display_top_data(sp):
-    """
-    Display top tracks, artists, and genres with visuals.
-    """
-    st.subheader("🎤 Top Artists and Songs")
-    top_tracks = sp.current_user_top_tracks(limit=10)
-    top_artists = sp.current_user_top_artists(limit=5)
+    st.write(data.groupby('mood')[['valence', 'energy']].mean())
 
-    st.write("### 🎵 Top Tracks")
-    for track in top_tracks["items"]:
-        st.markdown(
-            f"""
-            <div class="card">
-                <img src="{track['album']['images'][0]['url']}" width="80" height="80">
-                <p><strong>{track['name']}</strong> by {track['artists'][0]['name']}</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
+# --- Scatter Plot ---
+def scatter_energy_valence(data):
+    st.subheader("Energy vs Valence")
+    fig, ax = plt.subplots(figsize=(8, 5))
+    sns.scatterplot(x='valence', y='energy', hue='mood', data=data, palette='deep', ax=ax)
+    plt.title("Energy vs Valence Analysis", color="white")
+    plt.xlabel("Valence (Happiness)", color="white")
+    plt.ylabel("Energy", color="white")
+    plt.xticks(color="white")
+    plt.yticks(color="white")
+    st.pyplot(fig)
 
-    st.write("### 🎤 Top Artists")
-    for artist in top_artists["items"]:
-        st.markdown(
-            f"""
-            <div class="card">
-                <img src="{artist['images'][0]['url']}" width="80" height="80">
-                <p><strong>{artist['name']}</strong></p>
-            </div>
-            """, unsafe_allow_html=True
-        )
+# --- Main App ---
+st.title("MusoMood")
+st.markdown("**Discover Your Music. Understand Your Mood.**")
 
-def plot_weekly_moods():
-    """
-    Weekly Mood Analysis Visualization.
-    """
-    data = pd.DataFrame({
-        "Day": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-        "Mood": [7, 6, 8, 5, 7, 9, 8]
-    })
-    plt.figure(figsize=(10, 5))
-    sns.lineplot(x="Day", y="Mood", data=data, marker="o", color="cyan")
-    plt.title("Weekly Mood Analysis", color="white")
-    plt.ylabel("Mood Intensity", color="white")
-    plt.xlabel("Day", color="white")
-    plt.gca().set_facecolor("black")
-    plt.gcf().set_facecolor("black")
-    st.pyplot(plt)
+authenticate_spotify()
+sp = st.session_state["sp"]
 
-# Main App Logic
-st.title("Moodify 🎵")
-st.subheader("Your Mood. Your Music.")
+page = st.sidebar.radio("Navigate to:", ["Liked Songs", "Recently Played", "Insights & Stats"])
 
-if "sp" not in st.session_state:
-    st.info("Please log in with Spotify to continue.")
-    if st.button("Log in with Spotify"):
-        authenticate_spotify()
-else:
-    sp = st.session_state["sp"]
-    page = st.sidebar.radio("Navigate to:", ["🎧 Discover Songs", "📊 Insights & Analytics"])
+if page == "Liked Songs":
+    st.subheader("Your Liked Songs")
+    with st.spinner("Fetching your liked songs..."):
+        liked_songs = fetch_liked_songs(sp)
+    st.write(liked_songs[['name', 'artist']])
+    analyze_mood(liked_songs)
+    scatter_energy_valence(liked_songs)
 
-    # Page 1 - Discover Songs
-    if page == "🎧 Discover Songs":
-        st.title("🎧 Discover Liked Songs")
-        mood = st.selectbox("Choose a Mood:", ["Happy", "Calm", "Energetic", "Sad"])
-        intensity = st.slider("Choose Intensity (1-5):", 1, 5, 3)
+elif page == "Recently Played":
+    st.subheader("Your Recently Played Songs")
+    with st.spinner("Fetching recently played songs..."):
+        recent_songs = fetch_recently_played(sp)
+    st.write(recent_songs[['name', 'artist', 'played_at']])
+    analyze_mood(recent_songs)
+    scatter_energy_valence(recent_songs)
 
-        with st.spinner("Fetching your liked songs..."):
-            liked_songs = fetch_liked_songs(sp)
-        if not liked_songs.empty:
-            filtered_songs = filter_songs_by_mood(liked_songs, mood, intensity)
-            for _, song in filtered_songs.iterrows():
-                st.markdown(
-                    f"""
-                    <div class="card">
-                        <img src="{song['image']}" width="80" height="80">
-                        <p><strong>{song['name']}</strong> by {song['artist']}</p>
-                        <p>Mood: {mood}</p>
-                    </div>
-                    """, unsafe_allow_html=True
-                )
-        else:
-            st.warning("No liked songs found!")
-
-    # Page 2 - Insights & Analytics
-    elif page == "📊 Insights & Analytics":
-        st.title("📊 Music Insights")
-        display_top_data(sp)
-        st.write("### 🧠 Weekly Mood Insights")
-        st.markdown("We analyzed your weekly listening trends and moods.")
-        plot_weekly_moods()
-        st.markdown("**Your music is vibrant and full of energy! Keep exploring. 🎨**")
+elif page == "Insights & Stats":
+    st.subheader("Insights & Analytics")
+    st.write("We analyze your listening patterns, moods, and habits.")
+    st.markdown("""
+    - **Your most energetic songs reflect your vibrant personality.**  
+    - **Calm songs suggest moments of peace and relaxation.**  
+    - **Listening habits describe you as a dynamic and exploratory listener.**  
+    """)
