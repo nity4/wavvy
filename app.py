@@ -11,34 +11,35 @@ SCOPE = "user-library-read user-top-read playlist-read-private user-read-recentl
 # --- Streamlit Page Config ---
 st.set_page_config(page_title="MusoMoodify 🎼", page_icon="🎼", layout="wide")
 
-# --- Custom CSS for Styling ---
+# --- Custom CSS ---
 st.markdown("""
     <style>
         body {
             background: linear-gradient(to right, black, #1DB954);
-            color: white;
             font-family: Arial, sans-serif;
         }
         .stApp {
             background: linear-gradient(to right, black, #1DB954);
         }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            height: 100vh;
+            padding-left: 50px;
+        }
         h1 {
             font-size: 4em;
-            text-align: center;
-            margin-top: 50px;
+            margin-bottom: 20px;
             color: white;
         }
         p {
-            text-align: center;
             font-size: 1.5em;
-            margin: 20px 0;
+            color: white;
+            margin-bottom: 30px;
         }
-        .login-button {
-            display: flex;
-            justify-content: center;
-            margin-top: 50px;
-        }
-        .login-button button {
+        .spotify-button {
             background-color: white;
             color: black;
             font-size: 1.2em;
@@ -47,7 +48,7 @@ st.markdown("""
             border-radius: 5px;
             cursor: pointer;
         }
-        .login-button button:hover {
+        .spotify-button:hover {
             background-color: #f1f1f1;
         }
     </style>
@@ -55,31 +56,38 @@ st.markdown("""
 
 # --- Spotify Authentication ---
 def authenticate_spotify():
-    """
-    Authenticate with Spotify and store the Spotify client in session state.
-    """
-    auth_manager = SpotifyOAuth(client_id=CLIENT_ID,
-                                client_secret=CLIENT_SECRET,
-                                redirect_uri=REDIRECT_URI,
-                                scope=SCOPE)
-    st.session_state["sp"] = spotipy.Spotify(auth_manager=auth_manager)
-    st.session_state["authenticated"] = True
+    try:
+        auth_manager = SpotifyOAuth(
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
+            redirect_uri=REDIRECT_URI,
+            scope=SCOPE
+        )
+        st.session_state["sp"] = spotipy.Spotify(auth_manager=auth_manager)
+        st.session_state["authenticated"] = True
+        st.experimental_rerun()
+    except Exception as e:
+        st.error(f"Spotify Authentication failed: {e}")
 
 # --- Main App ---
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
+# Landing Page
 if not st.session_state["authenticated"]:
-    # Landing Page
-    st.markdown("<h1>MusoMoodify</h1>", unsafe_allow_html=True)
-    st.markdown("<p>Discover your music and understand your mood. Explore your listening trends and connect with your favorite tracks on a deeper level.</p>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class="container">
+            <h1>MusoMoodify</h1>
+            <p>Discover your music and understand your mood. Explore your listening trends and connect with your favorite tracks on a deeper level.</p>
+            <button class="spotify-button" onclick="window.location.reload()">Log in with Spotify</button>
+        </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown('<div class="login-button"><button onclick="window.location.reload();">Log in with Spotify</button></div>', unsafe_allow_html=True)
-
-    if st.button("Log in with Spotify", key="login"):
+    # Log in with Spotify
+    if st.button("Log in with Spotify", key="login-button"):
         authenticate_spotify()
-        st.experimental_rerun()
+
 else:
-    # Redirect to the first page (currently blank)
+    # Redirect to First Page (currently blank)
     st.title("Welcome to MusoMoodify")
     st.write("This is the first page. Content will be added here later.")
