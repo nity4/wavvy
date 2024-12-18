@@ -1,5 +1,3 @@
-# File: moodify_streamlit.py
-
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -29,104 +27,128 @@ st.markdown("""
     body {background: linear-gradient(to right, #1a1a1a, #1DB954) !important; color: white;}
     .stApp {background: linear-gradient(to right, #1a1a1a, #1DB954) !important;}
     h1, h2, h3, p {color: white !important;}
+    .mood-card {border-radius: 10px; background-color: #444; padding: 10px; margin: 10px; text-align: center;}
     </style>
 """, unsafe_allow_html=True)
 
 # Spotify OAuth Helper Functions
-def login_with_spotify():
-    auth_manager = SpotifyOAuth(
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        redirect_uri=REDIRECT_URI,
-        scope=scope,
-        show_dialog=True
-    )
-    token = auth_manager.get_access_token()
-    st.session_state["sp"] = spotipy.Spotify(auth=token)
+def authenticate_spotify():
+    try:
+        auth_manager = SpotifyOAuth(
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
+            redirect_uri=REDIRECT_URI,
+            scope=scope,
+            show_dialog=True
+        )
+        token = auth_manager.get_access_token(as_dict=True)
+        st.session_state["sp"] = spotipy.Spotify(auth=token["access_token"])
+        st.success("Authentication successful!")
+    except Exception as e:
+        st.error(f"Authentication failed: {e}")
+        st.stop()
 
 def clear_session():
     if "sp" in st.session_state:
         del st.session_state["sp"]
-        st.success("Logged out successfully!")
+    st.success("Logged out successfully!")
 
-# Fetch Spotify Data
-def fetch_spotify_data(sp_func, *args, **kwargs):
-    try:
-        return sp_func(*args, **kwargs)
-    except Exception as e:
-        st.error(f"Error fetching Spotify data: {e}")
-        return None
+# Fetch Data
+def fetch_liked_songs(sp):
+    results = sp.current_user_saved_tracks(limit=50)
+    songs = []
+    for item in results['items']:
+        track = item['track']
+        features = sp.audio_features(track['id'])[0]
+        songs.append({
+            "name": track['name'],
+            "artist": ", ".join(artist['name'] for artist in track['artists']),
+            "mood": get_mood_from_features(features),
+            "image": track['album']['images'][0]['url'] if track['album']['images'] else None
+        })
+    return pd.DataFrame(songs)
 
-# Mood Analysis and Insights
-def display_mood_insights(data):
-    st.subheader("🎨 Mood Insights")
-    mood_colors = {
-        "Happy": "#FFD700",
-        "Energetic": "#FF4500",
-        "Calm": "#1E90FF",
-        "Sad": "#4B0082"
-    }
+def get_mood_from_features(features):
+    """
+    Analyze audio features and map to a mood.
+    """
+    if features:
+        if features['valence'] > 0.7 and features['energy'] > 0.6:
+            return "Happy"
+        elif features['energy'] > 0.7:
+            return "Energetic"
+        elif features['valence'] < 0.4:
+            return "Sad"
+        else:
+            return "Calm"
+    return "Unknown"
 
-    # Example Insights
-    st.markdown(f"**Mood of the Week:**")
-    st.markdown(f"- You mostly felt **Calm** this week (45%). 🌊")
-    st.markdown(f"- Your top genre for the week is **Chillstep**. 🎶")
-    st.markdown(f"- Moods mapped to food colors: Chocolate 🍫 for Sad mood.")
-
-# Visualization of Moods
-def plot_mood_chart(data):
-    mood_counts = data["mood"].value_counts()
-    plt.figure(figsize=(8, 6))
-    mood_counts.plot(kind="bar", color=["#FFD700", "#FF4500", "#1E90FF", "#4B0082"])
-    plt.title("Mood Distribution Over the Week", color="white")
-    plt.xlabel("Mood", color="white")
-    plt.ylabel("Count", color="white")
-    plt.xticks(color="white")
-    plt.yticks(color="white")
+# Visualize Insights
+def plot_mood_pie_chart(data):
+    mood_counts = data['mood'].value_counts()
+    plt.figure(figsize=(8, 8))
+    plt.pie(mood_counts, labels=mood_counts.index, autopct="%1.1f%%", startangle=140, colors=["#FFD700", "#FF4500", "#1E90FF", "#4B0082"])
+    plt.title("Distribution of Moods in Liked Songs", color="white")
     plt.gca().set_facecolor("black")
-    plt.gcf().set_facecolor("black")
     st.pyplot(plt)
 
+def display_mood_insights(data):
+    st.subheader("🎨 Mood Insights")
+    mood_summary = data['mood'].value_counts()
+    st.write("Here's a breakdown of your liked songs by mood:")
+    for mood, count in mood_summary.items():
+        st.markdown(f"- **{mood}:** {count} songs")
+
+    # Visualize as a pie chart
+    plot_mood_pie_chart(data)
+
 # Main App Logic
+st.title("Moodify 🎵")
+st.subheader("Your Mood. Your Music.")
+st.markdown("Discover insights about your music and mood.")
+
+# Authentication
 if "sp" not in st.session_state:
-    st.title("Moodify 🎵")
-    st.subheader("Your Mood. Your Music.")
-    st.markdown("Discover insights about your music and mood.")
+    st.info("Log in to access your Spotify account.")
     if st.button("Log in with Spotify"):
-        login_with_spotify()
+        authenticate_spotify()
 else:
     sp = st.session_state["sp"]
     st.sidebar.button("Logout", on_click=clear_session)
-    page = st.sidebar.radio("Navigate to:", ["Discover Music", "Mood Insights"])
 
-    if page == "Discover Music":
-        st.title("🎧 Discover New & Liked Songs")
-        mood = st.selectbox("Choose a Mood:", ["Happy", "Energetic", "Calm", "Sad"])
-        feature = st.radio("Explore:", ["Liked Songs", "Discover New Songs"])
+    # Navigation
+    page = st.sidebar.radio("Navigate to:", ["🎧 Discover Liked Songs", "📊 Mood Insights"])
 
-        if feature == "Liked Songs":
-            liked_songs = fetch_spotify_data(sp.current_user_saved_tracks, limit=50)
-            if liked_songs:
-                for item in liked_songs["items"]:
-                    st.markdown(
-                        f"""
-                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                            <img src="{item['track']['album']['images'][0]['url']}" alt="Cover" style="width: 80px; height: 80px; border-radius: 10px;">
-                            <div>
-                                <p><strong>{item['track']['name']}</strong></p>
-                                <p>by {', '.join(artist['name'] for artist in item['track']['artists'])}</p>
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+    # Discover Liked Songs - Page 1
+    if page == "🎧 Discover Liked Songs":
+        st.title("🎧 Discover Liked Songs Filtered by Mood")
+        mood_filter = st.selectbox("Filter songs by mood:", ["All", "Happy", "Energetic", "Calm", "Sad"])
+        
+        with st.spinner("Fetching your liked songs..."):
+            liked_songs = fetch_liked_songs(sp)
 
-    elif page == "Mood Insights":
-        st.title("📊 Mood Insights")
-        # Example behavior data simulation
-        behavior_data = pd.DataFrame({
-            "mood": ["Happy", "Sad", "Calm", "Energetic", "Happy"],
-            "count": [10, 7, 15, 5, 13]
-        })
-        display_mood_insights(behavior_data)
-        plot_mood_chart(behavior_data)
+        if not liked_songs.empty:
+            filtered_songs = liked_songs if mood_filter == "All" else liked_songs[liked_songs["mood"] == mood_filter]
+            for _, song in filtered_songs.iterrows():
+                st.markdown(
+                    f"""
+                    <div class="mood-card">
+                        <img src="{song['image']}" width="80" height="80" style="border-radius: 10px; margin-bottom: 10px;">
+                        <p><strong>{song['name']}</strong> by {song['artist']}</p>
+                        <p>Mood: {song['mood']}</p>
+                    </div>
+                    """, unsafe_allow_html=True
+                )
+        else:
+            st.warning("No liked songs found. Please add songs to your Spotify library!")
+
+    # Mood Insights - Page 2
+    elif page == "📊 Mood Insights":
+        st.title("📊 Mood Insights and Visuals")
+        with st.spinner("Analyzing your liked songs..."):
+            liked_songs = fetch_liked_songs(sp)
+
+        if not liked_songs.empty:
+            display_mood_insights(liked_songs)
+        else:
+            st.warning("No liked songs found for mood insights. Please add songs to your Spotify library!")
