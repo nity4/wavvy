@@ -7,16 +7,50 @@ import pandas as pd
 CLIENT_ID = st.secrets["spotify"]["client_id"]
 CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
-SCOPE = "user-library-read playlist-modify-private user-top-read"
+SCOPE = "user-library-read playlist-modify-private user-read-recently-played"
 
 # --- Streamlit Page Config ---
 st.set_page_config(page_title="MusoMoodify 🎼", page_icon="🎼", layout="wide")
 
+# --- Custom CSS for Background and Text Styling ---
+st.markdown("""
+    <style>
+        body, .stApp {
+            background: linear-gradient(to right, black, #1DB954);
+            color: white;
+        }
+        .header-container {
+            margin-top: 20px;
+            padding-left: 20px;
+        }
+        h1 {
+            font-size: 4em;
+            margin-bottom: 10px;
+            color: white;
+        }
+        p {
+            font-size: 1.3em;
+            margin-bottom: 30px;
+            color: white;
+        }
+        .spotify-button {
+            background-color: white;
+            color: black;
+            font-size: 1.1em;
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .spotify-button:hover {
+            background-color: #f1f1f1;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- Spotify Authentication ---
 def authenticate_spotify():
-    """
-    Authenticate with Spotify and store the Spotify client in session state.
-    """
     if "sp" not in st.session_state:
         auth_manager = SpotifyOAuth(
             client_id=CLIENT_ID,
@@ -27,92 +61,54 @@ def authenticate_spotify():
         st.session_state["sp"] = spotipy.Spotify(auth_manager=auth_manager)
         st.session_state["authenticated"] = True
 
-# --- Fetch Liked Songs ---
+# --- Fetch Liked Songs with Error Handling ---
 def fetch_liked_songs(sp):
-    """
-    Fetch user's liked songs and analyze audio features.
-    """
-    results = sp.current_user_saved_tracks(limit=50)
-    songs = []
-    for item in results["items"]:
-        track = item["track"]
-        features = sp.audio_features(track["id"])[0]
-        songs.append({
-            "name": track["name"],
-            "artist": ", ".join(artist["name"] for artist in track["artists"]),
-            "id": track["id"],
-            "image": track["album"]["images"][0]["url"],
-            "valence": features["valence"],
-            "energy": features["energy"],
-        })
-    return pd.DataFrame(songs)
-
-# --- Filter Songs by Mood and Intensity ---
-def filter_songs(data, mood, intensity):
-    """
-    Filter liked songs based on mood and intensity.
-    """
-    mood_conditions = {
-        "Happy": (data["valence"] > 0.6) & (data["energy"] > 0.6),
-        "Chill": (data["valence"] > 0.6) & (data["energy"] < 0.5),
-        "Energetic": (data["valence"] < 0.5) & (data["energy"] > 0.6),
-        "Melancholic": (data["valence"] < 0.5) & (data["energy"] < 0.5)
-    }
-    filtered = data[mood_conditions[mood] & (data["energy"] >= intensity / 10)]
-    return filtered
-
-# --- Create Playlist ---
-def create_playlist(sp, name, track_ids):
-    """
-    Create a new Spotify playlist and add selected songs to it.
-    """
-    user_id = sp.me()["id"]
-    playlist = sp.user_playlist_create(user_id, name, public=False, description="MusoMoodify - Mood Based Playlist")
-    sp.playlist_add_items(playlist["id"], track_ids)
-    return playlist["external_urls"]["spotify"]
+    try:
+        with st.spinner("Fetching your liked songs..."):
+            results = sp.current_user_saved_tracks(limit=50)
+            songs = []
+            for item in results["items"]:
+                track = item["track"]
+                features = sp.audio_features(track["id"])[0]
+                songs.append({
+                    "name": track["name"],
+                    "artist": ", ".join(artist["name"] for artist in track["artists"]),
+                    "id": track["id"],
+                    "image": track["album"]["images"][0]["url"],
+                    "valence": features["valence"],
+                    "energy": features["energy"]
+                })
+            return pd.DataFrame(songs)
+    except Exception as e:
+        st.error(f"Error fetching songs: {e}")
+        return pd.DataFrame()
 
 # --- Main App Logic ---
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+
 authenticate_spotify()
-sp = st.session_state["sp"]
 
-st.title("Page 1: Liked Songs with Mood and Intensity Filters 🎼")
+# Landing Page
+if not st.session_state["authenticated"]:
+    st.markdown("""
+        <div class="header-container">
+            <h1>MusoMoodify</h1>
+            <p>Discover your music and understand your mood. Explore your listening trends and connect with your favorite tracks on a deeper level.</p>
+        </div>
+    """, unsafe_allow_html=True)
 
-# --- Fetch Liked Songs ---
-st.write("Fetching your liked songs...")
-liked_songs = fetch_liked_songs(sp)
-
-# --- Mood and Intensity Filters ---
-st.sidebar.header("Filter Your Songs 🎚️")
-selected_mood = st.sidebar.selectbox("Select a Mood:", ["Happy", "Chill", "Energetic", "Melancholic"])
-selected_intensity = st.sidebar.slider("Select Intensity (1-10):", 1, 10, 5)
-
-# --- Filter Songs ---
-filtered_songs = filter_songs(liked_songs, selected_mood, selected_intensity)
-
-# --- Display Filtered Songs ---
-st.subheader(f"Songs Matching Mood: {selected_mood} with Intensity: {selected_intensity}")
-if not filtered_songs.empty:
-    for _, song in filtered_songs.iterrows():
-        st.markdown(
-            f"""
-            <div style="display: flex; align-items: center; margin-bottom: 10px; color: white;">
-                <img src="{song['image']}" width="80" height="80" style="border-radius: 10px; margin-right: 15px;">
-                <div>
-                    <p style="margin: 0;"><strong>{song['name']}</strong> by {song['artist']}</p>
-                    <p style="margin: 0;">Valence: {song['valence']:.2f} | Energy: {song['energy']:.2f}</p>
-                </div>
-            </div>
-            """, unsafe_allow_html=True
-        )
+    if st.button("Log in with Spotify", help="Authenticate with Spotify"):
+        authenticate_spotify()
 else:
-    st.warning("No songs found matching the selected mood and intensity.")
+    # Page 1: Liked Songs with Mood and Intensity Filters
+    st.title("Page 1: Liked Songs with Mood and Intensity Filters 🎼")
 
-# --- Dynamic Playlist Creation ---
-if not filtered_songs.empty:
-    st.subheader("🎶 Save Your Filtered Songs as a Playlist")
-    playlist_name = st.text_input("Enter a name for your playlist:", f"{selected_mood} Vibes")
-    if st.button("Create Playlist"):
-        track_ids = filtered_songs["id"].tolist()
-        playlist_url = create_playlist(sp, playlist_name, track_ids)
-        st.success(f"Playlist '{playlist_name}' created successfully!")
-        st.markdown(f"[Open Playlist in Spotify]({playlist_url})")
+    sp = st.session_state["sp"]
+    liked_songs = fetch_liked_songs(sp)
+
+    if not liked_songs.empty:
+        st.write("Here are your liked songs:")
+        st.dataframe(liked_songs[["name", "artist", "valence", "energy"]])
+    else:
+        st.warning("No songs found. Please try again later.")
