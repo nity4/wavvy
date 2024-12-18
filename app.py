@@ -13,6 +13,51 @@ SCOPE = "user-library-read"  # Scope for liked songs
 # --- Streamlit Page Configuration ---
 st.set_page_config(page_title="MusoMoodify 🎼", page_icon="🎼", layout="wide")
 
+# --- Custom CSS for Background and Visuals ---
+st.markdown(
+    """
+    <style>
+        body, .stApp {
+            background: linear-gradient(to bottom right, black, #1DB954);
+            color: white;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: white;
+            text-align: center;
+        }
+        .stButton > button {
+            background-color: #1DB954;
+            color: black;
+            font-size: 1em;
+            font-weight: bold;
+            border-radius: 10px;
+            padding: 10px 20px;
+            border: none;
+        }
+        .stButton > button:hover {
+            background-color: #1ed760;
+            color: black;
+        }
+        .stTextInput > div > div > input {
+            background-color: #222222;
+            color: white;
+            border-radius: 5px;
+            border: 1px solid #1DB954;
+        }
+        a {
+            color: #1DB954;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        a:hover {
+            color: #1ed760;
+            text-decoration: underline;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # --- Authenticate with Spotify ---
 def get_auth_url():
     """Generate Spotify OAuth URL."""
@@ -36,8 +81,8 @@ def fetch_spotify_token(code):
 
 # --- Main Streamlit App ---
 def main():
-    st.markdown("<h1 style='text-align: center;'>🎼 MusoMoodify 🎼</h1>", unsafe_allow_html=True)
-    st.write("Welcome! Log in with Spotify to explore your liked songs.")
+    st.markdown("<h1>🎼 MusoMoodify 🎼</h1>", unsafe_allow_html=True)
+    st.markdown("<h3>Your Spotify Liked Songs Mood Analyzer</h3>", unsafe_allow_html=True)
 
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
@@ -49,9 +94,7 @@ def main():
         auth_url = get_auth_url()
 
         # Manually display the link and open it in a browser
-        st.write("Click the link below to log in with Spotify:")
-        st.markdown(f"[Login to Spotify]({auth_url})", unsafe_allow_html=True)
-
+        st.markdown(f"Click here to log in: [Login to Spotify]({auth_url})", unsafe_allow_html=True)
         if st.button("Open Spotify Login Page"):
             webbrowser.open(auth_url)
 
@@ -65,17 +108,17 @@ def main():
                 if token_info:
                     st.session_state["sp"] = spotipy.Spotify(auth=token_info["access_token"])
                     st.session_state["authenticated"] = True
-                    st.success("Successfully connected to Spotify! 🎉")
+                    st.success("✅ Successfully connected to Spotify!")
             except Exception as e:
                 st.error(f"Authentication failed: {e}")
 
     # Step 3: Fetch Liked Songs if Authenticated
     if st.session_state["authenticated"]:
         sp = st.session_state["sp"]
-        st.success("✅ Connected to Spotify! Fetching liked songs...")
+        st.success("🎶 Connected to Spotify! Fetching liked songs...")
 
         try:
-            with st.spinner("🎶 Fetching your liked songs..."):
+            with st.spinner("🎵 Fetching your liked songs..."):
                 results = sp.current_user_saved_tracks(limit=50)
                 songs = [
                     {
@@ -85,6 +128,7 @@ def main():
                     for item in results["items"]
                 ]
                 if songs:
+                    st.success("🎉 Here are your liked songs:")
                     st.dataframe(pd.DataFrame(songs))
                 else:
                     st.warning("No liked songs found!")
