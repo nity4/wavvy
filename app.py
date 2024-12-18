@@ -4,7 +4,7 @@ from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import time
 
-# --- Spotify API Credentials (Using Streamlit Secrets) ---
+# --- Spotify API Credentials ---
 CLIENT_ID = st.secrets["spotify"]["client_id"]
 CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
@@ -15,7 +15,7 @@ st.set_page_config(page_title="MusoMoodify 🎼", page_icon="🎼", layout="wide
 
 # --- Spotify Authentication ---
 def authenticate_spotify():
-    """Authenticate and initialize Spotify client."""
+    """Authenticate Spotify and initialize the client."""
     try:
         auth_manager = SpotifyOAuth(
             client_id=CLIENT_ID,
@@ -28,20 +28,27 @@ def authenticate_spotify():
         st.session_state["authenticated"] = True
         st.success("Successfully connected to Spotify! 🎉")
     except Exception as e:
-        st.error(f"Authentication Error: {e}")
+        st.error(f"Error during authentication: {e}")
+        st.stop()
 
-# --- Fetch Liked Songs with Retry Logic ---
-def fetch_liked_songs(sp):
-    """Fetch liked songs and their audio features."""
+# --- Fetch Liked Songs with Timeout Handling ---
+def fetch_liked_songs(sp, timeout=10):
+    """Fetch user's liked songs with error handling and timeout."""
+    start_time = time.time()
+    songs = []
+
     try:
         with st.spinner("Fetching your liked songs... 🎶"):
             results = sp.current_user_saved_tracks(limit=50)
-            songs = []
-
             for item in results["items"]:
+                if time.time() - start_time > timeout:  # Timeout check
+                    st.error("Fetching songs timed out. Please try again later.")
+                    return pd.DataFrame()
+
                 track = item["track"]
                 features = sp.audio_features(track["id"])
-                if features and features[0]:  # Ensure features are not None
+                
+                if features and features[0]:  # Ensure features are valid
                     songs.append({
                         "Name": track["name"],
                         "Artist": ", ".join([artist["name"] for artist in track["artists"]]),
@@ -49,11 +56,15 @@ def fetch_liked_songs(sp):
                         "Energy": features[0]["energy"],
                         "ID": track["id"]
                     })
-                time.sleep(0.1)  # Prevent hitting API rate limits
+                else:
+                    st.warning(f"Skipping track: {track['name']} (no audio features)")
 
-            return pd.DataFrame(songs)
+                time.sleep(0.1)  # Avoid hitting Spotify API rate limits
+
+        return pd.DataFrame(songs)
+
     except Exception as e:
-        st.error(f"Error fetching songs: {e}")
+        st.error(f"Error fetching liked songs: {e}")
         return pd.DataFrame()
 
 # --- Main Streamlit App Logic ---
@@ -63,25 +74,23 @@ def main():
         unsafe_allow_html=True
     )
 
-    # Initialize authentication state
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
 
-    # Authenticate Spotify
     if not st.session_state["authenticated"]:
         st.warning("Please log in with Spotify to continue.")
-        if st.button("Log in with Spotify", help="Authenticate with your Spotify account"):
+        if st.button("Log in with Spotify", help="Authenticate with Spotify"):
             authenticate_spotify()
     else:
-        # Display the liked songs
         sp = st.session_state["sp"]
+        st.info("Fetching your liked songs from Spotify...")
         liked_songs_df = fetch_liked_songs(sp)
 
         if not liked_songs_df.empty:
-            st.success("Here are your liked songs with mood and intensity data:")
+            st.success("Here are your liked songs with mood and intensity:")
             st.dataframe(liked_songs_df)
         else:
-            st.warning("No liked songs found. Add some songs to your library!")
+            st.warning("No songs found or failed to fetch songs. Try again later.")
 
 # --- Custom CSS ---
 st.markdown("""
@@ -101,6 +110,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Run the main app
+# --- Run Main App ---
 if __name__ == "__main__":
     main()
