@@ -47,15 +47,19 @@ st.markdown("""
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            transition: background-color 0.3s ease;
         }
         .spotify-button:hover {
-            background-color: #f1f1f1;
+            background-color: #e6e6e6;
         }
     </style>
 """, unsafe_allow_html=True)
 
 # --- Spotify Authentication ---
 def authenticate_spotify():
+    """
+    Handles Spotify OAuth flow and stores the Spotify client.
+    """
     try:
         auth_manager = SpotifyOAuth(
             client_id=CLIENT_ID,
@@ -65,16 +69,16 @@ def authenticate_spotify():
         )
         st.session_state["sp"] = spotipy.Spotify(auth_manager=auth_manager)
         st.session_state["authenticated"] = True
-        st.experimental_rerun()
+        st.experimental_rerun()  # Reload the app to proceed
     except Exception as e:
         st.error(f"Spotify Authentication failed: {e}")
 
-# --- Main App ---
+# --- Main App Logic ---
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
-# Landing Page
 if not st.session_state["authenticated"]:
+    # Landing Page
     st.markdown("""
         <div class="container">
             <h1>MusoMoodify</h1>
@@ -83,11 +87,11 @@ if not st.session_state["authenticated"]:
         </div>
     """, unsafe_allow_html=True)
 
-    # Log in with Spotify
-    if st.button("Log in with Spotify", key="login-button"):
+    if st.button("Log in with Spotify"):
         authenticate_spotify()
 
 else:
-    # Redirect to First Page (currently blank)
-    st.title("Welcome to MusoMoodify")
-    st.write("This is the first page. Content will be added here later.")
+    # First Page (Post-Authentication)
+    st.title("Welcome to MusoMoodify 🎶")
+    st.write("You are successfully authenticated with Spotify!")
+    st.write("This is the first page where we’ll implement mood-based song filtering.")
