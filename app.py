@@ -21,17 +21,13 @@ st.markdown("""
         .stApp {
             background: linear-gradient(to right, black, #1DB954);
         }
-        .container {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            justify-content: center;
-            height: 100vh;
-            padding-left: 50px;
+        .header-container {
+            margin-top: 50px;
+            padding-left: 30px;
         }
         h1 {
             font-size: 4em;
-            margin-bottom: 20px;
+            margin: 0;
             color: white;
         }
         p {
@@ -69,7 +65,6 @@ def authenticate_spotify():
         )
         st.session_state["sp"] = spotipy.Spotify(auth_manager=auth_manager)
         st.session_state["authenticated"] = True
-        st.experimental_rerun()  # Reload the app to proceed
     except Exception as e:
         st.error(f"Spotify Authentication failed: {e}")
 
@@ -77,17 +72,16 @@ def authenticate_spotify():
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
+# Landing Page
 if not st.session_state["authenticated"]:
-    # Landing Page
     st.markdown("""
-        <div class="container">
+        <div class="header-container">
             <h1>MusoMoodify</h1>
             <p>Discover your music and understand your mood. Explore your listening trends and connect with your favorite tracks on a deeper level.</p>
-            <button class="spotify-button" onclick="window.location.reload()">Log in with Spotify</button>
         </div>
     """, unsafe_allow_html=True)
 
-    if st.button("Log in with Spotify"):
+    if st.button("Log in with Spotify", key="login-button", help="Authenticate with Spotify"):
         authenticate_spotify()
 
 else:
