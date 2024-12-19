@@ -78,12 +78,12 @@ st.markdown("<div class='header-title'>\u3030 Wvvy</div>", unsafe_allow_html=Tru
 
 # Authentication Functions
 def is_authenticated():
-    return 'token_info' in st.session_state and st.session_state['token_info'] is not None
+    return "token_info" in st.session_state and st.session_state["token_info"] is not None
 
 def refresh_token():
-    if 'token_info' in st.session_state and sp_oauth.is_token_expired(st.session_state['token_info']):
-        token_info = sp_oauth.refresh_access_token(st.session_state['token_info']['refresh_token'])
-        st.session_state['token_info'] = token_info
+    if "token_info" in st.session_state and sp_oauth.is_token_expired(st.session_state["token_info"]):
+        token_info = sp_oauth.refresh_access_token(st.session_state["token_info"]["refresh_token"])
+        st.session_state["token_info"] = token_info
 
 def authenticate_user():
     query_params = st.experimental_get_query_params()
@@ -92,7 +92,7 @@ def authenticate_user():
         code = query_params["code"][0]
         try:
             token_info = sp_oauth.get_access_token(code)
-            st.session_state['token_info'] = token_info
+            st.session_state["token_info"] = token_info
             st.experimental_set_query_params(**{})
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
@@ -112,23 +112,27 @@ def get_liked_songs(_sp):
     try:
         results = _sp.current_user_saved_tracks(limit=50)
         liked_songs = []
-        for item in results['items']:
-            track = item['track']
-            try:
-                audio_features = _sp.audio_features([track['id']])[0]
-                if audio_features:  # Ensure audio features are valid
+        track_ids = []
+
+        for item in results["items"]:
+            track_ids.append(item["track"]["id"])
+
+        # Fetch audio features in batches of 50
+        for i in range(0, len(track_ids), 50):
+            batch_ids = track_ids[i:i + 50]
+            audio_features_batch = _sp.audio_features(batch_ids)
+            for features, track in zip(audio_features_batch, results["items"][i:i + 50]):
+                if features:
                     liked_songs.append({
-                        "name": track['name'],
-                        "artist": track['artists'][0]['name'],
-                        "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
-                        "energy": audio_features.get("energy", 0),
-                        "valence": audio_features.get("valence", 0),
-                        "tempo": audio_features.get("tempo", 0)
+                        "name": track["track"]["name"],
+                        "artist": track["track"]["artists"][0]["name"],
+                        "cover": track["track"]["album"]["images"][0]["url"] if track["track"]["album"]["images"] else None,
+                        "energy": features.get("energy", 0),
+                        "valence": features.get("valence", 0),
+                        "tempo": features.get("tempo", 0),
                     })
                 else:
-                    st.warning(f"No audio features available for track: {track['name']}")
-            except spotipy.exceptions.SpotifyException as e:
-                st.error(f"Error retrieving audio features for {track['name']}: {e}")
+                    st.warning(f"No audio features available for track: {track['track']['name']}")
         return liked_songs
     except spotipy.exceptions.SpotifyException as e:
         st.error(f"Spotify API error: {e}")
@@ -149,7 +153,7 @@ def filter_songs(songs, mood, intensity):
         song for song in songs
         if mood_filter["valence"][0] <= song["valence"] <= mood_filter["valence"][1]
         and mood_filter["tempo"][0] <= song["tempo"] <= mood_filter["tempo"][1]
-        and song['energy'] >= (intensity / 5)
+        and song["energy"] >= (intensity / 5)
     ]
 
 # Display songs
@@ -171,7 +175,7 @@ def display_songs(song_list, title):
 # Display mood insights
 def mood_insights(_sp):
     st.write("## Mood Insights & Therapy Overview")
-    
+
     mood_breakdown = {
         "Happy": 40,
         "Chill": 30,
@@ -183,7 +187,7 @@ def mood_insights(_sp):
         st.write(f"{mood}: {percentage}%")
 
     st.write("#### Mood of the Week")
-    st.write("Happy")  # Example
+    st.write("Happy")
     st.write("Contributed by Artist X, Artist Y")
 
     st.write("### Fun Insights")
@@ -203,7 +207,7 @@ def mood_insights(_sp):
 if is_authenticated():
     try:
         refresh_token()
-        sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
+        sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
 
         tab1, tab2 = st.tabs(["Filter Liked Songs", "Mood Insights"])
 
