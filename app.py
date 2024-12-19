@@ -2,7 +2,6 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
-import webbrowser
 
 # --- Spotify API Credentials ---
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -21,7 +20,7 @@ st.markdown(
             background: linear-gradient(to bottom right, black, #1DB954);
             color: white;
         }
-        h1, h2, h3, h4, h5, h6 {
+        h1, h2, h3 {
             color: white;
             text-align: center;
         }
@@ -31,12 +30,9 @@ st.markdown(
             font-size: 1em;
             font-weight: bold;
             border-radius: 10px;
-            padding: 10px 20px;
-            border: none;
         }
         .stButton > button:hover {
             background-color: #1ed760;
-            color: black;
         }
         .stTextInput > div > div > input {
             background-color: #222222;
@@ -44,78 +40,36 @@ st.markdown(
             border-radius: 5px;
             border: 1px solid #1DB954;
         }
-        a {
-            color: #1DB954;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        a:hover {
-            color: #1ed760;
-            text-decoration: underline;
-        }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-# --- Authenticate with Spotify ---
-def get_auth_url():
-    """Generate Spotify OAuth URL."""
+# --- Spotify Authentication ---
+def authenticate_spotify():
+    """Authenticate Spotify and return Spotipy client."""
     auth_manager = SpotifyOAuth(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
-        scope=SCOPE
+        scope=SCOPE,
     )
-    return auth_manager.get_authorize_url()
+    sp = spotipy.Spotify(auth_manager=auth_manager)
+    return sp
 
-def fetch_spotify_token(code):
-    """Fetch access token using authorization code."""
-    auth_manager = SpotifyOAuth(
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        redirect_uri=REDIRECT_URI,
-        scope=SCOPE
-    )
-    return auth_manager.get_access_token(code)
-
-# --- Main Streamlit App ---
+# --- Main App ---
 def main():
     st.markdown("<h1>🎼 MusoMoodify 🎼</h1>", unsafe_allow_html=True)
     st.markdown("<h3>Your Spotify Liked Songs Mood Analyzer</h3>", unsafe_allow_html=True)
 
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
-        st.session_state["auth_code"] = None
+    if "sp" not in st.session_state:
+        st.session_state["sp"] = authenticate_spotify()
+        st.session_state["authenticated"] = True
 
-    # Step 1: Provide Spotify Authentication URL
-    if not st.session_state["authenticated"]:
-        st.warning("Please authenticate with Spotify to continue.")
-        auth_url = get_auth_url()
-
-        # Manually display the link and open it in a browser
-        st.markdown(f"Click here to log in: [Login to Spotify]({auth_url})", unsafe_allow_html=True)
-        if st.button("Open Spotify Login Page"):
-            webbrowser.open(auth_url)
-
-        # Step 2: Input authorization code
-        st.info("After logging in, Spotify will provide a code in the URL. Copy and paste it below.")
-        code_input = st.text_input("Enter the code from the Spotify URL:", "")
-
-        if code_input:
-            try:
-                token_info = fetch_spotify_token(code_input)
-                if token_info:
-                    st.session_state["sp"] = spotipy.Spotify(auth=token_info["access_token"])
-                    st.session_state["authenticated"] = True
-                    st.success("✅ Successfully connected to Spotify!")
-            except Exception as e:
-                st.error(f"Authentication failed: {e}")
-
-    # Step 3: Fetch Liked Songs if Authenticated
+    # Step 2: Fetch Liked Songs
     if st.session_state["authenticated"]:
         sp = st.session_state["sp"]
-        st.success("🎶 Connected to Spotify! Fetching liked songs...")
+        st.success("🎶 Connected to Spotify! Fetching your liked songs...")
 
         try:
             with st.spinner("🎵 Fetching your liked songs..."):
@@ -123,13 +77,63 @@ def main():
                 songs = [
                     {
                         "Name": item["track"]["name"],
-                        "Artist": ", ".join([artist["name"] for artist in item["track"]["artists"]])
+                        "Artist": ", ".join([artist["name"] for artist in item["track"]["artists"]]),
+                        "Valence": item["track"]["valence"] if "valence" in item["track"] else None,
+                        "Energy": item["track"]["energy"] if "energy" in item["track"] else None,
                     }
                     for item in results["items"]
                 ]
-                if songs:
+                songs_df = pd.DataFrame(songs)
+
+                if not songs_df.empty:
                     st.success("🎉 Here are your liked songs:")
-                    st.dataframe(pd.DataFrame(songs))
+                    st.dataframe(songs_df)
+
+                    # Step 3: Mood and Intensity Filtering
+                    st.markdown("<h3>Filter Songs by Mood</h3>", unsafe_allow_html=True)
+                    mood = st.selectbox(
+                        "Select a mood:",
+                        ["Happy", "Chill", "Energetic", "Melancholic"]
+                    )
+                    energy_range = st.slider(
+                        "Select energy level:",
+                        min_value=0.0, max_value=1.0, value=(0.0, 1.0), step=0.1
+                    )
+
+                    # Filtering songs based on mood and energy
+                    mood_mapping = {
+                        "Happy": lambda row: row["Valence"] > 0.5 and row["Energy"] > 0.5,
+                        "Chill": lambda row: row["Valence"] > 0.5 and row["Energy"] <= 0.5,
+                        "Energetic": lambda row: row["Valence"] <= 0.5 and row["Energy"] > 0.5,
+                        "Melancholic": lambda row: row["Valence"] <= 0.5 and row["Energy"] <= 0.5,
+                    }
+
+                    filtered_songs = songs_df[
+                        songs_df.apply(mood_mapping[mood], axis=1) &
+                        (songs_df["Energy"] >= energy_range[0]) &
+                        (songs_df["Energy"] <= energy_range[1])
+                    ]
+
+                    if not filtered_songs.empty:
+                        st.markdown("### Filtered Songs")
+                        st.dataframe(filtered_songs)
+                    else:
+                        st.warning("No songs match your selected criteria.")
+
+                    # Save playlist (if supported)
+                    if st.button("Save Filtered Playlist"):
+                        try:
+                            track_ids = filtered_songs["ID"].tolist()
+                            playlist = sp.user_playlist_create(
+                                user=sp.me()["id"],
+                                name=f"{mood} Playlist",
+                                public=False
+                            )
+                            sp.user_playlist_add_tracks(playlist_id=playlist["id"], tracks=track_ids)
+                            st.success("✅ Playlist created successfully!")
+                        except Exception as e:
+                            st.error(f"Failed to save playlist: {e}")
+
                 else:
                     st.warning("No liked songs found!")
         except Exception as e:
