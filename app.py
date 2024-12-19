@@ -2,6 +2,7 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
+import time
 
 # --- Spotify API Credentials ---
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -37,42 +38,53 @@ st.markdown(
             background-color: #1ed760;
             color: black;
         }
-        .stTextInput > div > div > input {
-            background-color: #222222;
-            color: white;
-            border-radius: 5px;
-            border: 1px solid #1DB954;
-        }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-# --- Spotify Authentication Function ---
+# --- Spotify Authentication ---
 def authenticate_spotify():
-    """Authenticate Spotify and reload the current page after success."""
-    auth_manager = SpotifyOAuth(
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        redirect_uri=REDIRECT_URI,
-        scope=SCOPE,
-        open_browser=False
-    )
-    if not st.session_state.get("token_info"):
-        token_info = auth_manager.get_access_token(as_dict=False)
-        if token_info:
+    """Authenticate Spotify and store token in session."""
+    if "token_info" not in st.session_state or st.session_state["token_info"] is None:
+        auth_manager = SpotifyOAuth(
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
+            redirect_uri=REDIRECT_URI,
+            scope=SCOPE,
+            open_browser=False
+        )
+        if not auth_manager.get_cached_token():
+            auth_url = auth_manager.get_authorize_url()
+            st.info("Please log in to Spotify:")
+            st.markdown(f"[Login here]({auth_url})", unsafe_allow_html=True)
+        else:
+            token_info = auth_manager.get_access_token()
             st.session_state["token_info"] = token_info
-            st.session_state["authenticated"] = True
-            st.experimental_rerun()  # Reload the app page after authentication
+            st.experimental_rerun()
+    else:
+        # Refresh token if expired
+        token_info = st.session_state["token_info"]
+        if time.time() > token_info["expires_at"]:
+            auth_manager = SpotifyOAuth(
+                client_id=CLIENT_ID,
+                client_secret=CLIENT_SECRET,
+                redirect_uri=REDIRECT_URI,
+                scope=SCOPE,
+                open_browser=False
+            )
+            token_info = auth_manager.refresh_access_token(token_info["refresh_token"])
+            st.session_state["token_info"] = token_info
 
 # --- Fetch Liked Songs ---
-def fetch_liked_songs(sp):
+def fetch_liked_songs():
     """Fetch user's liked songs."""
+    sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
     results = sp.current_user_saved_tracks(limit=50)
     songs = [
         {
             "Name": item["track"]["name"],
-            "Artist": ", ".join([artist["name"] for artist in item["track"]["artists"]])
+            "Artist": ", ".join([artist["name"] for artist in item["track"]["artists"]]),
         }
         for item in results["items"]
     ]
@@ -82,24 +94,24 @@ def fetch_liked_songs(sp):
 def main():
     st.markdown("<h1>🎼 MusoMoodify 🎼</h1>", unsafe_allow_html=True)
 
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
-
-    if not st.session_state["authenticated"]:
+    # Step 1: Authenticate
+    if "token_info" not in st.session_state or st.session_state["token_info"] is None:
         st.warning("Please authenticate with Spotify to continue.")
-        if st.button("Log in with Spotify"):
-            authenticate_spotify()
+        authenticate_spotify()
     else:
         st.success("✅ Successfully connected to Spotify!")
-        sp = spotipy.Spotify(auth=st.session_state["token_info"])
-        liked_songs_df = fetch_liked_songs(sp)
+        
+        # Step 2: Fetch and display liked songs
+        try:
+            liked_songs_df = fetch_liked_songs()
+            if not liked_songs_df.empty:
+                st.success("🎵 Here are your liked songs:")
+                st.dataframe(liked_songs_df)
+            else:
+                st.warning("No liked songs found!")
+        except Exception as e:
+            st.error(f"Error fetching liked songs: {e}")
+            st.session_state["token_info"] = None
 
-        if not liked_songs_df.empty:
-            st.success("🎵 Here are your liked songs:")
-            st.dataframe(liked_songs_df)
-        else:
-            st.warning("No liked songs found!")
-
-# Run the app
 if __name__ == "__main__":
     main()
