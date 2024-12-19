@@ -78,26 +78,38 @@ def refresh_token():
 
 def authenticate_user():
     query_params = st.query_params
-    
+
     if "code" in query_params:
         code = query_params["code"][0]
         try:
-            token_string = sp_oauth.get_access_token(code, as_dict=False)
-            if not token_string:
-                raise ValueError("Invalid authorization code")
-            st.session_state["token_info"] = {"access_token": token_string}
-            st.experimental_set_query_params(**{})
+            # Attempt to exchange the code for an access token
+            token_info = sp_oauth.get_access_token(code)
+            if not token_info:
+                raise ValueError("Invalid or expired authorization code.")
+            
+            # Store the token in session state
+            st.session_state["token_info"] = token_info
+            st.experimental_set_query_params(**{})  # Clear query params
             st.success("You're authenticated! Click the button below to enter.")
+            
             if st.button("Enter Wvvy"):
                 st.experimental_rerun()
+
+        except spotipy.exceptions.SpotifyException as e:
+            st.error(f"Spotify API error during authentication: {e}")
+        except ValueError as e:
+            st.error(f"Authorization failed: {e}")
         except Exception as e:
-            st.error(f"Authentication error: {e}")
+            st.error(f"Unexpected error during authentication: {e}")
+
     else:
+        # Generate and display the Spotify login URL
         auth_url = sp_oauth.get_authorize_url()
         st.markdown(
             f'<a href="{auth_url}" class="login-button">Login with Spotify</a>',
             unsafe_allow_html=True
         )
+
 
 # Safe API call with retries
 def safe_api_call(api_call, retries=3, delay=2, *args, **kwargs):
