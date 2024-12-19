@@ -1,6 +1,7 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+import time
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -8,7 +9,7 @@ CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 
 # Define the required scope for Spotify access
-scope = "user-library-read user-top-read playlist-read-private"
+scope = "user-library-read user-top-read playlist-read-private user-read-private"
 
 # Initialize Spotify OAuth object
 sp_oauth = SpotifyOAuth(
@@ -16,7 +17,7 @@ sp_oauth = SpotifyOAuth(
     client_secret=CLIENT_SECRET,
     redirect_uri=REDIRECT_URI,
     scope=scope,
-    cache_path=".cache"  # Optional: Specify a cache path
+    cache_path=".cache"
 )
 
 # Set Streamlit page configuration
@@ -57,19 +58,6 @@ st.markdown("""
         font-weight: bold;
         margin-top: 30px;
     }
-    .stMarkdown p, .stMarkdown h3 {
-        color: white !important;
-    }
-    .stSelectbox label, .stSlider label {
-        color: black !important;
-    }
-    .stTabs [role="tab"] {
-        color: white !important;
-    }
-    .stTabs [role="tabpanel"] {
-        background-color: rgba(0, 0, 0, 0.5) !important;
-        color: white !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -89,13 +77,13 @@ def refresh_token():
             st.error(f"Token refresh failed: {e}")
 
 def authenticate_user():
-    query_params = st.query_params
-
+    query_params = st.experimental_get_query_params()
+    
     if "code" in query_params:
         code = query_params["code"][0]
         try:
-            token_info = sp_oauth.get_access_token(code, as_dict=False)
-            st.session_state["token_info"] = {"access_token": token_info}
+            token_info = sp_oauth.get_access_token(code)
+            st.session_state["token_info"] = token_info
             st.experimental_set_query_params(**{})
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
@@ -109,21 +97,34 @@ def authenticate_user():
             unsafe_allow_html=True
         )
 
+# Safe API call with retries
+def safe_api_call(api_call, retries=3, delay=2, *args, **kwargs):
+    for attempt in range(retries):
+        try:
+            return api_call(*args, **kwargs)
+        except spotipy.exceptions.SpotifyException as e:
+            st.warning(f"Retrying after Spotify API error: {e}")
+            time.sleep(delay * (2 ** attempt))
+        except Exception as e:
+            st.error(f"Unexpected error: {e}")
+            break
+    return None
+
 # Retrieve liked songs and audio features
 @st.cache_data
 def get_liked_songs(_sp):
     try:
         results = _sp.current_user_saved_tracks(limit=50)
         liked_songs = []
-        track_ids = [item["track"]["id"] for item in results["items"]]
+        track_ids = [item["track"]["id"] for item in results["items"] if item["track"]]
 
-        # Fetch audio features in smaller batches
-        for i in range(0, len(track_ids), 10):  # Batch size reduced to 10
-            batch_ids = track_ids[i:i + 10]
-            try:
-                audio_features_batch = _sp.audio_features(batch_ids)
+        for i in range(0, len(track_ids), 10):
+            batch_ids = [id for id in track_ids[i:i + 10] if id]
+            audio_features_batch = safe_api_call(_sp.audio_features, batch_ids)
+
+            if audio_features_batch:
                 for features, track in zip(audio_features_batch, results["items"][i:i + 10]):
-                    if features:  # Ensure features exist
+                    if features:
                         liked_songs.append({
                             "name": track["track"]["name"],
                             "artist": track["track"]["artists"][0]["name"],
@@ -134,10 +135,6 @@ def get_liked_songs(_sp):
                         })
                     else:
                         st.warning(f"No audio features for track: {track['track']['name']}")
-            except spotipy.exceptions.SpotifyException as e:
-                st.error(f"Error fetching audio features for batch: {e}")
-            except Exception as e:
-                st.error(f"Unexpected error occurred: {e}")
         return liked_songs
     except spotipy.exceptions.SpotifyException as e:
         st.error(f"Spotify API error: {e}")
@@ -146,7 +143,7 @@ def get_liked_songs(_sp):
         st.error(f"Unexpected error occurred: {e}")
         return []
 
-# Mood filtering
+# Filter songs by mood and intensity
 def filter_songs(songs, mood, intensity):
     mood_ranges = {
         "Happy": {"valence": (0.6, 1), "tempo": (100, 200)},
@@ -181,9 +178,8 @@ def display_songs(song_list, title):
         st.write("No songs found.")
 
 # Display mood insights
-def mood_insights(_sp):
-    st.write("## Mood Insights & Therapy Overview")
-
+def mood_insights():
+    st.write("## Mood Insights")
     mood_breakdown = {
         "Happy": 40,
         "Chill": 30,
@@ -193,23 +189,6 @@ def mood_insights(_sp):
     st.write("### Mood Snapshot")
     for mood, percentage in mood_breakdown.items():
         st.write(f"{mood}: {percentage}%")
-
-    st.write("#### Mood of the Week")
-    st.write("Happy")
-    st.write("Contributed by Artist X, Artist Y")
-
-    st.write("### Fun Insights")
-    st.write("You're a Dreamer! Your mellow tracks show your love for introspection.")
-    st.write("Top genre and mood combo: Chill Jazz")
-
-    st.write("### Interactive Mood Input")
-    current_mood = st.selectbox("Select your current mood:", ["Happy", "Calm", "Energetic", "Sad"])
-    st.write(f"Playlist recommendation for {current_mood}: [Playlist Name]")
-
-    st.write("### Basic Stats")
-    st.write("Top Song: Example Song")
-    st.write("Top Artist: Example Artist")
-    st.write("Top Genre: Example Genre")
 
 # Main app logic
 if is_authenticated():
@@ -228,7 +207,7 @@ if is_authenticated():
             display_songs(filtered_liked_songs, "Filtered Liked Songs")
 
         with tab2:
-            mood_insights(sp)
+            mood_insights()
 
     except Exception as e:
         st.error(f"Error loading the app: {e}")
