@@ -1,7 +1,6 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import random
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -23,12 +22,12 @@ sp_oauth = SpotifyOAuth(
 # Set Streamlit page configuration
 st.set_page_config(
     page_title="Wvvy",
-    page_icon="〰",
+    page_icon="\u3030",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for white text in the main body and normal text for select elements
+# Custom CSS for UI customization
 st.markdown("""
     <style>
     body {
@@ -58,23 +57,12 @@ st.markdown("""
         font-weight: bold;
         margin-top: 30px;
     }
-    /* Set white text for markdown and body */
     .stMarkdown p, .stMarkdown h3 {
         color: white !important;
     }
-    /* Set text color for select box and slider labels */
     .stSelectbox label, .stSlider label {
         color: black !important;
     }
-    /* Set black color for options in selectbox */
-    .stSelectbox .css-1wa3eu0-placeholder, .stSelectbox .css-2b097c-container {
-        color: black !important;
-    }
-    /* Set text color for slider numbers */
-    .stSlider .css-164nlkn .css-qrbaxs {
-        color: white !important;
-    }
-    /* Adjust background and text color for tabs */
     .stTabs [role="tab"] {
         color: white !important;
     }
@@ -86,7 +74,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Wvvy logo and title
-st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
+st.markdown("<div class='header-title'>\u3030 Wvvy</div>", unsafe_allow_html=True)
 
 # Authentication Functions
 def is_authenticated():
@@ -98,8 +86,8 @@ def refresh_token():
         st.session_state['token_info'] = token_info
 
 def authenticate_user():
-    query_params = st.experimental_get_query_params()
-    
+    query_params = st.query_params
+
     if "code" in query_params:
         code = query_params["code"][0]
         try:
@@ -118,7 +106,7 @@ def authenticate_user():
             unsafe_allow_html=True
         )
 
-# Retrieve liked songs and audio features (valence, energy, tempo)
+# Retrieve liked songs and audio features
 def get_liked_songs(sp):
     results = sp.current_user_saved_tracks(limit=50)
     liked_songs = []
@@ -135,42 +123,7 @@ def get_liked_songs(sp):
         })
     return liked_songs
 
-# Retrieve recommendations based on user's listening habits
-def get_new_discoveries(sp):
-    # Fetch top tracks and artists based on user's listening history
-    top_tracks_results = sp.current_user_top_tracks(limit=5, time_range="medium_term")['items']
-    top_artists_results = sp.current_user_top_artists(limit=5, time_range="medium_term")['items']
-    
-    top_tracks = [track['id'] for track in top_tracks_results]
-    top_genres = [artist['genres'][0] for artist in top_artists_results if artist['genres']]
-
-    # Ensure we don't exceed the limit of 5 seeds
-    seed_tracks = top_tracks[:3]  # Limit to 3 tracks
-    seed_genres = top_genres[:2]  # Limit to 2 genres
-
-    # Handle cases where there are no genres or tracks
-    if not seed_tracks and not seed_genres:
-        seed_tracks = ['4uLU6hMCjMI75M1A2tKUQC']  # A default track seed (50 Cent - In Da Club)
-    
-    try:
-        recommendations = sp.recommendations(seed_tracks=seed_tracks, seed_genres=seed_genres, limit=50)
-        new_songs = []
-        for track in recommendations['tracks']:
-            audio_features = sp.audio_features(track['id'])[0]
-            new_songs.append({
-                "name": track['name'],
-                "artist": track['artists'][0]['name'],
-                "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
-                "energy": audio_features["energy"],
-                "valence": audio_features["valence"],
-                "tempo": audio_features["tempo"]
-            })
-        return new_songs
-    except Exception as e:
-        st.error(f"Error fetching recommendations: {e}")
-        return []
-
-# Enhanced mood classification based on valence and tempo
+# Mood filtering
 def filter_songs(songs, mood, intensity):
     mood_ranges = {
         "Happy": {"valence": (0.6, 1), "tempo": (100, 200)},
@@ -178,20 +131,17 @@ def filter_songs(songs, mood, intensity):
         "Energetic": {"valence": (0.5, 1), "tempo": (120, 200)},
         "Sad": {"valence": (0, 0.3), "tempo": (40, 80)}
     }
-    
+
     mood_filter = mood_ranges[mood]
-    
-    # Apply mood and intensity filtering
-    filtered_songs = [
+
+    return [
         song for song in songs
         if mood_filter["valence"][0] <= song["valence"] <= mood_filter["valence"][1]
         and mood_filter["tempo"][0] <= song["tempo"] <= mood_filter["tempo"][1]
         and song['energy'] >= (intensity / 5)
     ]
-    
-    return filtered_songs
 
-# Function to display songs with their cover images
+# Display songs
 def display_songs(song_list, title):
     st.write(f"### {title}")
     if song_list:
@@ -207,31 +157,56 @@ def display_songs(song_list, title):
     else:
         st.write("No songs found.")
 
+# Display mood insights
+def mood_insights(sp):
+    st.write("## Mood Insights & Therapy Overview")
+    
+    mood_breakdown = {
+        "Happy": 40,
+        "Chill": 30,
+        "Energetic": 20,
+        "Reflective": 10
+    }
+    st.write("### Mood Snapshot")
+    for mood, percentage in mood_breakdown.items():
+        st.write(f"{mood}: {percentage}%")
+
+    st.write("#### Mood of the Week")
+    st.write("Happy")  # Example
+    st.write("Contributed by Artist X, Artist Y")
+
+    st.write("### Fun Insights")
+    st.write("You're a Dreamer! Your mellow tracks show your love for introspection.")
+    st.write("Top genre and mood combo: Chill Jazz")
+
+    st.write("### Interactive Mood Input")
+    current_mood = st.selectbox("Select your current mood:", ["Happy", "Calm", "Energetic", "Sad"])
+    st.write(f"Playlist recommendation for {current_mood}: [Playlist Name]")
+
+    st.write("### Basic Stats")
+    st.write("Top Song: Example Song")
+    st.write("Top Artist: Example Artist")
+    st.write("Top Genre: Example Genre")
+
 # Main app logic
 if is_authenticated():
     try:
         refresh_token()
-        st.success("You are logged in! Your Spotify data is ready for analysis.")
-        
         sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
-        
-        # Mood and Intensity filters
-        mood = st.selectbox("Choose your mood:", ["Happy", "Calm", "Energetic", "Sad"])
-        intensity = st.slider("Choose intensity:", 1, 5, 3)  # Adjusted intensity to 1-5
-        
-        # Tabs for liked songs and new discoveries
-        tab1, tab2 = st.tabs(["Liked Songs", "New Discoveries"])
+
+        tab1, tab2 = st.tabs(["Filter Liked Songs", "Mood Insights"])
 
         with tab1:
+            mood = st.selectbox("Choose your mood:", ["Happy", "Calm", "Energetic", "Sad"])
+            intensity = st.slider("Choose intensity:", 1, 5, 3)
+
             liked_songs = get_liked_songs(sp)
             filtered_liked_songs = filter_songs(liked_songs, mood, intensity)
-            display_songs(filtered_liked_songs, "Your Liked Songs")
+            display_songs(filtered_liked_songs, "Filtered Liked Songs")
 
         with tab2:
-            new_songs = get_new_discoveries(sp)
-            filtered_new_songs = filter_songs(new_songs, mood, intensity)
-            display_songs(filtered_new_songs, "New Song Discoveries")
-        
+            mood_insights(sp)
+
     except Exception as e:
         st.error(f"Error loading the app: {e}")
 else:
