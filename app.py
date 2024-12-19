@@ -82,10 +82,10 @@ def authenticate_user():
     if "code" in query_params:
         code = query_params["code"][0]
         try:
-            token_info = sp_oauth.get_access_token(code)
-            if not token_info:
+            token_string = sp_oauth.get_access_token(code, as_dict=False)
+            if not token_string:
                 raise ValueError("Invalid authorization code")
-            st.session_state["token_info"] = token_info
+            st.session_state["token_info"] = {"access_token": token_string}
             st.experimental_set_query_params(**{})
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
