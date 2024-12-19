@@ -114,16 +114,21 @@ def get_liked_songs(_sp):
         liked_songs = []
         for item in results['items']:
             track = item['track']
-            audio_features = _sp.audio_features([track['id']])[0]
-            if audio_features:  # Handle None responses
-                liked_songs.append({
-                    "name": track['name'],
-                    "artist": track['artists'][0]['name'],
-                    "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
-                    "energy": audio_features.get("energy", 0),
-                    "valence": audio_features.get("valence", 0),
-                    "tempo": audio_features.get("tempo", 0)
-                })
+            try:
+                audio_features = _sp.audio_features([track['id']])[0]
+                if audio_features:  # Ensure audio features are valid
+                    liked_songs.append({
+                        "name": track['name'],
+                        "artist": track['artists'][0]['name'],
+                        "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
+                        "energy": audio_features.get("energy", 0),
+                        "valence": audio_features.get("valence", 0),
+                        "tempo": audio_features.get("tempo", 0)
+                    })
+                else:
+                    st.warning(f"No audio features available for track: {track['name']}")
+            except spotipy.exceptions.SpotifyException as e:
+                st.error(f"Error retrieving audio features for {track['name']}: {e}")
         return liked_songs
     except spotipy.exceptions.SpotifyException as e:
         st.error(f"Spotify API error: {e}")
