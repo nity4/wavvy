@@ -136,9 +136,14 @@ def get_liked_songs(_sp):
                         st.warning(f"No audio features for track: {track['track']['name']}")
             except spotipy.exceptions.SpotifyException as e:
                 st.error(f"Error fetching audio features for batch: {e}")
+            except Exception as e:
+                st.error(f"Unexpected error occurred: {e}")
         return liked_songs
     except spotipy.exceptions.SpotifyException as e:
         st.error(f"Spotify API error: {e}")
+        return []
+    except Exception as e:
+        st.error(f"Unexpected error occurred: {e}")
         return []
 
 # Mood filtering
