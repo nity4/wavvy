@@ -82,8 +82,15 @@ def is_authenticated():
 
 def refresh_token():
     if "token_info" in st.session_state and sp_oauth.is_token_expired(st.session_state["token_info"]):
-        token_info = sp_oauth.refresh_access_token(st.session_state["token_info"]["refresh_token"])
-        st.session_state["token_info"] = token_info
+        try:
+            token_info = sp_oauth.refresh_access_token(st.session_state["token_info"]["refresh_token"])
+            st.session_state["token_info"] = token_info
+        except Exception as e:
+            st.error(f"Token refresh failed: {e}")
+
+user = sp.me()
+st.write(f"Authenticated user: {user['display_name']}")
+
 
 def authenticate_user():
     query_params = st.experimental_get_query_params()
@@ -112,27 +119,27 @@ def get_liked_songs(_sp):
     try:
         results = _sp.current_user_saved_tracks(limit=50)
         liked_songs = []
-        track_ids = []
+        track_ids = [item["track"]["id"] for item in results["items"]]
 
-        for item in results["items"]:
-            track_ids.append(item["track"]["id"])
-
-        # Fetch audio features in batches of 50
-        for i in range(0, len(track_ids), 50):
-            batch_ids = track_ids[i:i + 50]
-            audio_features_batch = _sp.audio_features(batch_ids)
-            for features, track in zip(audio_features_batch, results["items"][i:i + 50]):
-                if features:
-                    liked_songs.append({
-                        "name": track["track"]["name"],
-                        "artist": track["track"]["artists"][0]["name"],
-                        "cover": track["track"]["album"]["images"][0]["url"] if track["track"]["album"]["images"] else None,
-                        "energy": features.get("energy", 0),
-                        "valence": features.get("valence", 0),
-                        "tempo": features.get("tempo", 0),
-                    })
-                else:
-                    st.warning(f"No audio features available for track: {track['track']['name']}")
+        # Fetch audio features in smaller batches
+        for i in range(0, len(track_ids), 10):  # Batch size reduced to 10
+            batch_ids = track_ids[i:i + 10]
+            try:
+                audio_features_batch = _sp.audio_features(batch_ids)
+                for features, track in zip(audio_features_batch, results["items"][i:i + 10]):
+                    if features:  # Ensure features exist
+                        liked_songs.append({
+                            "name": track["track"]["name"],
+                            "artist": track["track"]["artists"][0]["name"],
+                            "cover": track["track"]["album"]["images"][0]["url"] if track["track"]["album"]["images"] else None,
+                            "energy": features.get("energy", 0),
+                            "valence": features.get("valence", 0),
+                            "tempo": features.get("tempo", 0),
+                        })
+                    else:
+                        st.warning(f"No audio features for track: {track['track']['name']}")
+            except spotipy.exceptions.SpotifyException as e:
+                st.error(f"Error fetching audio features for batch: {e}")
         return liked_songs
     except spotipy.exceptions.SpotifyException as e:
         st.error(f"Spotify API error: {e}")
