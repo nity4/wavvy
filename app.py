@@ -108,13 +108,13 @@ def authenticate_user():
 
 # Retrieve liked songs and audio features
 @st.cache_data
-def get_liked_songs(sp):
+def get_liked_songs(_sp):
     try:
-        results = sp.current_user_saved_tracks(limit=50)
+        results = _sp.current_user_saved_tracks(limit=50)
         liked_songs = []
         for item in results['items']:
             track = item['track']
-            audio_features = sp.audio_features([track['id']])[0]
+            audio_features = _sp.audio_features([track['id']])[0]
             if audio_features:  # Handle None responses
                 liked_songs.append({
                     "name": track['name'],
@@ -164,7 +164,7 @@ def display_songs(song_list, title):
         st.write("No songs found.")
 
 # Display mood insights
-def mood_insights(sp):
+def mood_insights(_sp):
     st.write("## Mood Insights & Therapy Overview")
     
     mood_breakdown = {
