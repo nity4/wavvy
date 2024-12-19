@@ -218,4 +218,16 @@ if is_authenticated():
             mood = st.selectbox("Choose your mood:", ["Happy", "Calm", "Energetic", "Sad"])
             intensity = st.slider("Choose intensity:", 1, 5, 3)
 
-            liked_songs = get_liked_songs(sp
+            liked_songs = get_liked_songs(sp)
+            filtered_liked_songs = filter_songs(liked_songs, mood, intensity)
+            display_songs(filtered_liked_songs, "Filtered Liked Songs")
+
+        with tab2:
+            mood_insights(sp)
+
+    except Exception as e:
+        st.error(f"Error loading the app: {e}")
+else:
+    st.write("Welcome to Wvvy")
+    st.write("Login to explore your personalized music experience.")
+    authenticate_user()
