@@ -7,78 +7,101 @@ import pandas as pd
 CLIENT_ID = st.secrets["spotify"]["client_id"]
 CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
-SCOPE = "user-library-read user-read-recently-played playlist-modify-private"
+SCOPE = "user-library-read"
 
-# --- Streamlit Page Config ---
+# --- Streamlit Page Configuration ---
 st.set_page_config(page_title="MusoMoodify 🎼", page_icon="🎼", layout="wide")
 
-# --- Spotify Authentication ---
+# --- Custom CSS for Visuals ---
+st.markdown(
+    """
+    <style>
+        body, .stApp {
+            background: linear-gradient(to bottom right, black, #1DB954);
+            color: white;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: white;
+            text-align: center;
+        }
+        .stButton > button {
+            background-color: #1DB954;
+            color: black;
+            font-size: 1em;
+            font-weight: bold;
+            border-radius: 10px;
+            padding: 10px 20px;
+        }
+        .stButton > button:hover {
+            background-color: #1ed760;
+            color: black;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# --- Authenticate Spotify ---
 def authenticate_spotify():
-    """
-    Authenticate with Spotify and store the Spotify client in session state.
-    """
-    try:
+    """Authenticate Spotify and store token in session state."""
+    if "spotify_token" not in st.session_state:
         auth_manager = SpotifyOAuth(
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
             redirect_uri=REDIRECT_URI,
             scope=SCOPE,
+            show_dialog=True
         )
-        st.session_state["sp"] = spotipy.Spotify(auth_manager=auth_manager)
+        try:
+            # Fetch token
+            token_info = auth_manager.get_access_token(as_dict=False)
+            st.session_state["spotify_token"] = token_info
+            st.session_state["authenticated"] = True
+        except Exception as e:
+            st.error(f"Error authenticating with Spotify: {e}")
+            st.session_state["authenticated"] = False
+    else:
         st.session_state["authenticated"] = True
-        st.success("Spotify Authentication Successful!")
-    except Exception as e:
-        st.error(f"Spotify Authentication failed: {e}")
-        st.stop()
 
 # --- Fetch Liked Songs ---
-def fetch_liked_songs(sp):
-    """
-    Fetch user's liked songs and display them.
-    """
-    try:
-        st.write("Fetching liked songs...")
-        results = sp.current_user_saved_tracks(limit=10)
-        st.success("Successfully fetched liked songs!")
-        songs = []
-        for item in results["items"]:
-            track = item["track"]
-            songs.append({
-                "name": track["name"],
-                "artist": ", ".join(artist["name"] for artist in track["artists"]),
-                "album": track["album"]["name"]
-            })
-        return pd.DataFrame(songs)
-    except Exception as e:
-        st.error(f"Error fetching liked songs: {e}")
-        return pd.DataFrame()
+def fetch_liked_songs():
+    """Fetch the user's liked songs."""
+    sp = spotipy.Spotify(auth=st.session_state["spotify_token"])
+    results = sp.current_user_saved_tracks(limit=50)
+    songs = [
+        {
+            "Name": item["track"]["name"],
+            "Artist": ", ".join([artist["name"] for artist in item["track"]["artists"]]),
+        }
+        for item in results["items"]
+    ]
+    return pd.DataFrame(songs)
 
 # --- Main App ---
-if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
+def main():
+    st.markdown("<h1>🎼 MusoMoodify 🎼</h1>", unsafe_allow_html=True)
 
-st.title("MusoMoodify 🎼")
-st.subheader("Discover your music and explore your moods!")
-
-# Spotify Login
-if not st.session_state["authenticated"]:
-    if st.button("Log in with Spotify"):
-        authenticate_spotify()
-
-else:
-    # Debug: Check current user
-    st.write("✅ You are authenticated with Spotify!")
-    try:
-        sp = st.session_state["sp"]
-        user = sp.current_user()
-        st.write(f"Welcome, **{user['display_name']}** 👋")
-    except Exception as e:
-        st.error(f"Failed to fetch user details: {e}")
-        st.stop()
-
-    # Fetch Liked Songs
-    liked_songs_df = fetch_liked_songs(sp)
-    if not liked_songs_df.empty:
-        st.dataframe(liked_songs_df)
+    # Step 1: Authenticate
+    if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
+        st.warning("Please log in with Spotify to continue.")
+        if st.button("Log in with Spotify"):
+            authenticate_spotify()
+            st.experimental_rerun()
     else:
-        st.warning("No liked songs found.")
+        st.success("✅ Successfully connected to Spotify!")
+        
+        # Step 2: Fetch and display liked songs
+        try:
+            with st.spinner("🎶 Fetching your liked songs..."):
+                liked_songs_df = fetch_liked_songs()
+            if not liked_songs_df.empty:
+                st.success("🎵 Here are your liked songs:")
+                st.dataframe(liked_songs_df)
+            else:
+                st.warning("No liked songs found!")
+        except Exception as e:
+            st.error(f"Error fetching liked songs: {e}")
+            st.session_state["authenticated"] = False
+
+if __name__ == "__main__":
+    main()
