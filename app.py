@@ -107,21 +107,27 @@ def authenticate_user():
         )
 
 # Retrieve liked songs and audio features
+@st.cache_data
 def get_liked_songs(sp):
-    results = sp.current_user_saved_tracks(limit=50)
-    liked_songs = []
-    for item in results['items']:
-        track = item['track']
-        audio_features = sp.audio_features(track['id'])[0]
-        liked_songs.append({
-            "name": track['name'],
-            "artist": track['artists'][0]['name'],
-            "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
-            "energy": audio_features["energy"],
-            "valence": audio_features["valence"],
-            "tempo": audio_features["tempo"]
-        })
-    return liked_songs
+    try:
+        results = sp.current_user_saved_tracks(limit=50)
+        liked_songs = []
+        for item in results['items']:
+            track = item['track']
+            audio_features = sp.audio_features([track['id']])[0]
+            if audio_features:  # Handle None responses
+                liked_songs.append({
+                    "name": track['name'],
+                    "artist": track['artists'][0]['name'],
+                    "cover": track['album']['images'][0]['url'] if track['album']['images'] else None,
+                    "energy": audio_features.get("energy", 0),
+                    "valence": audio_features.get("valence", 0),
+                    "tempo": audio_features.get("tempo", 0)
+                })
+        return liked_songs
+    except spotipy.exceptions.SpotifyException as e:
+        st.error(f"Spotify API error: {e}")
+        return []
 
 # Mood filtering
 def filter_songs(songs, mood, intensity):
