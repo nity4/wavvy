@@ -82,8 +82,8 @@ def authenticate_user():
     if "code" in query_params:
         code = query_params["code"][0]
         try:
-            token_info = sp_oauth.get_access_token(code)
-            st.session_state["token_info"] = token_info
+            token_info = sp_oauth.get_access_token(code, as_dict=False)
+            st.session_state["token_info"] = {"access_token": token_info}
             st.experimental_set_query_params(**{})
             st.success("You're authenticated! Click the button below to enter.")
             if st.button("Enter Wvvy"):
