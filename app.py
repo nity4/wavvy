@@ -70,7 +70,6 @@ def authenticate_user():
         st.markdown(f'<a href="{auth_url}" target="_self" class="button">Login with Spotify</a>', unsafe_allow_html=True)
 
 
-# Fetch all liked songs and analyze based on mood and intensity
 def get_all_liked_songs(sp, mood=None, intensity=None):
     results = []
     offset = 0
@@ -81,6 +80,7 @@ def get_all_liked_songs(sp, mood=None, intensity=None):
     energy_target = mood_energy_map.get(mood, None)
 
     while True:
+        refresh_token_if_needed()  # Refresh token before API calls
         try:
             tracks = sp.current_user_saved_tracks(limit=50, offset=offset)
         except spotipy.exceptions.SpotifyException as e:
@@ -93,13 +93,13 @@ def get_all_liked_songs(sp, mood=None, intensity=None):
         for item in tracks['items']:
             track = item['track']
             track_id = track.get('id')
-            if not track_id:
-                continue  # Skip tracks with no valid ID
+            if not track_id:  # Skip invalid track IDs
+                continue
 
             try:
                 features = sp.audio_features([track_id])
             except spotipy.exceptions.SpotifyException as e:
-                st.warning(f"Error fetching audio features for track ID {track_id}. Skipping...")
+                st.warning(f"Error fetching features for track ID {track_id}. Skipping...")
                 continue
 
             if features and features[0]:
@@ -112,6 +112,7 @@ def get_all_liked_songs(sp, mood=None, intensity=None):
                         'cover': track['album']['images'][0]['url'] if track['album']['images'] else None
                     })
         offset += 50
+        time.sleep(0.2)  # Avoid hitting rate limits
 
     return results
 
