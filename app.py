@@ -56,15 +56,15 @@ def is_authenticated():
     return 'token_info' in st.session_state and st.session_state['token_info']
 
 def authenticate_user():
-    query_params = st.query_params
+    query_params = st.experimental_get_query_params()
     if "code" in query_params:
         code = query_params["code"][0]
         token_info = sp_oauth.get_access_token(code)
         st.session_state['token_info'] = token_info
         # Clear query parameters indirectly by resetting the URL
         st.write("<script>history.replaceState({}, '', window.location.pathname);</script>", unsafe_allow_html=True)
-        st.success("Authentication successful! Reloading...")
-        st.experimental_rerun()  # If Streamlit fully supports rerun, retain this; otherwise, refresh manually
+        st.success("Authentication successful! Please reload the page.")
+        return
     else:
         auth_url = sp_oauth.get_authorize_url()
         st.markdown(f'<a href="{auth_url}" target="_self" class="button">Login with Spotify</a>', unsafe_allow_html=True)
@@ -129,6 +129,7 @@ def analyze_mood_and_insights(sp):
     return mood_counts, mood_of_week, top_artist
 
 if is_authenticated():
+    refresh_token()
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
     # Page navigation at the top
