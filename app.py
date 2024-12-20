@@ -24,6 +24,23 @@ sp_oauth = SpotifyOAuth(
 # Set Streamlit page configuration
 st.set_page_config(page_title="Mood Music Insights", layout="wide")
 
+# Custom CSS for black and green-Spotify theme
+st.markdown(
+    """
+    <style>
+    body {
+        background: linear-gradient(to right, black, #1DB954);
+        color: white;
+    }
+    .stApp {
+        background: linear-gradient(to right, black, #1DB954);
+        color: white;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # Function to refresh token if expired
 def refresh_token():
     token_info = st.session_state.get('token_info', None)
@@ -37,12 +54,12 @@ def is_authenticated():
 
 # Function to authenticate user
 def authenticate_user():
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params
     if "code" in query_params:
         code = query_params["code"][0]
         token_info = sp_oauth.get_access_token(code)
         st.session_state['token_info'] = token_info
-        st.experimental_set_query_params()
+        st.experimental_set_query_params()  # Clear the query params
         st.success("Authentication successful! Reloading...")
         st.experimental_rerun()
     else:
