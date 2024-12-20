@@ -77,9 +77,9 @@ def refresh_token_if_needed():
         new_token = sp_oauth.refresh_access_token(token_info["refresh_token"])
         st.session_state["token_info"] = new_token
 
-# Function to get all liked songs
 def get_all_liked_songs(sp, mood=None, intensity=None):
     results = []
+    skipped_tracks = []
     offset = 0
     mood_valence_map = {"Happy": 0.8, "Chill": 0.5, "Energetic": 0.7, "Reflective": 0.3}
     mood_energy_map = {"Happy": 0.7, "Chill": 0.4, "Energetic": 0.9, "Reflective": 0.2}
@@ -88,7 +88,7 @@ def get_all_liked_songs(sp, mood=None, intensity=None):
     energy_target = mood_energy_map.get(mood, None)
 
     while True:
-        refresh_token_if_needed()  # Refresh token before API calls
+        refresh_token_if_needed()
         try:
             tracks = sp.current_user_saved_tracks(limit=50, offset=offset)
         except spotipy.exceptions.SpotifyException as e:
@@ -101,26 +101,27 @@ def get_all_liked_songs(sp, mood=None, intensity=None):
         for item in tracks['items']:
             track = item['track']
             track_id = track.get('id')
-            if not track_id:  # Skip invalid track IDs
+            if not track_id:
                 continue
 
-            try:
-                features = sp.audio_features([track_id])
-            except spotipy.exceptions.SpotifyException as e:
-                st.warning(f"Error fetching features for track ID {track_id}. Skipping...")
+            feature = fetch_audio_features_with_retry(sp, track_id)
+            if not feature:
+                skipped_tracks.append(track_id)
                 continue
 
-            if features and features[0]:
-                feature = features[0]
-                if (not mood or abs(feature['valence'] - valence_target) < 0.2) and \
-                   (not intensity or abs(feature['energy'] - (intensity / 5)) < 0.2):
-                    results.append({
-                        'name': track['name'],
-                        'artist': track['artists'][0]['name'],
-                        'cover': track['album']['images'][0]['url'] if track['album']['images'] else None
-                    })
+            if (not mood or abs(feature['valence'] - valence_target) < 0.2) and \
+               (not intensity or abs(feature['energy'] - (intensity / 5)) < 0.2):
+                results.append({
+                    'name': track['name'],
+                    'artist': track['artists'][0]['name'],
+                    'cover': track['album']['images'][0]['url'] if track['album']['images'] else None
+                })
+
         offset += 50
-        time.sleep(0.2)  # Avoid hitting rate limits
+        time.sleep(0.1)  # Avoid hitting rate limits
+
+    if skipped_tracks:
+        st.warning(f"Skipped {len(skipped_tracks)} tracks due to errors.")
 
     return results
 
