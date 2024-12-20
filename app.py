@@ -1,10 +1,9 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import time
 import pandas as pd
 import random
-from requests.exceptions import ReadTimeout
+import time
 
 # Spotify API credentials from Streamlit Secrets
 CLIENT_ID = st.secrets["spotify"]["client_id"]
@@ -12,284 +11,146 @@ CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
 REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
 
 # Define the required scope for Spotify access
-scope = "user-library-read user-top-read playlist-read-private user-read-recently-played"
+scope = "user-library-read user-top-read playlist-read-private"
 
-# Initialize Spotify OAuth object (used for user-specific authentication)
+# Initialize Spotify OAuth object
 sp_oauth = SpotifyOAuth(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     redirect_uri=REDIRECT_URI,
-    scope=scope,
-    cache_path=None  # Remove cache file to ensure user-specific sessions
+    scope=scope
 )
 
 # Set Streamlit page configuration
-st.set_page_config(
-    page_title="Wvvy",
-    page_icon="〰",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Mood Music Insights", layout="wide")
 
-# Custom CSS for styling
-st.markdown("""
-    <style>
-    * {
-        color: white !important;
-    }
-    body {
-        background: linear-gradient(to right, black, #1DB954) !important;
-    }
-    .stApp {
-        background: linear-gradient(to right, black, #1DB954) !important;
-    }
-    .header-title {
-        font-size: 5em;
-        font-weight: bold;
-        text-align: center;
-        padding-top: 50px;
-        margin-bottom: 20px;
-        letter-spacing: 5px;
-        color: white !important;
-    }
-    .login-button {
-        color: white;
-        background-color: #1DB954;
-        padding: 15px 30px;
-        font-size: 1.5em;
-        border-radius: 12px;
-        text-align: center;
-        display: inline-block;
-        font-weight: bold;
-        margin-top: 30px;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# Wvvy logo and title
-st.markdown("<div class='header-title'>〰 Wvvy</div>", unsafe_allow_html=True)
-
-# Function to refresh the token if expired
+# Function to refresh token if expired
 def refresh_token():
     token_info = st.session_state.get('token_info', None)
     if token_info and sp_oauth.is_token_expired(token_info):
-        try:
-            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-            st.session_state['token_info'] = token_info
-        except Exception as e:
-            st.error(f"Error refreshing token: {e}")
-            st.session_state.pop('token_info', None)  # Remove invalid token
+        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+        st.session_state['token_info'] = token_info
 
 # Function to check if the user is authenticated
 def is_authenticated():
-    if 'token_info' in st.session_state and st.session_state['token_info']:
-        refresh_token()  # Ensure token is refreshed before using it
-        return True
-    return False
+    return 'token_info' in st.session_state and st.session_state['token_info']
 
-# Authentication flow
+# Function to authenticate user
 def authenticate_user():
     query_params = st.experimental_get_query_params()
-
     if "code" in query_params:
         code = query_params["code"][0]
-        try:
-            token_info = sp_oauth.get_cached_token()
-            if not token_info:
-                token_info = sp_oauth.get_access_token(code)
-            if token_info:  # Ensure token_info is not None
-                st.session_state['token_info'] = token_info
-                st.experimental_set_query_params()  # Clear the query params after authentication
-                st.success("You're authenticated! Click the button below to enter.")
-                if st.button("Enter Wvvy"):
-                    st.experimental_rerun()
-            else:
-                st.error("Failed to retrieve token.")
-        except Exception as e:
-            st.error(f"Authentication error: {e}")
+        token_info = sp_oauth.get_access_token(code)
+        st.session_state['token_info'] = token_info
+        st.experimental_set_query_params()
+        st.success("Authentication successful! Reloading...")
+        st.experimental_rerun()
     else:
-        # Generate the authentication URL for each user
         auth_url = sp_oauth.get_authorize_url()
-        st.markdown(
-            f'<a href="{auth_url}" class="login-button">Login with Spotify</a>',
-            unsafe_allow_html=True
-        )
+        st.markdown(f'<a href="{auth_url}" target="_self" class="button">Login with Spotify</a>', unsafe_allow_html=True)
 
-# Helper Function for Handling Spotify API Rate Limit (429 Error) and Timeout
-def handle_spotify_api(sp_func, *args, **kwargs):
-    wait_time = 1  # Start with a 1-second wait time
-    while True:
-        try:
-            return sp_func(*args, **kwargs)
-        except spotipy.SpotifyException as e:
-            if e.http_status == 429:  # Rate limit error
-                retry_after = int(e.headers.get("Retry-After", wait_time)) if e.headers and "Retry-After" in e.headers else wait_time
-                wait_time = max(retry_after, wait_time)  # Use Spotify's suggested wait time if available
-                st.warning(f"Rate limit reached. Retrying after {wait_time} seconds...")
-                time.sleep(wait_time)
-                wait_time *= 2  # Exponential backoff
-            else:
-                st.error(f"Spotify API Error: {e}")
-                return None
-        except ReadTimeout:
-            st.warning(f"Request timed out. Retrying...")
-            time.sleep(wait_time)
-            wait_time *= 2  # Double the wait time
-        except Exception as e:
-            st.error(f"Unexpected error: {e}")
-            return None
-
-# Function to fetch all liked songs for the authenticated user
-@st.cache_data
-def get_all_liked_songs(sp):
-    liked_songs = []
+# Fetch all liked songs and analyze based on mood and intensity
+def get_all_liked_songs(sp, mood=None, intensity=None):
+    results = []
     offset = 0
+    mood_valence_map = {"Happy": 0.8, "Chill": 0.5, "Energetic": 0.7, "Reflective": 0.3}
+    mood_energy_map = {"Happy": 0.7, "Chill": 0.4, "Energetic": 0.9, "Reflective": 0.2}
+
+    valence_target = mood_valence_map.get(mood, None)
+    energy_target = mood_energy_map.get(mood, None)
+
     while True:
-        results = handle_spotify_api(sp.current_user_saved_tracks, limit=50, offset=offset)
-        if not results or 'items' not in results:  # Ensure results exist and contain 'items'
+        tracks = sp.current_user_saved_tracks(limit=50, offset=offset)
+        if not tracks['items']:
             break
-        for item in results['items']:
-            track = item.get('track')
-            if track is None:  # Check if track is None
-                continue
-            audio_features = handle_spotify_api(sp.audio_features, [track['id']])
-            if audio_features and audio_features[0]:  # Check if audio_features is valid
-                liked_songs.append({
-                    "id": track.get('id', None),
-                    "name": track.get('name', "Unknown Track"),
-                    "artist": track['artists'][0]['name'] if 'artists' in track and track['artists'] else "Unknown Artist",
-                    "cover": track['album']['images'][0]['url'] if 'album' in track and track['album']['images'] else None,
-                    "energy": audio_features[0].get("energy", 0.5),
-                    "valence": audio_features[0].get("valence", 0.5),
-                    "tempo": audio_features[0].get("tempo", 120),
-                    "popularity": track.get('popularity', 0)
-                })
-        offset += 50  # Move to the next set of tracks
-    return liked_songs
-
-# Function to fetch top items (tracks or artists) for the authenticated user
-@st.cache_data
-def get_all_top_items(sp, item_type='tracks', time_range='short_term'):
-    top_items = []
-    offset = 0
-    while True:
-        if item_type == 'tracks':
-            results = handle_spotify_api(sp.current_user_top_tracks, time_range=time_range, limit=50, offset=offset)
-        elif item_type == 'artists':
-            results = handle_spotify_api(sp.current_user_top_artists, time_range=time_range, limit=50, offset=offset)
-        
-        if not results or 'items' not in results:  # Check if results and items exist
-            break
-        for item in results['items']:
-            if item_type == 'tracks':
-                top_items.append({
-                    'id': item.get('id', None),
-                    'name': item.get('name', "Unknown Track"),
-                    'artist': item['artists'][0]['name'] if 'artists' in item and item['artists'] else "Unknown Artist",
-                    'popularity': item.get('popularity', 0),
-                    'cover': item['album']['images'][0]['url'] if 'album' in item and item['album']['images'] else None,
-                    'tempo': item.get('tempo', 120)
-                })
-            elif item_type == 'artists':
-                top_items.append({
-                    'name': item.get('name', "Unknown Artist"),
-                    'genres': item.get('genres', ['Unknown Genre']),
-                    'cover': item['images'][0]['url'] if 'images' in item and item['images'] else None
-                })
-        offset += 50  # Move to the next set of items
-    return top_items
-
-# Function to display songs with their cover images
-def display_songs_with_cover(song_list, title):
-    st.write(f"### {title}")
-    if song_list:
-        for song in song_list:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                if song.get("cover"):
-                    st.image(song["cover"], width=80)
-                else:
-                    st.write("No cover")
-            with col2:
-                song_name = song.get("name", "Unknown Song")
-                artist_name = song.get("artist", "Unknown Artist")
-                st.write(f"**{song_name}** by {artist_name}")
-    else:
-        st.write("No songs found.")
-
-# Function to discover new songs based on mood and intensity
-def discover_new_songs(sp, mood, intensity):
-    top_tracks = get_all_top_items(sp, item_type='tracks', time_range='short_term')
-    
-    # Define mood and intensity mapping
-    mood_valence_map = {"Happy": 0.8, "Calm": 0.3, "Energetic": 0.7, "Sad": 0.2}
-    mood_energy_map = {"Happy": 0.7, "Calm": 0.4, "Energetic": 0.9, "Sad": 0.3}
-    
-    valence_target = mood_valence_map.get(mood, 0.5) * intensity / 5
-    energy_target = mood_energy_map.get(mood, 0.5) * intensity / 5
-
-    seed_tracks = [track['id'] for track in top_tracks if track.get('id')]
-
-    if seed_tracks:
-        # Shuffle and use only up to 5 seed tracks
-        random.shuffle(seed_tracks)
-        seed_tracks = seed_tracks[:5]
-
-        try:
-            recommendations = handle_spotify_api(
-                sp.recommendations,
-                seed_tracks=seed_tracks,
-                limit=10,
-                target_energy=energy_target,
-                target_valence=valence_target
-            )
-            
-            # Check if recommendations were successful
-            if recommendations and 'tracks' in recommendations:
-                new_songs = []
-                for rec in recommendations['tracks']:
-                    new_songs.append({
-                        "name": rec.get('name', "Unknown Track"),
-                        "artist": rec['artists'][0]['name'] if 'artists' in rec and rec['artists'] else "Unknown Artist",
-                        "cover": rec['album']['images'][0]['url'] if 'album' in rec and rec['album']['images'] else None
+        for item in tracks['items']:
+            track = item['track']
+            features = sp.audio_features([track['id']])[0]
+            if features:
+                if (not mood or abs(features['valence'] - valence_target) < 0.2) and \
+                   (not intensity or abs(features['energy'] - (intensity / 5)) < 0.2):
+                    results.append({
+                        'name': track['name'],
+                        'artist': track['artists'][0]['name'],
+                        'cover': track['album']['images'][0]['url'] if track['album']['images'] else None
                     })
+        offset += 50
+    return results
 
-                display_songs_with_cover(new_songs, "New Songs Based on Your Mood")
+# Function to analyze mood-based insights
+def analyze_mood_and_insights(sp):
+    top_tracks = sp.current_user_top_tracks(limit=50, time_range='medium_term')['items']
+    mood_counts = {"Happy": 0, "Chill": 0, "Energetic": 0, "Reflective": 0}
+    artist_contributions = {}
+
+    for track in top_tracks:
+        features = sp.audio_features([track['id']])[0]
+        if features:
+            valence = features['valence']
+            energy = features['energy']
+            if valence > 0.7 and energy > 0.6:
+                mood_counts['Happy'] += 1
+            elif valence < 0.4 and energy < 0.5:
+                mood_counts['Reflective'] += 1
+            elif energy > 0.7:
+                mood_counts['Energetic'] += 1
             else:
-                st.write("No recommendations found based on your mood.")
-        except Exception as e:
-            st.error(f"Error fetching recommendations: {e}")
-    else:
-        st.write("Not enough data to recommend new songs.")
+                mood_counts['Chill'] += 1
+            
+            artist = track['artists'][0]['name']
+            artist_contributions[artist] = artist_contributions.get(artist, 0) + 1
 
-# Main app logic
+    mood_of_week = max(mood_counts, key=mood_counts.get)
+    top_artist = max(artist_contributions, key=artist_contributions.get)
+
+    return mood_counts, mood_of_week, top_artist
+
 if is_authenticated():
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
-    tab1, tab2, tab3 = st.tabs([
-        "Liked Songs & New Discoveries", 
-        "Top Songs, Artists & Genres", 
-        "Your Music Personality"
-    ])
+    # Page 1: Filter Liked Songs
+    with st.sidebar:
+        selected_page = st.radio("Navigate", ["Filter Liked Songs", "Mood Insights & Therapy"])
 
-    with tab1:
-        option = st.radio("Choose Option:", ["Liked Songs", "Discover New Songs"])
-        mood = st.selectbox("Choose your mood:", ["Happy", "Calm", "Energetic", "Sad"])
-        intensity = st.slider("Choose intensity:", 1, 5, 3)
+    if selected_page == "Filter Liked Songs":
+        st.title("Filter Liked Songs")
 
-        if option == "Liked Songs":
-            liked_songs = get_all_liked_songs(sp)
-            filtered_liked_songs = random.sample(liked_songs, min(len(liked_songs), 20))  # Limit and shuffle for display
-            display_songs_with_cover(filtered_liked_songs, "Your Liked Songs")
-        elif option == "Discover New Songs":
-            discover_new_songs(sp, mood, intensity)
+        mood = st.selectbox("Choose your mood", ["Happy", "Chill", "Energetic", "Reflective"])
+        intensity = st.slider("Choose intensity", 1, 5, 3)
 
-    with tab2:
-        time_filter = st.selectbox("Select Time Period:", ["This Week", "This Month", "This Year"])
-        time_mapping = {'This Week': 'short_term', 'This Month': 'medium_term', 'This Year': 'long_term'}
-        display_top_insights_with_genres(sp, time_range=time_mapping[time_filter])
+        filtered_songs = get_all_liked_songs(sp, mood, intensity)
+        st.write("### Filtered Songs")
+        for song in filtered_songs:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if song['cover']:
+                    st.image(song['cover'], width=80)
+            with col2:
+                st.write(f"**{song['name']}** by {song['artist']}")
+
+    elif selected_page == "Mood Insights & Therapy":
+        st.title("Mood Insights & Therapy Overview")
+
+        mood_counts, mood_of_week, top_artist = analyze_mood_and_insights(sp)
+
+        st.write("### Mood Snapshot")
+        st.write(f"**Mood of the Week:** {mood_of_week} (Top Artist: {top_artist})")
+        st.write("Mood Breakdown:")
+        for mood, count in mood_counts.items():
+            st.write(f"{mood}: {count} tracks")
+
+        st.write("### Fun Insights")
+        st.write("**What Your Music Says About You:**")
+        st.write(f"You're a {mood_of_week} personality! Your top tracks show your affinity for {mood_of_week.lower()} vibes.")
+        
+        st.write("### Interactive Mood Input")
+        selected_mood = st.selectbox("How are you feeling now?", ["Happy", "Chill", "Energetic", "Reflective"])
+        if st.button("Get Playlist Recommendation"):
+            recommendations = get_all_liked_songs(sp, mood=selected_mood, intensity=3)
+            st.write(f"### Recommended Songs for {selected_mood} Mood")
+            for song in recommendations:
+                st.write(f"**{song['name']}** by {song['artist']}")
 
 else:
-    st.write("Welcome to Wvvy")
-    st.write("Login to explore your personalized music experience.")
+    st.title("Welcome to Mood Music Insights")
     authenticate_user()
