@@ -55,19 +55,20 @@ def refresh_token():
 def is_authenticated():
     return 'token_info' in st.session_state and st.session_state['token_info']
 
-# Function to authenticate user
 def authenticate_user():
     query_params = st.query_params
     if "code" in query_params:
         code = query_params["code"][0]
         token_info = sp_oauth.get_access_token(code)
         st.session_state['token_info'] = token_info
-        st.query_params.clear()  # Clear the query params
+        # Clear query parameters indirectly by resetting the URL
+        st.write("<script>history.replaceState({}, '', window.location.pathname);</script>", unsafe_allow_html=True)
         st.success("Authentication successful! Reloading...")
-        st.experimental_rerun()
+        st.experimental_rerun()  # If Streamlit fully supports rerun, retain this; otherwise, refresh manually
     else:
         auth_url = sp_oauth.get_authorize_url()
         st.markdown(f'<a href="{auth_url}" target="_self" class="button">Login with Spotify</a>', unsafe_allow_html=True)
+
 
 # Fetch all liked songs and analyze based on mood and intensity
 def get_all_liked_songs(sp, mood=None, intensity=None):
