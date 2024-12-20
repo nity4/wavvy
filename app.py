@@ -56,7 +56,7 @@ def is_authenticated():
     return 'token_info' in st.session_state and st.session_state['token_info']
 
 def authenticate_user():
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params
     if "code" in query_params:
         code = query_params["code"][0]
         token_info = sp_oauth.get_access_token(code)
