@@ -81,12 +81,27 @@ def get_all_liked_songs(sp, mood=None, intensity=None):
     energy_target = mood_energy_map.get(mood, None)
 
     while True:
-        tracks = sp.current_user_saved_tracks(limit=50, offset=offset)
+        try:
+            tracks = sp.current_user_saved_tracks(limit=50, offset=offset)
+        except spotipy.exceptions.SpotifyException as e:
+            st.error("Error fetching saved tracks. Please check your Spotify connection.")
+            return []
+
         if not tracks['items']:
             break
+
         for item in tracks['items']:
             track = item['track']
-            features = sp.audio_features([track['id']])
+            track_id = track.get('id')
+            if not track_id:
+                continue  # Skip tracks with no valid ID
+
+            try:
+                features = sp.audio_features([track_id])
+            except spotipy.exceptions.SpotifyException as e:
+                st.warning(f"Error fetching audio features for track ID {track_id}. Skipping...")
+                continue
+
             if features and features[0]:
                 feature = features[0]
                 if (not mood or abs(feature['valence'] - valence_target) < 0.2) and \
@@ -97,7 +112,9 @@ def get_all_liked_songs(sp, mood=None, intensity=None):
                         'cover': track['album']['images'][0]['url'] if track['album']['images'] else None
                     })
         offset += 50
+
     return results
+
 
 # Function to analyze mood-based insights
 def analyze_mood_and_insights(sp):
