@@ -82,10 +82,11 @@ def get_all_liked_songs(sp, mood=None, intensity=None):
             break
         for item in tracks['items']:
             track = item['track']
-            features = sp.audio_features([track['id']])[0]
-            if features:
-                if (not mood or abs(features['valence'] - valence_target) < 0.2) and \
-                   (not intensity or abs(features['energy'] - (intensity / 5)) < 0.2):
+            features = sp.audio_features([track['id']])
+            if features and features[0]:
+                feature = features[0]
+                if (not mood or abs(feature['valence'] - valence_target) < 0.2) and \
+                   (not intensity or abs(feature['energy'] - (intensity / 5)) < 0.2):
                     results.append({
                         'name': track['name'],
                         'artist': track['artists'][0]['name'],
@@ -101,10 +102,11 @@ def analyze_mood_and_insights(sp):
     artist_contributions = {}
 
     for track in top_tracks:
-        features = sp.audio_features([track['id']])[0]
-        if features:
-            valence = features['valence']
-            energy = features['energy']
+        features = sp.audio_features([track['id']])
+        if features and features[0]:
+            feature = features[0]
+            valence = feature['valence']
+            energy = feature['energy']
             if valence > 0.7 and energy > 0.6:
                 mood_counts['Happy'] += 1
             elif valence < 0.4 and energy < 0.5:
@@ -125,9 +127,8 @@ def analyze_mood_and_insights(sp):
 if is_authenticated():
     sp = spotipy.Spotify(auth=st.session_state['token_info']['access_token'])
 
-    # Page 1: Filter Liked Songs
-    with st.sidebar:
-        selected_page = st.radio("Navigate", ["Filter Liked Songs", "Mood Insights & Therapy"])
+    # Page navigation at the top
+    selected_page = st.radio("Navigate", ["Filter Liked Songs", "Mood Insights & Therapy"], horizontal=True)
 
     if selected_page == "Filter Liked Songs":
         st.title("Filter Liked Songs")
