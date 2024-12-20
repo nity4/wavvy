@@ -22,9 +22,9 @@ sp_oauth = SpotifyOAuth(
 )
 
 # Set Streamlit page configuration
-st.set_page_config(page_title="Mood Music Insights", layout="wide")
+st.set_page_config(page_title="Spot-YourMood-ify", layout="wide")
 
-# Custom CSS for black and green-Spotify theme
+# Custom CSS for black and green-Spotify theme with white heading
 st.markdown(
     """
     <style>
@@ -34,6 +34,9 @@ st.markdown(
     }
     .stApp {
         background: linear-gradient(to right, black, #1DB954);
+        color: white;
+    }
+    h1, h2, h3, h4, h5, h6 {
         color: white;
     }
     </style>
@@ -170,5 +173,5 @@ if is_authenticated():
                 st.write(f"**{song['name']}** by {song['artist']}")
 
 else:
-    st.title("Welcome to Mood Music Insights")
+    st.title("Welcome to Spot-YourMood-ify")
     authenticate_user()
