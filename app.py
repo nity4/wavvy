@@ -62,7 +62,7 @@ def authenticate_user():
         code = query_params["code"][0]
         token_info = sp_oauth.get_access_token(code)
         st.session_state['token_info'] = token_info
-        st.experimental_set_query_params()  # Clear the query params
+        st.query_params.clear()  # Clear the query params
         st.success("Authentication successful! Reloading...")
         st.experimental_rerun()
     else:
