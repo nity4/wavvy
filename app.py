@@ -70,6 +70,14 @@ def authenticate_user():
         st.markdown(f'<a href="{auth_url}" target="_self" class="button">Login with Spotify</a>', unsafe_allow_html=True)
 
 
+# Function to refresh token if needed
+def refresh_token_if_needed():
+    token_info = st.session_state.get("token_info", None)
+    if token_info and sp_oauth.is_token_expired(token_info):
+        new_token = sp_oauth.refresh_access_token(token_info["refresh_token"])
+        st.session_state["token_info"] = new_token
+
+# Function to get all liked songs
 def get_all_liked_songs(sp, mood=None, intensity=None):
     results = []
     offset = 0
@@ -115,6 +123,15 @@ def get_all_liked_songs(sp, mood=None, intensity=None):
         time.sleep(0.2)  # Avoid hitting rate limits
 
     return results
+
+# Usage
+if is_authenticated():
+    refresh_token_if_needed()
+    sp = spotipy.Spotify(auth=st.session_state["token_info"]["access_token"])
+
+    mood = "Happy"  # Example mood
+    intensity = 3  # Example intensity
+    filtered_songs = get_all_liked_songs(sp, mood, intensity)
 
 
 # Function to analyze mood-based insights
