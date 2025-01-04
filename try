@@ -1,0 +1,69 @@
+# Vogel's Approximation Method (VAM) implementation
+# Supply and Demand arrays
+supply = [15, 25, 10]
+demand = [5, 15, 15, 15]
+
+# Cost matrix
+cost_matrix = [
+    [10, 2, 20, 11],
+    [12, 7, 9, 20],
+    [4, 14, 16, 18]
+]
+
+# Initialize the result matrix with zeroes (representing the number of truckloads to transport)
+result_matrix = [[0] * 4 for _ in range(3)]
+
+# Create copies of the supply and demand for manipulation
+supply_copy = supply[:]
+demand_copy = demand[:]
+
+# Initialize total cost
+total_cost = 0
+
+# Function to calculate penalty (difference between two smallest costs in each row/column)
+def calculate_penalty(matrix, is_row):
+    penalties = []
+    if is_row:  # Row-wise penalty
+        for row in matrix:
+            sorted_row = sorted(row)
+            penalties.append(sorted_row[1] - sorted_row[0] if len(sorted_row) > 1 else 0)
+    else:  # Column-wise penalty
+        for col in zip(*matrix):  # Transpose to process columns as rows
+            sorted_col = sorted(col)
+            penalties.append(sorted_col[1] - sorted_col[0] if len(sorted_col) > 1 else 0)
+    return penalties
+
+# Apply Vogel's Approximation Method to fill the result matrix
+while sum(supply_copy) > 0 and sum(demand_copy) > 0:
+    # Calculate penalties for rows and columns
+    row_penalties = calculate_penalty(cost_matrix, is_row=True)
+    col_penalties = calculate_penalty(cost_matrix, is_row=False)
+
+    # Find the largest penalty
+    if max(row_penalties) >= max(col_penalties):
+        # Process the row with the largest penalty
+        row_index = row_penalties.index(max(row_penalties))
+        min_cost_col = cost_matrix[row_index].index(min(cost_matrix[row_index]))  # Find the column with minimum cost
+    else:
+        # Process the column with the largest penalty
+        col_index = col_penalties.index(max(col_penalties))
+        min_cost_row = [cost_matrix[row][col_index] for row in range(3)].index(min([cost_matrix[row][col_index] for row in range(3)]))  # Find the row with minimum cost
+    
+    # Allocate the amount to transport
+    if max(row_penalties) >= max(col_penalties):  # Row-wise allocation
+        move = min(supply_copy[row_index], demand_copy[min_cost_col])
+        result_matrix[row_index][min_cost_col] = move
+        supply_copy[row_index] -= move
+        demand_copy[min_cost_col] -= move
+        total_cost += move * cost_matrix[row_index][min_cost_col]
+    else:  # Column-wise allocation
+        move = min(supply_copy[min_cost_row], demand_copy[col_index])
+        result_matrix[min_cost_row][col_index] = move
+        supply_copy[min_cost_row] -= move
+        demand_copy[col_index] -= move
+        total_cost += move * cost_matrix[min_cost_row][col_index]
+
+# Display the result matrix and the total cost
+tools.display_dataframe_to_user(name="Vogel's Approximation Solution", dataframe=pd.DataFrame(result_matrix, columns=["Chicago", "St. Louis", "Cincinnati", "Detroit"], index=["Kansas City", "Omaha", "Des Moines"]))
+
+total_cost
