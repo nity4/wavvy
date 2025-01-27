@@ -68,6 +68,7 @@ def authenticate_user():
         except spotipy.exceptions.SpotifyOauthError as e:
             st.error(f"Authentication failed: {e}")
             st.error(f"Error details: {e.args}")
+            st.warning("Please reauthorize by logging in again.")
         return
     else:
         auth_url = sp_oauth.get_authorize_url()
