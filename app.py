@@ -59,11 +59,15 @@ def authenticate_user():
     query_params = st.query_params
     if "code" in query_params:
         code = query_params["code"][0]
-        token_info = sp_oauth.get_access_token(code)
-        st.session_state['token_info'] = token_info
-        # Clear query parameters indirectly by resetting the URL
-        st.write("<script>history.replaceState({}, '', window.location.pathname);</script>", unsafe_allow_html=True)
-        st.success("Authentication successful! Please reload the page.")
+        try:
+            token_info = sp_oauth.get_access_token(code)
+            st.session_state['token_info'] = token_info
+            # Clear query parameters indirectly by resetting the URL
+            st.write("<script>history.replaceState({}, '', window.location.pathname);</script>", unsafe_allow_html=True)
+            st.success("Authentication successful! Please reload the page.")
+        except spotipy.exceptions.SpotifyOauthError as e:
+            st.error(f"Authentication failed: {e}")
+            st.error(f"Error details: {e.args}")
         return
     else:
         auth_url = sp_oauth.get_authorize_url()
